@@ -16,7 +16,7 @@ class Course:
 
     def min_id():
         """
-        Returns the maximum number for the course IDs (always 0)
+        Returns the minimum number for the course IDs (always 0)
         """
         return 0
 
