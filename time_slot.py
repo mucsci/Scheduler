@@ -65,12 +65,14 @@ class TimeSlot:
             - `TR`: a course is only offered as two 110-minute meetings
         """
         def init_class_time() -> List[Tuple[Day, int, int]]:
+            SHORT = 50
+            LONG = 110
             if class_time == ClassTime.MF_EARLY:
-                return [(two_hour_day, start_time, 110), (Day.MON, start_time - (start_time % 60), 50), (Day.FRI, start_time - (start_time % 60), 50)]
+                return [(two_hour_day, start_time, LONG), (Day.MON, start_time - (start_time % 60), SHORT), (Day.FRI, start_time - (start_time % 60), SHORT)]
             elif class_time == ClassTime.MF_LATE:
-                return [(two_hour_day, start_time, 110), (Day.MON, start_time - (start_time % 60) + 60, 50), (Day.FRI, start_time - (start_time % 60) + 60, 50)]
+                return [(two_hour_day, start_time, LONG), (Day.MON, start_time - (start_time % 60) + 60, SHORT), (Day.FRI, start_time - (start_time % 60) + 60, SHORT)]
             else:
-                return [(two_hour_day, start_time, 110), (Day.TUE ^ Day.THU ^ two_hour_day, start_time, 110)]
+                return [(two_hour_day, start_time, LONG), (Day.TUE ^ Day.THU ^ two_hour_day, start_time, LONG)]
         self._times = init_class_time()
     
     def __init__(self, two_hour_day : Day, hour : int, minute : int, class_time: ClassTime):
@@ -141,10 +143,10 @@ class TimeSlot:
         """
         d1, t1, dur1 = a
         d2, t2, dur2 = b
-        return d1 == d2 and ((t1 <= t2 < t1 + dur1) or
-                    (t1 <= t2 + dur2 < t1 + dur1) or
-                    (t2 <= t1 < t2 + dur2) or
-                    (t2 <= t1 + dur1 < t2 + dur2))
+        return d1 == d2 and ((t1 < t2 < t1 + dur1) or
+                    (t1 < t2 + dur2 < t1 + dur1) or
+                    (t2 < t1 < t2 + dur2) or
+                    (t2 < t1 + dur1 < t2 + dur2))
 
     def in_time_range(self, mask : Day, start : int, stop : int) -> bool:
         """
@@ -152,7 +154,7 @@ class TimeSlot:
         """
         if any(not (mask & d) for (d, _, _) in self.times()):
             return False
-        return all(start <= t and t + dur < stop for (_, t, dur) in self.times())
+        return all(start <= t and t + dur <= stop for (_, t, dur) in self.times())
 
     def __repr__(self) -> str:
         return ','.join(f'{day.name} {t // 60:02d}:{t % 60:02d}-{(t + d) // 60:02d}:{(t + d) % 60:02d}' for (day, t, d) in self.times())
