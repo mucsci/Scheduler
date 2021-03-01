@@ -7,11 +7,11 @@
 class Lab:
 
     _all = dict()
-    lab_id = 200
+    _lab_id = 200
 
     def min_id():
         """
-        Returns the maximum number for the lab IDs (always 200)
+        Returns the minimum number for the lab IDs (always 200)
         """
         return 200
 
@@ -19,7 +19,7 @@ class Lab:
         """
         Returns the maximum number for the lab IDs
         """
-        return Lab.lab_id - 1
+        return Lab._lab_id - 1
 
     def get(id):
         """
@@ -29,8 +29,8 @@ class Lab:
 
     def __init__(self, name: str):
         # update id to be a unique identifier
-        self.id = Lab.lab_id
-        Lab.lab_id += 1
+        self.id = Lab._lab_id
+        Lab._lab_id += 1
         self.name = name
         Lab._all[self.id] = self
 

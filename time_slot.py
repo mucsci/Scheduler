@@ -17,19 +17,14 @@ class Day(IntFlag):
     THU = auto()
     FRI = auto()
 
-class ClassTime(Enum):
-    MF_EARLY = auto()
-    MF_LATE = auto()
-    TR = auto()
-
 class TimeSlot:
 
-    time_slot_id = 0
+    _time_slot_id = 0
     _all = dict()
 
     def min_id():
         """
-        Returns the maximum number for the course IDs (always 0)
+        Returns the minimum number for the course IDs (always 0)
         """
         return 0
 
@@ -37,7 +32,7 @@ class TimeSlot:
         """
         Returns the maximum number for the course IDs
         """
-        return TimeSlot.time_slot_id - 1
+        return TimeSlot._time_slot_id - 1
 
     
     def get(id):
@@ -45,57 +40,35 @@ class TimeSlot:
         Given an ID of a time slot, return the instance
         """
         return TimeSlot._all[id]
+
+    @classmethod
+    def make_mwf(cls, hour, minute, duration):
+        return cls(*((d, hour, minute, duration) for d in [Day.MON, Day.WED, Day.FRI]))
     
-    """
-    A time slot class used to represent when a class can be held
-    """
-    def _make(self, two_hour_day : Day, start_time : int, class_time : ClassTime):
+    @classmethod
+    def make_tr(cls, hour, minute, duration, lab_index = -1):
+        return cls(*((d, hour, minute, duration) for d in [Day.TUE, Day.THU]), lab_index=lab_index)
+    
+    @classmethod
+    def make_mw(cls, hour, minute, duration, lab_index = -1):
+        return cls(*((d, hour, minute, duration) for d in [Day.MON, Day.WED]), lab_index=lab_index)
+    
+    def __init__(self, *times, lab_index = -1):
         """Constructs a time slot. For the sake of the CS department, we are guaranteed to have exactly one two-hour day.
 
         Parameters
         ----------
-        two_hour_day : Day
-            which day has a two-hour period that may be a lab
-        start_time : int
-            an integral number representing the time in minutes of the day
-        class_time: ClassTime
-            an enumeration specifying when the class will meet on the non-two-hour-day
-            - `MF_EARLY`: the 50-minute meetings are during the early half of the period
-            - `MF_LATE`: the 50-minute meetings are during the late half of the period
-            - `TR`: a course is only offered as two 110-minute meetings
+        times : vararg of (Day, hour, minute, duration) tuples
+            meeting times
+        lab_index : int = -1
+            an integral number representing index of which a lab period occurs (or none at all)
         """
-        def init_class_time() -> List[Tuple[Day, int, int]]:
-            SHORT = 50
-            LONG = 110
-            if class_time == ClassTime.MF_EARLY:
-                return [(two_hour_day, start_time, LONG), (Day.MON, start_time - (start_time % 60), SHORT), (Day.FRI, start_time - (start_time % 60), SHORT)]
-            elif class_time == ClassTime.MF_LATE:
-                return [(two_hour_day, start_time, LONG), (Day.MON, start_time - (start_time % 60) + 60, SHORT), (Day.FRI, start_time - (start_time % 60) + 60, SHORT)]
-            else:
-                return [(two_hour_day, start_time, LONG), (Day.TUE ^ Day.THU ^ two_hour_day, start_time, LONG)]
-        self._times = init_class_time()
-    
-    def __init__(self, two_hour_day : Day, hour : int, minute : int, class_time: ClassTime):
-        """Constructs a time slot. For the sake of the CS department, we are guaranteed to have exactly one two-hour day.
+        self.id = TimeSlot._time_slot_id
+        self._lab_index = lab_index
+        self._times = list((t[0], hhmm_to_timeid(t[1], t[2]), t[3]) for t in times)
 
-        Parameters
-        ----------
-        two_hour_day : Day
-            which day has a two-hour period that may be a lab
-        hour : int
-            an integral number representing the hour in which the class starts
-        minute : int
-            an integral number representing the minute of the hour in which the class starts
-        class_time: ClassTime
-            an enumeration specifying when the class will meet on the non-two-hour-day
-            - `MF_EARLY`: the 50-minute meetings are during the early half of the period
-            - `MF_LATE`: the 50-minute meetings are during the late half of the period
-            - `TR`: a course is only offered as two 110-minute meetings
-        """
         # update id to be a unique identifier
-        self.id = TimeSlot.time_slot_id
-        TimeSlot.time_slot_id += 1
-        self._make(two_hour_day, hhmm_to_timeid(hour, minute), class_time)
+        TimeSlot._time_slot_id += 1
         TimeSlot._all[self.id] = self
 
     def times(self) -> List[Tuple[Day, int, int]]:
@@ -104,20 +77,33 @@ class TimeSlot:
         """
         return self._times
     
-    def two_hour_time(self) -> Tuple[Day, int, int]:
+    def lab_time(self) -> Tuple[Day, int, int]:
         """
         Returns only the two hour time (if necessary) for a lab
         """
-        return self.times()[0]
+        if self._lab_index >= 0:
+            return self.times()[self._lab_index]
+        else:
+            return None
+    
+    def has_lab(self) -> bool:
+        return self._lab_index > 0
 
     def next_to(self, other) -> bool:
         """
         Check if a time slot is logically next to another (same day + adjacent or next day + same time)
         """
-        [d1, t1, _] = self.two_hour_time()
-        [d2, t2, _] = other.two_hour_time()
-        #       same day     within 180 minutes      different day within 60 minutes
-        return (d1 == d2 and abs(t1 - t2) <= 180) or abs(t1 - t2) <= 60
+        if self.has_lab() and other.has_lab():
+            def range(t):
+                return t[0], t[1], t[1] + t[2] - 1
+            day1, start1, stop1 = range(self.lab_time())
+            day2, start2, stop2 = range(other.lab_time())
+            # calculate time gap between for same day
+            diff_same_day = min(abs(start1 - stop2), abs(start2 - stop1))
+            diff_diff_day = abs(start1 - start2)
+            return (day1 == day2 and diff_same_day <= 70) or (day1 != day2 and diff_diff_day <= 70)
+        else:
+            return False
 
     def overlaps(self, other) -> bool:
         """
@@ -129,24 +115,32 @@ class TimeSlot:
         """
         Returns true IFF this timeslot's two-hour block has any overlap with the passed time slot's two-hour block
         """
-        return TimeSlot._overlaps(self.two_hour_time(), other.two_hour_time())
+        l1 = self.lab_time()
+        l2 = other.lab_time()
+        return l1 and l2 and TimeSlot._overlaps(l1, l2)
 
     def labs_on_same_day(self, other) -> bool:
         """
         Returns true IFF the labs of this timeslot and the passed are on the same day
         """
-        return self.two_hour_time()[0] == other.two_hour_time()[0]
+        return self.has_lab() and other.has_lab() and self.lab_time()[0] == other.lab_time()[0]
 
     def _overlaps(a, b) -> bool:
         """
         Internal utility function that returns true if two time slot instances overlap
         """
-        d1, t1, dur1 = a
-        d2, t2, dur2 = b
-        return d1 == d2 and ((t1 < t2 < t1 + dur1) or
-                    (t1 < t2 + dur2 < t1 + dur1) or
-                    (t2 < t1 < t2 + dur2) or
-                    (t2 < t1 + dur1 < t2 + dur2))
+        def range(t):
+            return t[0], t[1], t[1] + t[2] - 1
+        
+        day1, start1, stop1 = range(a)
+        day2, start2, stop2 = range(b)
+
+        return (day1 == day2) and (
+            (start1 <= start2 <= stop1) or
+            (start2 <= start1 <= stop2) or
+            (start1 < stop2 <= stop1) or
+            (start2 < stop1 <= stop2)
+        )
 
     def in_time_range(self, mask : Day, start : int, stop : int) -> bool:
         """
@@ -157,4 +151,4 @@ class TimeSlot:
         return all(start <= t and t + dur <= stop for (_, t, dur) in self.times())
 
     def __repr__(self) -> str:
-        return ','.join(f'{day.name} {t // 60:02d}:{t % 60:02d}-{(t + d) // 60:02d}:{(t + d) % 60:02d}' for (day, t, d) in self.times())
+        return ','.join(f'{day.name} {t // 60:02d}:{t % 60:02d}-{(t + d) // 60:02d}:{(t + d) % 60:02d}{"*" if i == self._lab_index else ""}' for i,(day, t, d) in enumerate(self.times()))

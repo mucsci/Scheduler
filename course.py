@@ -11,8 +11,8 @@ import z3
 class Course:
 
     _all = dict()
-    total_sections = defaultdict(int)
-    course_id = 0
+    _total_sections = defaultdict(int)
+    _course_id = 0
 
     def min_id():
         """
@@ -24,7 +24,7 @@ class Course:
         """
         Returns the maximum number for the course IDs
         """
-        return Course.course_id - 1
+        return Course._course_id - 1
     
     def get(id):
         """
@@ -32,15 +32,16 @@ class Course:
         """
         return Course._all[id]
     
-    def __init__(self, subj : str, num : int, labs : List[str], rooms : List[str], faculty: str, conflicts : List[int]):
+    def __init__(self, credits : int, subj : str, num : int, labs : List[str], rooms : List[str], faculty: str, conflicts : List[int]):
         # update id to be a unique identifier
-        self.id = Course.course_id
-        Course.course_id += 1
+        self.id = Course._course_id
+        Course._course_id += 1
+        self.credits = credits
         # set subject, name, and section
         self.subject = subj
         self.num = num
-        Course.total_sections[num] += 1
-        self.section = Course.total_sections[num]
+        Course._total_sections[num] += 1
+        self.section = Course._total_sections[num]
         self.labs = labs
         self.rooms = rooms
         self.conflicts = conflicts

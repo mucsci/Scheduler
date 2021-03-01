@@ -7,7 +7,7 @@
 from course import Course
 from lab import Lab
 from room import Room
-from time_slot import Day, TimeSlot
+from time_slot import Day, TimeSlot, hhmm_to_timeid
 from config import time_slots
 
 import json
@@ -22,32 +22,43 @@ def load(filename):
         data = json.load(f)
         ROOMS = {r : Room(r) for r in data['rooms']}
         LABS = {l : Lab(l) for l in data['labs']}
-        COURSES = [Course(*(c[v] for v in ["subj","num","lab","room","faculty","conflicts"])) for c in data['courses']]
+        COURSES = [Course(*(c[v] for v in ["credits","subj","num","lab","room","faculty","conflicts"])) for c in data['courses']]
         
         def get_info(person):
             days = [Day.MON, Day.TUE, Day.WED, Day.THU, Day.FRI]
             masked = functools.reduce(operator.or_, (d for d, m in zip(days, person['days']) if m))
             low, high = person['times']
-            return masked, low * 60, high * 60
+            return masked, hhmm_to_timeid(*low), hhmm_to_timeid(*high)
         FACULTY = { x : get_info(data['faculty'][x]) for x in data['faculty']}
         return (ROOMS, LABS, COURSES, FACULTY)
-
-
 
 def z3ify_time_constraint(name: str, fn):
     constraints = []
     z3fn = z3.Function(name, z3.IntSort(), z3.IntSort(), z3.BoolSort())
-    for i, j in itertools.combinations(ALL_SLOTS, 2):
-        ii, jj = z3.IntVal(i.id), z3.IntVal(j.id)
-        if fn(i, j):
-            constraints += [z3fn(ii, jj), z3fn(jj, ii)]
-        else:
-            constraints += [z3.Not(z3fn(ii, jj)), z3.Not(z3fn(jj, ii))]
-    for i in ALL_SLOTS:
-        ii = z3.IntVal(i.id)
-        constraints += [z3fn(ii, ii)]
-    return z3fn, constraints
+    def generate():
+        for i, j in itertools.combinations(ALL_SLOTS, 2):
+            ii, jj = z3.IntVal(i.id), z3.IntVal(j.id)
+            if fn(i, j):
+                yield z3fn(ii, jj)
+                yield z3fn(jj, ii)
+            else:
+                yield z3.Not(z3fn(ii, jj))
+                yield z3.Not(z3fn(jj, ii))
+        for i in ALL_SLOTS:
+            ii = z3.IntVal(i.id)
+            yield z3fn(ii, ii)
+    return z3fn, list(generate())
 
+def z3ify_time_slot_fn(name: str, fn):
+    z3fn = z3.Function(name, z3.IntSort(), z3.BoolSort())
+    def generate():
+        for i in ALL_SLOTS:
+            ii = z3.IntVal(i.id)
+            if fn(i):
+                yield z3fn(ii)
+            else:
+                yield z3.Not(z3fn(ii))
+    return z3fn, list(generate())
 
 def init_data(filename: str):
     global ROOMS
@@ -55,9 +66,19 @@ def init_data(filename: str):
     global COURSES
     global FACULTY
     global ALL_SLOTS
+    global HIGH3
+    global HIGH4
+    global LOW3
+    global LOW4
 
     ROOMS, LABS, COURSES, FACULTY = load(filename)
-    ALL_SLOTS = list(time_slots())
+    LOW3 = TimeSlot.min_id()
+    three_credit = list(time_slots(3))
+    HIGH3 = TimeSlot.max_id()
+    LOW4 = HIGH3 + 1
+    four_credit = list(time_slots(4))
+    HIGH4 = TimeSlot.max_id()
+    ALL_SLOTS = three_credit + four_credit
 
 def make_constraints():
 
@@ -66,73 +87,99 @@ def make_constraints():
     labs_on_same_day, o_labs_on_same_day = z3ify_time_constraint('labs_on_same_day', TimeSlot.labs_on_same_day)
     lab_overlaps, i_constraints = z3ify_time_constraint('lab_overlaps', TimeSlot.lab_overlaps)
     next_to, n_constraints = z3ify_time_constraint('next_to', TimeSlot.next_to)
+    has_lab, l_constraints = z3ify_time_slot_fn('has_lab', TimeSlot.has_lab)
     
-    fn_constraints = o_constraints + i_constraints + n_constraints + o_labs_on_same_day
-    
+    fn_constraints = o_constraints + i_constraints + n_constraints + o_labs_on_same_day + l_constraints
+
     # basic identity constraints and bounds
     def basic_constraints():
         for c in COURSES:
-            # can the time slot be assigned?
-            yield z3.And(TimeSlot.min_id() <= c.time(), c.time() <= TimeSlot.max_id())
-            mask, start, stop = FACULTY[c.faculty]
-            # check the faculty time constraint
-            yield z3.And(*(c.time() != slot.id for slot in ALL_SLOTS if not slot.in_time_range(mask, start, stop)))
-            # add constraint that all three two-hour period must be on different days
-            # TODO -- must restrict this to NOT apply to TR-only faculty
-            if len(list(x for x in COURSES if x.faculty == c.faculty)) == 3:
-                yield z3.Or(*(z3.Not(labs_on_same_day(c.time(), d.time())) for d in COURSES if c != d and c.faculty == d.faculty))
-
-    def overlapping_constraints():
-        # - check for unique, non-overlapping timeslots for each faculty
-        for name in FACULTY.keys():
-            assigned = list(c.time() for c in COURSES if c.faculty == name)
-            yield z3.And(*(z3.Not(overlaps(i,j)) for i,j in itertools.combinations(assigned, 2)))
+            # assign the correct time slot for the number of credits
+            if c.credits == 3:
+                yield z3.And(LOW3 <= c.time(), c.time() <= HIGH3)
+            elif c.credits == 4:
+                yield z3.And(LOW4 <= c.time(), c.time() <= HIGH4)
+            
+    def faculty_constraints():
+        def assign_to_faculty():
+            for c in COURSES:
+                mask, start, stop = FACULTY[c.faculty]
+                # check the faculty time constraint
+                yield z3.simplify(z3.And(*(c.time() != slot.id for slot in ALL_SLOTS if not slot.in_time_range(mask, start, stop))))
         
+        # - check for unique, non-overlapping timeslots for each faculty
+        def non_overlapping():
+            for name in FACULTY.keys():
+                assigned = list(c.time() for c in COURSES if c.faculty == name)
+                yield z3.And(*(z3.Not(overlaps(i,j)) for i,j in itertools.combinations(assigned, 2)))
+        
+        # - ensure sections of the same class are adjacent
+        def same_adjacent():
+            for name in FACULTY.keys():
+                courses = [c for c in COURSES if c.faculty == name]
+                for i, j in itertools.combinations(courses, 2):
+                    if i.num == j.num:
+                        yield next_to(i.time(), j.time())
+        
+        # add constraint that all three two-hour period must be on different days
+        def no_crazy_days():
+            for name in FACULTY.keys():
+                if FACULTY[name][0] ^ (Day.TUE | Day.THU) or FACULTY[name][0] ^ (Day.MON | Day.WED):
+                    courses = [c for c in COURSES if c.faculty == name]
+                    if len(courses) >= 3:
+                        yield z3.simplify(z3.Not(z3.And(
+                            list(z3.Implies(z3.And(has_lab(c.time()), has_lab(d.time())), labs_on_same_day(c.time(), d.time())) for c,d in itertools.combinations(courses, 2))
+                        )))
+
+        yield from assign_to_faculty()
+        yield from non_overlapping()
+        yield from same_adjacent()
+        # NOTE: may need to comment this out
+        yield from no_crazy_days()        
+
+    def conflict_constraints():
+
         # - check the other courses time slot constraint(s)
         for c in COURSES:
             for conflict_num in c.conflicts:
                 for other in filter(lambda x: x.num == conflict_num, (c for c in COURSES)):
                     yield z3.Not(overlaps(c.time(), other.time()))
 
-    def next_to_constraints():
-        # - check for unique, non-overlapping timeslots for each faculty
-        for name in FACULTY.keys():
-            courses = [c for c in COURSES if c.faculty == name]
-            for i, j in itertools.combinations(courses, 2):
-                if i.num == j.num:
-                    yield next_to(i.time(), j.time())
-
     # assign to a lab (or none)
     # - ensure no timeslot + lab conflicts exist
     def lab_assign_constraints():
-        for c in COURSES:
-            if c.labs:
-                pass
-                yield z3.Or(*(c.lab() == lab.id for name,lab in LABS.items() if name in c.labs))
-        for i, j in itertools.combinations(COURSES, 2):
-            if i.labs and j.labs:
-                yield z3.simplify(z3.Implies(i.lab() == j.lab(), z3.Not(lab_overlaps(i.time(), j.time()))))
+
+        # make all constraints for room assignment for lab
+        def gen(c):
+            for name,lab in LABS.items():
+                if name in c.labs:
+                    yield c.lab() == lab.id
+        
+        # we must assign to a lab when we have options
+        yield from (z3.simplify(z3.Or(list(gen(c)))) for c in COURSES if c.labs)
+
+        # any two courses with a lab must not have a resource overlap
+        with_labs = list(filter(lambda x: len(x.labs) >= 1, COURSES))
+        for i, j in itertools.combinations(with_labs, 2):
+            yield z3.simplify(z3.Implies(i.lab() == j.lab(), z3.Not(lab_overlaps(i.time(), j.time()))))
 
     # assign to a classroom
     # - ensure no timeslot + classroom conflicts exist
     def room_assign_constraints():
-        for c in COURSES:
-            if c.rooms:
-                yield z3.Or(*(c.room() == room.id for name,room in ROOMS.items() if name in c.rooms))
-        for i, j in itertools.combinations(COURSES, 2):
-            # use implication as the filter
-            yield z3.Implies(i.room() == j.room(), z3.Not(overlaps(i.time(), j.time())))
+        
+        # make all constraints for room assignment for lab
+        def gen(c):
+            yield from (c.room() == room.id for name,room in ROOMS.items() if name in c.rooms)
+        
+        # we must assign to a lab when we have options
+        yield from (z3.simplify(z3.Or(list(gen(c)))) for c in COURSES if c.rooms)
+        
+        # any two courses with a lab must not have a resource overlap
+        yield from (z3.Implies(overlaps(i.time(), j.time()), i.room() != j.room()) for i, j in itertools.combinations(COURSES, 2))
 
-    all_constraints = [
-        z3.simplify(z3.And(*(x for x in basic_constraints()))),
-        z3.simplify(z3.And(*(x for x in overlapping_constraints()))),
-        z3.simplify(z3.And(*(x for x in lab_assign_constraints()))),
-        z3.simplify(z3.And(*(x for x in room_assign_constraints()))),
-        # NOTE: comment out if no schedules are generated and you tweeked faculty days already
-        z3.simplify(z3.And(*(x for x in next_to_constraints())))
-    ]
-    
-    return fn_constraints + all_constraints
+    C = list(itertools.chain(basic_constraints(),faculty_constraints(),conflict_constraints(),lab_assign_constraints(),room_assign_constraints()))
+
+    return fn_constraints + C
 
 def get_models(F, M=10):
     s = z3.Solver()

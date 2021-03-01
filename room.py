@@ -7,11 +7,11 @@
 class Room:
 
     _all = dict()
-    room_id = 100
+    _room_id = 100
 
     def min_id():
         """
-        Returns the maximum number for the room IDs (always 100)
+        Returns the minimum number for the room IDs (always 100)
         """
         return 100
 
@@ -19,7 +19,7 @@ class Room:
         """
         Returns the maximum number for the room IDs
         """
-        return Room.room_id - 1
+        return Room._room_id - 1
 
     def get(id):
         """
@@ -29,8 +29,8 @@ class Room:
 
     def __init__(self, name: str):
         # update id to be a unique identifier
-        self.id = Room.room_id
-        Room.room_id += 1
+        self.id = Room._room_id
+        Room._room_id += 1
         self.name = name
         Room._all[self.id] = self
 
