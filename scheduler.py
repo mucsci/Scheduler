@@ -120,6 +120,8 @@ def make_constraints():
                 for i, j in itertools.combinations(courses, 2):
                     if i.num == j.num:
                         yield next_to(i.time(), j.time())
+                        yield i.room() == j.room()
+                        yield z3.Implies(z3.And(has_lab(i.time()), has_lab(j.time())), i.lab() == j.lab())
         
         # add constraint that all three two-hour period must be on different days
         def no_crazy_days():
@@ -187,7 +189,7 @@ def get_models(F, M=10):
     i = 0
     while i < M and s.check() == z3.sat:
         m = s.model()
-        yield i, m
+        yield i, m, s.statistics()
         i += 1
         block = []
         for d in m:
@@ -198,9 +200,6 @@ def get_models(F, M=10):
                 if not z3.is_array(c) and c.sort().kind() != z3.Z3_UNINTERPRETED_SORT:
                     block.append(c == m[d])
         s.add(z3.simplify(z3.Not(z3.And(*block))))
-    else:
-        # failed or limit -- print stats of last check
-        print(s.statistics())
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
@@ -213,8 +212,12 @@ if __name__ == '__main__':
     print("> Initialized data")
     C = make_constraints()
     print("> Made all constraints")
-    for i, m in get_models(C, limit):
+    for i, m, s in get_models(C, limit):
         print (f'Model {i}:')
+        print('  ',end='')
+        for i in ['time', 'conflicts', 'decisions', 'max memory', 'propagations']:
+            print(f'{i}:{s.get_key_value(i)}   ',end='')
+        print()
         for c in COURSES:
             timeslot = str(TimeSlot.get(m.eval(c.time()).as_long()))
             room = str(Room.get(m.eval(c.room()).as_long()))
