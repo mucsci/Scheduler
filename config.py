@@ -5,7 +5,8 @@
 # All Rights Reserved
 
 from typing import Iterable, Tuple
-from time_slot import Day, TimeSlot
+from day import Day
+from time_slot import TimeSlot
 
 # other departments (such as math) would want to define all of their
 # - 3 credit course times
@@ -25,9 +26,9 @@ def time_slots(credits) -> Iterable[Tuple[Day, int, int]]:
     elif credits == 4:
         # TR
         for (h, m) in [(8, 0), (9, 0), (10, 0), (13, 10), (14, 10), (15, 10)]:
-            yield TimeSlot.make_tr(h, m, LONG, lab_index=0)
-            yield TimeSlot.make_tr(h, m, LONG, lab_index=1)
-            for idx,lab in enumerate([Day.TUE, Day.THU]):
+            yield TimeSlot.make_tr(h, m, LONG, 0)
+            yield TimeSlot.make_tr(h, m, LONG, 1)
+            for lab in [Day.TUE, Day.THU]:
                 yield TimeSlot((Day.MON, h, 0, SHORT), (lab, h, m, LONG), (Day.FRI, h, 0, SHORT), lab_index=1)
                 yield TimeSlot((Day.MON, h + 1, 0, SHORT), (lab, h, m, LONG), (Day.FRI, h + 1, 0, SHORT), lab_index=1)
         # W
@@ -36,7 +37,7 @@ def time_slots(credits) -> Iterable[Tuple[Day, int, int]]:
             yield TimeSlot((Day.MON, h + 1, 0, SHORT), (Day.WED, h, m, LONG), (Day.FRI, h + 1, 0, SHORT), lab_index=1)
         # evenings
         for (h, m) in [(17, 0), (17, 30), (18, 0), (18, 30)]:
-            yield TimeSlot.make_mw(h, m, LONG, lab_index=0)
-            yield TimeSlot.make_mw(h, m, LONG, lab_index=1)
-            yield TimeSlot.make_tr(h, m, LONG, lab_index=0)
-            yield TimeSlot.make_tr(h, m, LONG, lab_index=1)
+            yield TimeSlot.make_mw(h, m, LONG, 0)
+            yield TimeSlot.make_mw(h, m, LONG, 1)
+            yield TimeSlot.make_tr(h, m, LONG, 0)
+            yield TimeSlot.make_tr(h, m, LONG, 1)

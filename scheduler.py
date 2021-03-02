@@ -4,6 +4,7 @@
 # Copyright 2021
 # All Rights Reserved
 
+from typing import Dict
 from course import Course
 from lab import Lab
 from room import Room
@@ -33,7 +34,6 @@ def load(filename):
         return (ROOMS, LABS, COURSES, FACULTY)
 
 def z3ify_time_constraint(name: str, fn):
-    constraints = []
     z3fn = z3.Function(name, z3.IntSort(), z3.IntSort(), z3.BoolSort())
     def generate():
         for i, j in itertools.combinations(ALL_SLOTS, 2):
@@ -201,6 +201,19 @@ def get_models(F, M=10):
                     block.append(c == m[d])
         s.add(z3.simplify(z3.Not(z3.And(*block))))
 
+def convert(map : Dict):
+    def iter():
+        for k,v in map.items():
+            if k == 'room':
+                yield (k, Room.get(map["room"]))
+            elif k == 'lab':
+                yield (k, Lab.get(map["lab"]))
+            elif k == 'time':
+                yield (k, TimeSlot.get(map["time"]))
+            else:
+                yield (k, v)
+    return dict(iter())
+
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         print(f"Usage: {sys.argv[0]} <json_config> [limit=10]")
@@ -215,15 +228,24 @@ if __name__ == '__main__':
     for i, m, s in get_models(C, limit):
         print (f'Model {i}:')
         print('  ',end='')
-        for i in ['time', 'conflicts', 'decisions', 'max memory', 'propagations']:
-            print(f'{i}:{s.get_key_value(i)}   ',end='')
-        print()
-        for c in COURSES:
-            timeslot = str(TimeSlot.get(m.eval(c.time()).as_long()))
-            room = str(Room.get(m.eval(c.room()).as_long()))
-            lab = 'None' if not c.labs else str(Lab.get(m.eval(c.lab()).as_long()))
-            print (f'{c},{c.faculty},{room},{lab},{timeslot}')
+        for j in ['time', 'conflicts', 'decisions', 'max memory', 'propagations']:
+            print(f'{j}:{s.get_key_value(j)}   ',end='')
+        print('\n')
+
+        assigned = list(convert(c.evaluate(m)) for c in COURSES)
+
+        for map in assigned:
+            print(','.join(str(map[k]) for k in ["name", "faculty", "room", "lab", "time"]))
+
+        with open(f'model{i}.json', 'w') as outfile:
+            # eval(repr()) is okay to use in some cases!
+            obj = eval(repr(assigned))
+            json.dump({'schedule' : obj }, outfile)
+
         try:
+            print()
             input('press <enter> for the next schedule (or Ctrl+D) to quit')
+            print()
+            print("> Getting next model...")
         except:
             exit(0)

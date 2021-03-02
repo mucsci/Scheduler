@@ -4,56 +4,38 @@
 # Copyright 2021
 # All Rights Reserved
 
+from os import times
+from identifiable import Identifiable
 from typing import List
 from collections import defaultdict
 import z3
 
-class Course:
+class Course(Identifiable, default_id = 0):
 
-    _all = dict()
     _total_sections = defaultdict(int)
-    _course_id = 0
 
-    def min_id():
-        """
-        Returns the minimum number for the course IDs (always 0)
-        """
-        return 0
+    @staticmethod
+    def _next_section(num):
+        Course._total_sections[num] += 1
+        return Course._total_sections[num]
 
-    def max_id():
-        """
-        Returns the maximum number for the course IDs
-        """
-        return Course._course_id - 1
-    
-    def get(id):
-        """
-        Given an ID of a course, return the instance
-        """
-        return Course._all[id]
-    
     def __init__(self, credits : int, subj : str, num : int, labs : List[str], rooms : List[str], faculty: str, conflicts : List[int]):
-        # update id to be a unique identifier
-        self.id = Course._course_id
-        Course._course_id += 1
+        # set credits, subject, name, and section
         self.credits = credits
-        # set subject, name, and section
         self.subject = subj
         self.num = num
-        Course._total_sections[num] += 1
-        self.section = Course._total_sections[num]
+        self.section = Course._next_section(num)
+        # store labs, rooms, conflicts, and faculty
         self.labs = labs
         self.rooms = rooms
         self.conflicts = conflicts
         self.faculty = faculty
-        Course._all[self.id] = self
         # z3 variables for each course -- must assign a timeslot, a room, and a lab
-        self._time = z3.Int(f'{self.__repr__()}_time')
-        self._room = z3.Int(f'{self.__repr__()}_room')
         self._lab = z3.Int(f'{self.__repr__()}_lab')
-    
+        self._room = z3.Int(f'{self.__repr__()}_room')
+        self._time = z3.Int(f'{self.__repr__()}_time')
 
-    def __repr__(self):
+    def __str__(self):
         """
         Pretty Print representation of a course is its subject, number, and section
         """
@@ -76,3 +58,9 @@ class Course:
         the z3 variable used for assigning a lab
         """
         return self._lab
+
+    def evaluate(self, m : z3.ModelRef):
+        timeslot = m.eval(self.time()).as_long()
+        room = m.eval(self.room()).as_long()
+        lab = None if not self.labs else m.eval(self.lab()).as_long()
+        return {'name': str(self), 'time': timeslot, 'room': room, 'lab': lab, 'faculty': self.faculty}
