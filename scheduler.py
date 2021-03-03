@@ -216,6 +216,16 @@ def convert(map : Dict):
                 yield (k, v)
     return dict(iter())
 
+def generate_models(data, limit):
+    with open('configuration.json', 'w') as f:
+        f.write(data)
+    init_data('configuration.json')
+    C = make_constraints()
+    def all():
+        for _, m, _ in get_models(C, limit):
+            yield eval(repr(list(convert(c.evaluate(m)) for c in COURSES)))
+    return json.dumps({'schedules' : list(all()) })
+
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         print(f"Usage: {sys.argv[0]} <json_config> [limit=10]")
