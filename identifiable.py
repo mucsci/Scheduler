@@ -1,8 +1,9 @@
 from abc import ABC
 
+
 class Identifiable(ABC):
 
-    def __init_subclass__(cls, /, default_id, **kwargs):
+    def __init_subclass__(cls, default_id, **kwargs):
         super().__init_subclass__(**kwargs)
         cls._default_id = default_id
         cls._id = cls._default_id

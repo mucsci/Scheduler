@@ -5,25 +5,38 @@
 # All Rights Reserved
 
 from identifiable import Identifiable
-from typing import List, Tuple
+from typing import List
 from day import Day
 
-def hhmm_to_timeid(hour : int, minute : int) -> int:
+def hhmm_to_timeid(hour: int, minute: int) -> int:
     return 60 * hour + minute
+
+
+class Slot:
+
+    EARLIEST : int = hhmm_to_timeid(8,0)
+
+    def __init__ (self, day : Day, hour : int, minute : int, duration: int):
+        self.day : Day = day
+        self.start : int = hhmm_to_timeid(hour, minute)
+        self.duration : int = duration
+    
+    def __repr__(self) -> str:
+        return repr({'x' : self.day, 'y': self.start - Slot.EARLIEST, 'w': Day.width(), 'h': self.duration })
 
 class TimeSlot(Identifiable, default_id = 0):
 
     @staticmethod
     def make_mwf(hour, minute, duration):
-        return TimeSlot(*((d, hour, minute, duration) for d in [Day.MON, Day.WED, Day.FRI]))
+        return TimeSlot(*(Slot(d, hour, minute, duration) for d in [Day.MON, Day.WED, Day.FRI]))
     
     @staticmethod
     def make_tr(hour, minute, duration, lab_index = -1):
-        return TimeSlot(*((d, hour, minute, duration) for d in [Day.TUE, Day.THU]), lab_index=lab_index)
+        return TimeSlot(*(Slot(d, hour, minute, duration) for d in [Day.TUE, Day.THU]), lab_index=lab_index)
     
     @staticmethod
     def make_mw(hour, minute, duration, lab_index = -1):
-        return TimeSlot(*((d, hour, minute, duration) for d in [Day.MON, Day.WED]), lab_index=lab_index)
+        return TimeSlot(*(Slot(d, hour, minute, duration) for d in [Day.MON, Day.WED]), lab_index=lab_index)
     
     def __init__(self, *times, lab_index = -1):
         """
@@ -36,16 +49,16 @@ class TimeSlot(Identifiable, default_id = 0):
         lab_index : int = -1
             an integral number representing index of which a lab period occurs (or none at all)
         """
-        self._lab_index = lab_index
-        self._times = list((t[0], hhmm_to_timeid(t[1], t[2]), t[3]) for t in times)
+        self._lab_index : int = lab_index
+        self._times : List[Slot] = list(times)
 
-    def times(self) -> List[Tuple[Day, int, int]]:
+    def times(self) -> List[Slot]:
         """
         Returns a list of Day - StartTime - Duration tuples
         """
         return self._times
     
-    def lab_time(self) -> Tuple[Day, int, int]:
+    def lab_time(self) -> Slot:
         """
         Returns only the two hour time (if necessary) for a lab
         """
@@ -65,8 +78,8 @@ class TimeSlot(Identifiable, default_id = 0):
         Check if a time slot is logically next to another (same day + adjacent or next day + same time)
         """
         if self.has_lab() and other.has_lab():
-            def range(t):
-                return t[0], t[1], t[1] + t[2] - 1
+            def range(t : Slot):
+                return t.day, t.start, t.start + t.duration
             day1, start1, stop1 = range(self.lab_time())
             day2, start2, stop2 = range(other.lab_time())
             # calculate time gap between for same day
@@ -94,16 +107,16 @@ class TimeSlot(Identifiable, default_id = 0):
         """
         Returns true IFF the labs of this timeslot and the passed are on the same day
         """
-        return self.has_lab() and other.has_lab() and self.lab_time()[0] == other.lab_time()[0]
+        return self.has_lab() and other.has_lab() and self.lab_time().day == other.lab_time().day
 
     @staticmethod
     def _overlaps(a, b) -> bool:
         """
         Internal utility function that returns true if two time slot instances overlap at any point
         """
-        def range(t):
-            return t[0], t[1], t[1] + t[2] - 1
-        
+        def range(t : Slot):
+            return t.day, t.start, t.start + t.duration
+    
         day1, start1, stop1 = range(a)
         day2, start2, stop2 = range(b)
 
@@ -118,20 +131,9 @@ class TimeSlot(Identifiable, default_id = 0):
         """
         Returns true if this time slot fits into the passed day mask, start time, and end time
         """
-        if any(not (mask & d) for (d, _, _) in self.times()):
+        if any(not (mask & t.day) for t in self.times()):
             return False
-        return all(start <= t and t + dur <= stop for (_, t, dur) in self.times())
+        return all(start <= t.start and t.start + t.duration <= stop for t in self.times())
 
     def __repr__(self) -> str:
-        def one(time):
-            day, start, duration = time
-            return {'day': day.name, 'start': start, 'duration': duration}
-        return str(list(one(t) for t in self.times()))
-
-    def __str__(self) -> str:
-        def time(t):
-            return f'{t // 60:02d}:{t % 60:02d}'
-        def str_for(day, start, dur, idx):
-            star = "*" if idx == self._lab_index else ""
-            return f'{day.name} {time(start)}-{time(start + dur)}{star}'
-        return ','.join(str_for(*t, i) for i,t in enumerate(self.times()))
+        return repr(self.times())

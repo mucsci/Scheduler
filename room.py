@@ -6,7 +6,8 @@
 
 from identifiable import Identifiable
 
-class Room(Identifiable, default_id = 100):
+
+class Room(Identifiable, default_id=100):
 
     def __init__(self, name: str):
         self.name = name
