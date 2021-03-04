@@ -5,7 +5,7 @@
 # All Rights Reserved
 
 from enum import IntFlag, auto
-
+import math
 
 class Day(IntFlag):
 
@@ -29,4 +29,4 @@ class Day(IntFlag):
         """
         Pretty Print representation of a course is its subject, number, and section
         """
-        return str(self.value * Day.width())
+        return str(int(math.log2(self.value)) * Day.width())
