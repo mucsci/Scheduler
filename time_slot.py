@@ -14,15 +14,13 @@ def hhmm_to_timeid(hour: int, minute: int) -> int:
 
 class Slot:
 
-    EARLIEST : int = hhmm_to_timeid(8,0)
-
     def __init__ (self, day : Day, hour : int, minute : int, duration: int):
         self.day : Day = day
         self.start : int = hhmm_to_timeid(hour, minute)
         self.duration : int = duration
     
     def __repr__(self) -> str:
-        return repr({'x' : self.day, 'y': self.start - Slot.EARLIEST, 'w': Day.width(), 'h': self.duration })
+        return repr({'day' : self.day, 'min': self.start, 'dur': self.duration })
 
 class TimeSlot(Identifiable, default_id = 0):
 

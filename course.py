@@ -40,7 +40,7 @@ class Course(Identifiable, default_id=0):
         """
         Pretty Print representation of a course is its subject, number, and section
         """
-        return f'{self.subject}{self.num}.{self.section:02d}'
+        return f'{self.subject} {self.num}.{self.section:02d}'
 
     def time(self):
         """

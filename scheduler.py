@@ -201,14 +201,14 @@ def concretize(map: Dict) -> Iterable[Dict]:
             "id": map["name"],
             "loc": Room.get(map["room"]),
             "fac": map["faculty"],
-            "t": t
+            "time": t
         }
     if 'lab' in map and map['lab']:
         yield {
             "id": map["name"],
             "loc": Lab.get(map["lab"]),
             "fac": map["faculty"],
-            "t": TimeSlot.get(map["time"]).lab_time()
+            "time": TimeSlot.get(map["time"]).lab_time()
         }
 
 def generate_models(data: bytes, limit: int):
