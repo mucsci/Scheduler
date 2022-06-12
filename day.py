@@ -14,13 +14,10 @@ class Day(IntFlag):
     FRI = auto()
 
     def __str__(self):
-        """
-        Pretty Print representation of a course is its subject, number, and section
-        """
-        return f'{self.name}'
+        return '|'.join(val.name for val in Day if self.value & val)
 
     def __repr__(self):
         """
         Pretty Print representation of a course is its subject, number, and section
         """
-        return f'"{self.name}"'
+        return '|'.join(val.name for val in Day if self.value & val)

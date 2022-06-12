@@ -5,6 +5,7 @@
 # All Rights Reserved
 
 import os
+from pprint import pprint
 from typing import Dict
 from collections import defaultdict
 import json
@@ -36,9 +37,12 @@ class Scheduler:
         self.courses = [Course(*(c[v] for v in ["credits","subj","num","lab","room","faculty","conflicts"])) for c in json_data['courses']]
         def get_info(person):
             days = [Day.MON, Day.TUE, Day.WED, Day.THU, Day.FRI]
-            masked = functools.reduce(operator.or_, (d for d, m in zip(days, person['days']) if m))
-            low, high = person['times']
-            return masked, hhmm_to_timeid(*low), hhmm_to_timeid(*high)
+            def walk():
+                for d, times in zip(days, person['times']):
+                    for time in times:
+                        start, end = time
+                        yield (d, hhmm_to_timeid(*start), hhmm_to_timeid(*end))
+            return list(walk())
         self.faculty = { x : get_info(json_data['faculty'][x]) for x in json_data['faculty']}
         self.ranges = defaultdict(lambda: [0, 0])
         def generate_slots():
@@ -101,9 +105,9 @@ class Scheduler:
         def faculty_constraints():
             def assign_to_faculty():
                 for c in self.courses:
-                    mask, start, stop = self.faculty[c.faculty]
+                    ranges = self.faculty[c.faculty]
                     # check the faculty time constraint
-                    yield z3.And(*(c.time() != slot.id for slot in self.slots if not slot.in_time_range(mask, start, stop)))
+                    yield z3.And(*(c.time() != slot.id for slot in self.slots if not slot.in_time_ranges(ranges)))
             
             # - check for unique, non-overlapping timeslots for each faculty
             def non_overlapping():
@@ -120,11 +124,14 @@ class Scheduler:
                             yield next_to(i.time(), j.time())
                             yield i.room() == j.room()
                             yield z3.Implies(z3.And(has_lab(i.time()), has_lab(j.time())), i.lab() == j.lab())
+                        else:
+                            yield z3.Not(next_to(i.time(), j.time()))
             
             # add constraint that all three two-hour period must be on different days
             def no_crazy_days():
-                for name in self.faculty.keys():
-                    if self.faculty[name][0] ^ (Day.TUE | Day.THU) or self.faculty[name][0] ^ (Day.MON | Day.WED):
+                for name in self.faculty.keys():   
+                    days = functools.reduce(operator.or_, set(d for d,_,_ in self.faculty[name]))
+                    if days == (Day.TUE | Day.THU) or days == (Day.MON | Day.WED):
                         courses = [c for c in self.courses if c.faculty == name]
                         if len(courses) >= 3:
                             yield z3.Not(z3.And(
@@ -238,8 +245,11 @@ if __name__ == '__main__':
             print(f'{j}:{s.get_key_value(j)}   ',end='')
         print('\n')
 
-        assigned = list(concretize(c.evaluate(m)) for c in sched.courses)
-        print(assigned)
+        #assigned = list(concretize(c.evaluate(m)) for c in sched.courses)
+        #print(assigned)
+
+        assigned = list(c.csv(m) for c in sched.courses)
+        print('\n'.join(assigned))
         
         try:
             print()

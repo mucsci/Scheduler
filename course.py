@@ -4,7 +4,9 @@
 # Copyright 2021
 # All Rights Reserved
 
-from os import times
+from lab import Lab
+from room import Room
+from time_slot import TimeSlot
 from identifiable import Identifiable
 from typing import List
 from collections import defaultdict
@@ -64,3 +66,9 @@ class Course(Identifiable, default_id = 0):
         room = m.eval(self.room()).as_long()
         lab = None if not self.labs else m.eval(self.lab()).as_long()
         return {'name': str(self), 'time': timeslot, 'room': room, 'lab': lab, 'faculty': self.faculty}
+
+    def csv(self, m : z3.ModelRef):
+        timeslot = str(TimeSlot.get(m.eval(self.time()).as_long()))
+        room = str(Room.get(m.eval(self.room()).as_long()))
+        lab = 'None' if not self.labs else str(Lab.get(m.eval(self.lab()).as_long()))
+        return f'{self},{self.faculty},{room},{lab},{timeslot}'

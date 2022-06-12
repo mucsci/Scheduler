@@ -114,14 +114,15 @@ class TimeSlot(Identifiable, default_id = 0):
             (start2 <= stop1 <= stop2)
         )
 
-    def in_time_range(self, mask : Day, start : int, stop : int) -> bool:
+    def in_time_ranges(self, ranges) -> bool:
         """
-        Returns true if this time slot fits into the passed day mask, start time, and end time
+        Returns true if this time slot fits into the passed range list (day mask, start time, and end time)
         """
-        if any(not (mask & d) for (d, _, _) in self.times()):
-            return False
-        return all(start <= t and t + dur <= stop for (_, t, dur) in self.times())
-
+        def check():
+            for d1, slot_start, dur in self.times():
+                yield any(d2 == d1 and start <= slot_start and  slot_start + dur <= stop for d2, start, stop in ranges)
+        return all(x for x in check())
+    
     def __repr__(self) -> str:
         def one(time):
             day, start, duration = time

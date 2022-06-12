@@ -1,37 +1,50 @@
 {
-    "rooms": ["Roddy 136", "Roddy 140", "Roddy 147"],
+    "rooms": ["Roddy 136", "Roddy 140", "Roddy 147", "elsewhere"],
     "labs": ["Linux", "Mac"],
     "courses": [
-        { "subj": "CSCI", "num": 140, "credits": 4, "room": ["Roddy 140"], "lab": [], "conflicts": [] , "faculty": "Cain"},
-        { "subj": "CSCI", "num": 140, "credits": 4, "room": ["Roddy 140"], "lab": [], "conflicts": [] , "faculty": "Cain"},
-        { "subj": "CSCI", "num": 161, "credits": 4, "room": ["Roddy 140"], "lab": ["Linux"], "conflicts": [] , "faculty": "Schwartz"},
-        { "subj": "CSCI", "num": 162, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": [140] , "faculty": "Xie"},
-        { "subj": "CSCI", "num": 162, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": [] , "faculty": "Xie"},
-    
-        { "subj": "CSCI", "num": 330, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": [362] , "faculty": "Cain"},
-        { "subj": "CSCI", "num": 340, "credits": 4, "room": ["Roddy 136"], "lab": ["Mac"], "conflicts": [362, 366] , "faculty": "Hardy"},
-        { "subj": "CSCI", "num": 340, "credits": 4, "room": ["Roddy 136"], "lab": ["Mac"], "conflicts": [] , "faculty": "Hardy"},
-        { "subj": "CSCI", "num": 362, "credits": 4, "room": ["Roddy 147"], "lab": ["Linux"], "conflicts": [340, 366] , "faculty": "Zoppetti"},
-        { "subj": "CSCI", "num": 362, "credits": 4, "room": ["Roddy 147"], "lab": ["Linux"], "conflicts": [] , "faculty": "Zoppetti"},  
-        { "subj": "CSCI", "num": 366, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux", "Mac"], "conflicts": [340, 362] , "faculty": "Hogg"},
-        { "subj": "CSCI", "num": 366, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux", "Mac"], "conflicts": [] , "faculty": "Hogg"},
 
-        { "subj": "CSCI", "num": 380, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux", "Mac"], "conflicts": [375, 395, 420, 453] , "faculty": "Zoppetti"},
-        { "subj": "CSCI", "num": 420, "credits": 4, "room": ["Roddy 140"], "lab": ["Mac"], "conflicts": [375, 395, 453] , "faculty": "Schwartz"},
-        { "subj": "CSCI", "num": 395, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac"], "conflicts": [375, 453] , "faculty": "Hardy"},
-        { "subj": "CSCI", "num": 375, "credits": 4, "room": ["Roddy 147"], "lab": ["Linux"], "conflicts": [453] , "faculty": "Hogg"},
-        { "subj": "CSCI", "num": 453, "credits": 4, "room": ["Roddy 140"], "lab": ["Linux", "Mac"], "conflicts": [] , "faculty": "Xie"}
+        
+        
+
+        { "subj": "CSCI", "num": 161, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": [140] , "faculty": "Antonucci"},
+
+        { "subj": "CSCI", "num": 162, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac","Linux"], "conflicts": [140], "faculty": "Hogg"},
+        { "subj": "CSCI", "num": 162, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac","Linux"], "conflicts": [140] , "faculty": "Hogg"},        
+        { "subj": "CSCI", "num": 419, "credits": 4, "room": ["Roddy 140","Roddy 147","Roddy 136"], "lab": ["Mac"], "conflicts": [420, 467, 415, 380] , "faculty": "Hogg"},
+
+
+        { "subj": "CSCI", "num": 362, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": [330, 366, 340] , "faculty": "Cain"},
+        { "subj": "CSCI", "num": 151, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac"], "conflicts": [] , "faculty": "Cain"},
+        { "subj": "CSCI", "num": 330, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux","Mac"], "conflicts": [362, 366] , "faculty": "Cain"},
+    
+        { "subj": "CSCI", "num": 380, "credits": 4, "room": ["Roddy 136", "Roddy 147"], "lab": ["Linux"], "conflicts": [420, 419, 452, 467, 415] , "faculty": "Zoppetti"},
+        { "subj": "CSCI", "num": 140, "credits": 4, "room": ["Roddy 136", "Roddy 147"], "lab": [], "conflicts": [] , "faculty": "Zoppetti"},
+        { "subj": "CSCI", "num": 140, "credits": 4, "room": ["Roddy 136", "Roddy 147"], "lab": [], "conflicts": [] , "faculty": "Zoppetti"},
+             
+    
+        { "subj": "CSCI", "num": 420, "credits": 4, "room": ["Roddy 140"], "lab": ["Mac"], "conflicts": [380, 419, 467, 415, 452, 340] , "faculty": "Schwartz"},
+        { "subj": "CSCI", "num": 452, "credits": 4, "room": ["Roddy 140"], "lab": ["Mac"], "conflicts": [420, 467, 415, 419, 380] , "faculty": "Schwartz"},
+
+        { "subj": "CSCI", "num": 415, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": [420, 467, 452, 419, 380, 340] , "faculty": "Hobbs"},
+
+        { "subj": "CSCI", "num": 340, "credits": 4, "room": ["Roddy 136",  "Roddy 147"], "lab": ["Mac"], "conflicts": [380, 330, 362], "faculty": "Hardy"},
+        { "subj": "CSCI", "num": 340, "credits": 4, "room": ["Roddy 136",  "Roddy 147"], "lab": ["Mac"], "conflicts": [380, 362] , "faculty": "Hardy"}, 
+        { "subj": "CSCI", "num": 161, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": [] , "faculty": "Hardy"},       
+        
+        { "subj": "CSCI", "num": 366, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac","Linux"], "conflicts": [362, 330, 340] , "faculty": "Xie"},
+        { "subj": "CSCI", "num": 366, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac","Linux"], "conflicts": [362, 330, 340] , "faculty": "Xie"},
+        { "subj": "CSCI", "num": 467, "credits": 4, "room": ["Roddy 140","Roddy 147","Roddy 136"], "lab": ["Linux","Mac"], "conflicts": [380, 419, 415, 452, 330, 340] , "faculty": "Xie"}    
     ],
 
     "faculty": {
-        "Zoppetti"    : {"days": [true , false, true , true , true ], "times": [[10, 0], [17, 0]]},
-        "Schwartz"    : {"days": [false, true , false, true , false], "times": [[10, 0], [15, 0]]},
-        "Cain"        : {"days": [true , true , true , false, true ], "times": [[ 8, 0], [15, 0]]},
-        "Hardy"       : {"days": [true , true , true , true , true ], "times": [[ 9, 0], [15, 0]]},
-        "Hogg"        : {"days": [true , false, true , true , true ], "times": [[ 9, 0], [15, 0]]},
-        "Xie"         : {"days": [true , true , true , false, true ], "times": [[10, 0], [17, 0]]},
-        "Etesamipour" : {"days": [true , false, true , true , true ], "times": [[10, 0], [17, 0]]},
-        "Rogers"      : {"days": [true , true , true , true , false], "times": [[17,30], [20, 0]]},
-        "Stone"       : {"days": [true , true , true , true , false], "times": [[17,30], [20, 0]]}
+        "Zoppetti"    : {"times": [[[[10, 0], [16, 0]]] , [], [[[10, 0], [17, 0]]] , [[[10, 0], [17, 0]]] , [[[10, 0], [16, 0]]] ] },
+        "Schwartz"    : {"times": [[], [[[10, 0], [15, 0]]] , [], [[[10, 0], [15, 0]]] , []] },
+        "Cain"        : {"times": [[[[ 8, 0], [15, 0]]] , [[[ 8, 0], [15, 0]]] , [[[ 8, 0], [15, 0]]] , [], [[[ 8, 0], [15, 0]]] ] },
+        "Hardy"       : {"times": [[[[ 9, 0], [15, 0]]] , [[[ 9, 0], [15, 0]]] , [[[ 9, 0], [15, 0]]] , [], [[[ 9, 0], [15, 0]]] ] },
+        "Hogg"        : {"times": [[[[ 9, 0], [15, 0]]] , [], [[[ 9, 0], [15, 0]]] , [[[ 8, 0], [15, 0]]] , [[[ 9, 0], [15, 0]]] ] },
+        "Xie"         : {"times": [[[[10, 0], [16, 0]]] , [[[10, 0], [17, 0]]] , [[[10, 0], [17, 0]]] , [], [[[10, 0], [16, 0]]] ] },
+        "Rogers"      : {"times": [[[[18,0], [20, 0]]] , [] , [[[18,0], [20, 0]]] , [] , []] },
+        "Antonucci"   : {"times": [[] , [[[8,0], [11, 0]]] , [] , [[[8,0], [11, 0]]] , []] },     
+        "Hobbs"       : {"times": [[[[15, 0], [19, 0]]] , [[[15, 0], [19, 0]]], [[[15, 0], [19, 0]]] , [[[15, 0], [19, 0]]] , [] ] }
     }
 }
