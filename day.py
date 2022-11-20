@@ -5,6 +5,7 @@
 # All Rights Reserved
 
 from enum import IntFlag, auto
+import json_fix
 
 class Day(IntFlag):
     MON = auto()
@@ -18,6 +19,9 @@ class Day(IntFlag):
 
     def __repr__(self):
         """
-        Pretty Print representation of a course is its subject, number, and section
+        Pretty Print representation of a day
         """
         return '|'.join(val.name for val in Day if self.value & val)
+
+    def __json__(self):
+        return '|'.join(f'"{val.name}"' for val in Day if self.value & val)

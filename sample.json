@@ -3,9 +3,6 @@
     "labs": ["Linux", "Mac"],
     "courses": [
 
-        
-        
-
         { "subj": "CSCI", "num": 161, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": [140] , "faculty": "Antonucci"},
 
         { "subj": "CSCI", "num": 162, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac","Linux"], "conflicts": [140], "faculty": "Hogg"},
@@ -27,8 +24,8 @@
 
         { "subj": "CSCI", "num": 415, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": [420, 467, 452, 419, 380, 340] , "faculty": "Hobbs"},
 
-        { "subj": "CSCI", "num": 340, "credits": 4, "room": ["Roddy 136",  "Roddy 147"], "lab": ["Mac"], "conflicts": [380, 330, 362], "faculty": "Hardy"},
-        { "subj": "CSCI", "num": 340, "credits": 4, "room": ["Roddy 136",  "Roddy 147"], "lab": ["Mac"], "conflicts": [380, 362] , "faculty": "Hardy"}, 
+        { "subj": "UNIV", "num": 103, "credits": 3, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": [], "conflicts": [], "faculty": "Hardy"},
+        { "subj": "UNIV", "num": 103, "credits": 3, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": [], "conflicts": [] , "faculty": "Hardy"}, 
         { "subj": "CSCI", "num": 161, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": [] , "faculty": "Hardy"},       
         
         { "subj": "CSCI", "num": 366, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac","Linux"], "conflicts": [362, 330, 340] , "faculty": "Xie"},

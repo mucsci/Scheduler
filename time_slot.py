@@ -4,12 +4,42 @@
 # Copyright 2021
 # All Rights Reserved
 
+from dataclasses import dataclass
 from identifiable import Identifiable
-from typing import List, Tuple
+from typing import List
 from day import Day
+import json
+
+import json_fix
 
 def hhmm_to_timeid(hour : int, minute : int) -> int:
     return 60 * hour + minute
+
+@dataclass
+class TimeInstance:
+    day : Day
+    start : int
+    duration : int
+
+    def __init__(self, d : Day, h : int, m : int, dur : int):
+        self.day = d
+        self.start = hhmm_to_timeid(h, m)
+        self.duration = dur
+    
+    def __init__(self, d : Day, begin : int, dur : int):
+        self.day = d
+        self.start = begin
+        self.duration = dur
+    
+    def __repr__(self) -> str:
+        return str({'day': str(self.day), 'start': self.start, 'duration': self.duration, 'stop': self.stop})
+
+    def __json__(self) -> str:
+        return repr(self)
+
+    @property
+    def stop(self) -> int:
+        return self.start + self.duration
 
 class TimeSlot(Identifiable, default_id = 0):
 
@@ -36,16 +66,16 @@ class TimeSlot(Identifiable, default_id = 0):
         lab_index : int = -1
             an integral number representing index of which a lab period occurs (or none at all)
         """
-        self._lab_index = lab_index
-        self._times = list((t[0], hhmm_to_timeid(t[1], t[2]), t[3]) for t in times)
+        self._lab_index : int = lab_index
+        self._times : List[TimeInstance] = list(TimeInstance(t[0], hhmm_to_timeid(t[1], t[2]), t[3]) for t in times)
 
-    def times(self) -> List[Tuple[Day, int, int]]:
+    def times(self) -> List[TimeInstance]:
         """
         Returns a list of Day - StartTime - Duration tuples
         """
         return self._times
     
-    def lab_time(self) -> Tuple[Day, int, int]:
+    def lab_time(self) -> TimeInstance:
         """
         Returns only the two hour time (if necessary) for a lab
         """
@@ -64,17 +94,26 @@ class TimeSlot(Identifiable, default_id = 0):
         """
         Check if a time slot is logically next to another (same day + adjacent or next day + same time)
         """
+        MAX_TIME_DELTA = 70
+        MAX_TIME_DELTA_NO_LAB = 60
+
+        def diff_same_day(t1 : TimeInstance, t2 : TimeInstance) -> int:
+            return min(abs(t1.start - t2.stop), abs(t2.start - t1.stop))
+        def diff_diff_day(t1 : TimeInstance, t2 : TimeInstance) -> int:
+            return abs(t1.start - t2.start)
+
         if self.has_lab() and other.has_lab():
-            def range(t):
-                return t[0], t[1], t[1] + t[2] - 1
-            day1, start1, stop1 = range(self.lab_time())
-            day2, start2, stop2 = range(other.lab_time())
-            # calculate time gap between for same day
-            diff_same_day = min(abs(start1 - stop2), abs(start2 - stop1))
-            diff_diff_day = abs(start1 - start2)
-            return (diff_same_day if day1 == day2 else diff_diff_day) <= 70
+            t1 : TimeInstance = self.lab_time()
+            t2 : TimeInstance = other.lab_time()
+            return (diff_same_day(t1, t2) if t1.day == t2.day else diff_diff_day(t1, t2)) <= MAX_TIME_DELTA
         else:
-            return False
+            if len(self.times()) != len(other.times()):
+                return False
+            for t1, t2 in zip(self.times(), other.times()):
+                if t1.day == t2.day:
+                    if diff_same_day(t1, t2) > MAX_TIME_DELTA_NO_LAB:
+                        return False
+            return True
 
     def overlaps(self, other) -> bool:
         """
@@ -82,57 +121,52 @@ class TimeSlot(Identifiable, default_id = 0):
         """
         return any(TimeSlot._overlaps(a, b) for a in self.times() for b in other.times())
 
-    def lab_overlaps(self, other) -> bool:
+    def lab_overlaps(self, other : TimeInstance) -> bool:
         """
         Returns true IFF this timeslot's two-hour block has any overlap with the passed time slot's two-hour block
         """
-        l1 = self.lab_time()
-        l2 = other.lab_time()
-        return l1 and l2 and TimeSlot._overlaps(l1, l2)
+        return self.has_lab() and other.has_lab() and TimeSlot._overlaps(self.lab_time(), other.lab_time())
 
     def labs_on_same_day(self, other) -> bool:
         """
         Returns true IFF the labs of this timeslot and the passed are on the same day
         """
-        return self.has_lab() and other.has_lab() and self.lab_time()[0] == other.lab_time()[0]
+        return self.has_lab() and other.has_lab() and self.lab_time().day == other.lab_time().day
 
     @staticmethod
-    def _overlaps(a, b) -> bool:
+    def _overlaps(a : TimeInstance, b : TimeInstance) -> bool:
         """
         Internal utility function that returns true if two time slot instances overlap at any point
         """
-        def range(t):
-            return t[0], t[1], t[1] + t[2] - 1
-        
-        day1, start1, stop1 = range(a)
-        day2, start2, stop2 = range(b)
 
-        return (day1 == day2) and (
-            (start1 <= start2 <= stop1) or
-            (start2 <= start1 <= stop2) or
-            (start1 <= stop2 <= stop1) or
-            (start2 <= stop1 <= stop2)
+        return (a.day == b.day) and (
+            (a.start <= b.start <= a.stop) or
+            (b.start <= a.start <= b.stop) or
+            (a.start <= b.stop <= a.stop) or
+            (b.start <= a.stop <= b.stop)
         )
 
-    def in_time_ranges(self, ranges) -> bool:
+    def in_time_ranges(self, ranges : List[TimeInstance]) -> bool:
         """
         Returns true if this time slot fits into the passed range list (day mask, start time, and end time)
         """
-        def check():
-            for d1, slot_start, dur in self.times():
-                yield any(d2 == d1 and start <= slot_start and  slot_start + dur <= stop for d2, start, stop in ranges)
-        return all(x for x in check())
+        #              on the same day       time fits in at least one available slot
+        for t in self.times():
+            fits = False
+            for slot in ranges:
+                if t.day == slot.day:
+                    fits = fits or (t.day == slot.day and slot.start <= t.start and t.stop <= slot.stop)
+            if not fits:
+                return False
+        return True
     
     def __repr__(self) -> str:
-        def one(time):
-            day, start, duration = time
-            return {'day': day.name, 'start': start, 'duration': duration}
-        return str(list(one(t) for t in self.times()))
+        return str(list(repr(t) for t in self.times()))
 
     def __str__(self) -> str:
         def time(t):
             return f'{t // 60:02d}:{t % 60:02d}'
-        def str_for(day, start, dur, idx):
+        def str_for(idx, t):
             star = "*" if idx == self._lab_index else ""
-            return f'{day.name} {time(start)}-{time(start + dur)}{star}'
-        return ','.join(str_for(*t, i) for i,t in enumerate(self.times()))
+            return f'{t.day.name} {time(t.start)}-{time(t.start + t.duration)}{star}'
+        return ','.join(str_for(i, t) for i,t in enumerate(self.times()))

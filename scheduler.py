@@ -4,8 +4,6 @@
 # Copyright 2021
 # All Rights Reserved
 
-import os
-from pprint import pprint
 from typing import Dict
 from collections import defaultdict
 import json
@@ -18,9 +16,10 @@ import sys
 from course import Course
 from lab import Lab
 from room import Room
-from time_slot import Day, TimeSlot, hhmm_to_timeid
+from time_slot import Day, TimeInstance, TimeSlot, hhmm_to_timeid
 from config import time_slots
 
+from json import JSONEncoder
 
 def load_from_file(filename):
     with open(filename) as f:
@@ -28,6 +27,11 @@ def load_from_file(filename):
 
 def load_from_raw(data):
     return json.loads(data)
+
+
+class MyEncoder(JSONEncoder):
+    def default(self, o):
+        return o.__dict__
 
 class Scheduler:
 
@@ -41,7 +45,7 @@ class Scheduler:
                 for d, times in zip(days, person['times']):
                     for time in times:
                         start, end = time
-                        yield (d, hhmm_to_timeid(*start), hhmm_to_timeid(*end))
+                        yield TimeInstance(d, hhmm_to_timeid(*start), hhmm_to_timeid(*end))
             return list(walk())
         self.faculty = { x : get_info(json_data['faculty'][x]) for x in json_data['faculty']}
         self.ranges = defaultdict(lambda: [0, 0])
@@ -130,7 +134,7 @@ class Scheduler:
             # add constraint that all three two-hour period must be on different days
             def no_crazy_days():
                 for name in self.faculty.keys():   
-                    days = functools.reduce(operator.or_, set(d for d,_,_ in self.faculty[name]))
+                    days = functools.reduce(operator.or_, set(t.day for t in self.faculty[name]))
                     if days == (Day.TUE | Day.THU) or days == (Day.MON | Day.WED):
                         courses = [c for c in self.courses if c.faculty == name]
                         if len(courses) >= 3:
@@ -212,27 +216,33 @@ def concretize(map : Dict):
                 if v:
                     yield (k, {'room': Lab.get(map["lab"]), 'time': TimeSlot.get(map["time"]).lab_time()})
             elif k == 'time':
-                yield (k, TimeSlot.get(map["time"]))
+                yield (k, list(t for t in TimeSlot.get(map["time"])._times))
             else:
                 yield (k, v)
     return dict(iter())
 
 def generate_models(data, limit):
-    s = Scheduler(load_from_raw(data))
+    s = Scheduler(load_from_file(data))
     def all():
         for _, m, _ in s.get_models(limit):
-            yield eval(repr(list(concretize(c.evaluate(m)) for c in s.courses)))
-    return json.dumps({'schedules' : list(all()) })
+            yield list(concretize(c.evaluate(m)) for c in s.courses)
+    return json.dumps({'schedules' : list(all()) }, cls=MyEncoder)
 
 if __name__ == '__main__':
 
     if len(sys.argv) < 2:
-        print(f"Usage: {sys.argv[0]} <json_config> [limit=10]")
+        print(f"Usage: {sys.argv[0]} <json_config> [limit=10] [json]")
         exit(1)
     
     config_file = sys.argv[1]
 
     limit = 10 if len(sys.argv) == 2 else int(sys.argv[2])
+
+    dump_json = len(sys.argv) == 4 and sys.argv[3] == "json"
+
+    if dump_json:
+        print(generate_models(config_file, limit))
+        exit(0)
     
     print(f"> Using limit={limit}")
     sched = Scheduler(load_from_file(config_file))
