@@ -43,9 +43,9 @@ class Scheduler:
             days = [Day.MON, Day.TUE, Day.WED, Day.THU, Day.FRI]
             def walk():
                 for d, times in zip(days, person['times']):
-                    for time in times:
-                        start, end = time
-                        yield TimeInstance(d, hhmm_to_timeid(*start), hhmm_to_timeid(*end))
+                    for start, end in times:
+                        duration = hhmm_to_timeid(*end) - hhmm_to_timeid(*start)
+                        yield TimeInstance(d, start[0], start[1], duration)
             return list(walk())
         self.faculty = { x : get_info(json_data['faculty'][x]) for x in json_data['faculty']}
         self.ranges = defaultdict(lambda: [0, 0])
@@ -251,8 +251,8 @@ if __name__ == '__main__':
     for i, m, s in sched.get_models(limit):
         print (f'Model {i}:')
         print('  ',end='')
-        for j in ['time', 'conflicts', 'decisions', 'max memory', 'propagations']:
-            print(f'{j}:{s.get_key_value(j)}   ',end='')
+        for j in s.keys():
+            print(f'{j}:{s.get_key_value(j)}  ', end='')
         print('\n')
 
         #assigned = list(concretize(c.evaluate(m)) for c in sched.courses)

@@ -21,15 +21,10 @@ class TimeInstance:
     start : int
     duration : int
 
-    def __init__(self, d : Day, h : int, m : int, dur : int):
-        self.day = d
-        self.start = hhmm_to_timeid(h, m)
-        self.duration = dur
-    
-    def __init__(self, d : Day, begin : int, dur : int):
-        self.day = d
-        self.start = begin
-        self.duration = dur
+    def __init__(self, the_day : Day, hr : int, min : int, duration : int):
+        self.day = the_day
+        self.start = hhmm_to_timeid(hr, min)
+        self.duration = duration
     
     def __repr__(self) -> str:
         return str({'day': str(self.day), 'start': self.start, 'duration': self.duration, 'stop': self.stop})
@@ -45,17 +40,17 @@ class TimeSlot(Identifiable, default_id = 0):
 
     @staticmethod
     def make_mwf(hour, minute, duration):
-        return TimeSlot(*((d, hour, minute, duration) for d in [Day.MON, Day.WED, Day.FRI]))
+        return TimeSlot(list(TimeInstance(day, hour, minute, duration) for day in [Day.MON, Day.WED, Day.FRI]))
     
     @staticmethod
     def make_tr(hour, minute, duration, lab_index = -1):
-        return TimeSlot(*((d, hour, minute, duration) for d in [Day.TUE, Day.THU]), lab_index=lab_index)
+        return TimeSlot(list(TimeInstance(day, hour, minute, duration) for day in [Day.TUE, Day.THU]), lab_index=lab_index)
     
     @staticmethod
     def make_mw(hour, minute, duration, lab_index = -1):
-        return TimeSlot(*((d, hour, minute, duration) for d in [Day.MON, Day.WED]), lab_index=lab_index)
+        return TimeSlot(list(TimeInstance(day, hour, minute, duration) for day in [Day.MON, Day.WED]), lab_index=lab_index)
     
-    def __init__(self, *times, lab_index = -1):
+    def __init__(self, times, lab_index = -1):
         """
         Constructs a time slot.
 
@@ -67,7 +62,7 @@ class TimeSlot(Identifiable, default_id = 0):
             an integral number representing index of which a lab period occurs (or none at all)
         """
         self._lab_index : int = lab_index
-        self._times : List[TimeInstance] = list(TimeInstance(t[0], hhmm_to_timeid(t[1], t[2]), t[3]) for t in times)
+        self._times : List[TimeInstance] = times
 
     def times(self) -> List[TimeInstance]:
         """
@@ -105,7 +100,18 @@ class TimeSlot(Identifiable, default_id = 0):
         if self.has_lab() and other.has_lab():
             t1 : TimeInstance = self.lab_time()
             t2 : TimeInstance = other.lab_time()
-            return (diff_same_day(t1, t2) if t1.day == t2.day else diff_diff_day(t1, t2)) <= MAX_TIME_DELTA
+            lab_adjacent = (diff_same_day(t1, t2) if t1.day == t2.day else diff_diff_day(t1, t2)) <= MAX_TIME_DELTA
+            lecture_adjacent = True
+            for i1,t1 in enumerate(self.times()):
+                if self._lab_index == i1:
+                    continue
+                for i2, t2 in enumerate(other.times()):
+                    if other._lab_index == i2:
+                        continue
+                    if t1.day == t2.day:
+                        if diff_same_day(t1, t2) > MAX_TIME_DELTA:
+                            lecture_adjacent = False
+            return lab_adjacent and lecture_adjacent
         else:
             if len(self.times()) != len(other.times()):
                 return False
@@ -167,6 +173,6 @@ class TimeSlot(Identifiable, default_id = 0):
         def time(t):
             return f'{t // 60:02d}:{t % 60:02d}'
         def str_for(idx, t):
-            star = "*" if idx == self._lab_index else ""
+            star = "^" if idx == self._lab_index else ""
             return f'{t.day.name} {time(t.start)}-{time(t.start + t.duration)}{star}'
         return ','.join(str_for(i, t) for i,t in enumerate(self.times()))

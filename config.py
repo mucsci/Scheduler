@@ -4,9 +4,9 @@
 # Copyright 2021
 # All Rights Reserved
 
-from typing import Iterable, Tuple
+from typing import Iterable
 from day import Day
-from time_slot import TimeSlot
+from time_slot import TimeInstance, TimeSlot
 
 # other departments (such as math) would want to define all of their
 # - 3 credit course times
@@ -14,7 +14,7 @@ from time_slot import TimeSlot
 # here -- programmatically would probably be best but a sequence of yield statements
 # could also work
 
-def time_slots(credits) -> Iterable[Tuple[Day, int, int]]:
+def time_slots(credits) -> Iterable[TimeSlot]:
     """
     returns all possible time slots
     """
@@ -29,12 +29,12 @@ def time_slots(credits) -> Iterable[Tuple[Day, int, int]]:
             yield TimeSlot.make_tr(h, m, LONG, 0)
             yield TimeSlot.make_tr(h, m, LONG, 1)
             for lab in [Day.TUE, Day.THU]:
-                yield TimeSlot((Day.MON, h, 0, SHORT), (lab, h, m, LONG), (Day.FRI, h, 0, SHORT), lab_index=1)
-                yield TimeSlot((Day.MON, h + 1, 0, SHORT), (lab, h, m, LONG), (Day.FRI, h + 1, 0, SHORT), lab_index=1)
+                yield TimeSlot([TimeInstance(Day.MON, h, 0, SHORT), TimeInstance(lab, h, m, LONG), TimeInstance(Day.FRI, h, 0, SHORT)], lab_index=1)
+                yield TimeSlot([TimeInstance(Day.MON, h + 1, 0, SHORT), TimeInstance(lab, h, m, LONG), TimeInstance(Day.FRI, h + 1, 0, SHORT)], lab_index=1)
         # W
         for (h, m) in [(8, 0), (9, 0), (10, 0), (11, 0), (12, 0), (13, 0)]:
-            yield TimeSlot((Day.MON, h, 0, SHORT), (Day.WED, h, m, LONG), (Day.FRI, h, 0, SHORT), lab_index=1)
-            yield TimeSlot((Day.MON, h + 1, 0, SHORT), (Day.WED, h, m, LONG), (Day.FRI, h + 1, 0, SHORT), lab_index=1)
+            yield TimeSlot([TimeInstance(Day.MON, h, 0, SHORT), TimeInstance(Day.WED, h, m, LONG), TimeInstance(Day.FRI, h, 0, SHORT)], lab_index=1)
+            yield TimeSlot([TimeInstance(Day.MON, h + 1, 0, SHORT), TimeInstance(Day.WED, h, m, LONG), TimeInstance(Day.FRI, h + 1, 0, SHORT)], lab_index=1)
         # evenings
         for (h, m) in [(17, 0), (17, 30), (18, 0), (18, 30)]:
             yield TimeSlot.make_mw(h, m, LONG, 0)
