@@ -1,6 +1,14 @@
 from abc import ABC
+from typing import ClassVar
+
 
 class Identifiable(ABC):
+
+    _default_id: ClassVar[int]
+    _id: ClassVar[int]
+    _all: ClassVar[dict]
+
+    id: int
 
     def __init_subclass__(cls, /, default_id, **kwargs):
         super().__init_subclass__(**kwargs)

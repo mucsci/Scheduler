@@ -5,8 +5,10 @@
 # All Rights Reserved
 
 from identifiable import Identifiable
+import json_fix
 
-class Room(Identifiable, default_id = 100):
+
+class Room(Identifiable, default_id=100):
 
     def __init__(self, name: str):
         self.name = name
@@ -16,3 +18,6 @@ class Room(Identifiable, default_id = 100):
 
     def __repr__(self):
         return f'"{self.name}"'
+
+    def __json__(self):
+        return self.name

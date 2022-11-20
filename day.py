@@ -4,24 +4,24 @@
 # Copyright 2021
 # All Rights Reserved
 
-from enum import IntFlag, auto
-import json_fix
+from enum import IntEnum, auto
 
-class Day(IntFlag):
+
+class Day(IntEnum):
     MON = auto()
     TUE = auto()
     WED = auto()
     THU = auto()
     FRI = auto()
 
-    def __str__(self):
-        return '|'.join(val.name for val in Day if self.value & val)
+    def __str__(self) -> str:
+        return next(val.name for val in Day if self.value == val)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """
         Pretty Print representation of a day
         """
-        return '|'.join(val.name for val in Day if self.value & val)
+        return next(val.name for val in Day if self.value == val)
 
     def __json__(self):
-        return '|'.join(f'"{val.name}"' for val in Day if self.value & val)
+        return self.value

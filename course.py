@@ -8,20 +8,21 @@ from lab import Lab
 from room import Room
 from time_slot import TimeSlot
 from identifiable import Identifiable
-from typing import List
+from typing import DefaultDict, List
 from collections import defaultdict
 import z3
 
-class Course(Identifiable, default_id = 0):
 
-    _total_sections = defaultdict(int)
+class Course(Identifiable, default_id=0):
+
+    _total_sections: DefaultDict[int, int] = defaultdict(int)
 
     @staticmethod
     def _next_section(num):
         Course._total_sections[num] += 1
         return Course._total_sections[num]
 
-    def __init__(self, credits : int, subj : str, num : int, labs : List[str], rooms : List[str], faculty: str, conflicts : List[int]):
+    def __init__(self, credits: int, subj: str, num: int, labs: List[str], rooms: List[str], faculty: str, conflicts: List[int]):
         # set credits, subject, name, and section
         self.credits = credits
         self.subject = subj
@@ -61,14 +62,15 @@ class Course(Identifiable, default_id = 0):
         """
         return self._lab
 
-    def evaluate(self, m : z3.ModelRef):
+    def evaluate(self, m: z3.ModelRef):
         timeslot = m.eval(self.time()).as_long()
         room = m.eval(self.room()).as_long()
         lab = None if not self.labs else m.eval(self.lab()).as_long()
         return {'name': str(self), 'time': timeslot, 'room': room, 'lab': lab, 'faculty': self.faculty}
 
-    def csv(self, m : z3.ModelRef):
+    def csv(self, m: z3.ModelRef):
         timeslot = str(TimeSlot.get(m.eval(self.time()).as_long()))
         room = str(Room.get(m.eval(self.room()).as_long()))
-        lab = 'None' if not self.labs else str(Lab.get(m.eval(self.lab()).as_long()))
+        lab = 'None' if not self.labs else str(
+            Lab.get(m.eval(self.lab()).as_long()))
         return f'{self},{self.faculty},{room},{lab},{timeslot}'
