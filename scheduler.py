@@ -142,31 +142,21 @@ class Scheduler:
                 for name in self.faculty.keys():
                     courses = [c for c in self.courses if c.faculty == name]
                     for i, j in itertools.combinations(courses, 2):
-                        if i.num == j.num:
+                        if i.subject == j.subject and i.num == j.num:
                             yield next_to(i.time(), j.time())
                             yield i.room() == j.room()
                             yield z3.Implies(z3.And(has_lab(i.time()), has_lab(j.time())), i.lab() == j.lab())
-                        else:
-                            yield z3.Not(next_to(i.time(), j.time()))
 
             # add constraint that all three two-hour period must be on different days
             def no_crazy_days():
                 for name in self.faculty.keys():
-                    days = functools.reduce(operator.or_, set(
-                        t.day for t in self.faculty[name]))
-                    if days == (Day.TUE | Day.THU) or days == (Day.MON | Day.WED):
-                        courses = [
-                            c for c in self.courses if c.faculty == name]
-                        if len(courses) >= 3:
-                            yield z3.Not(z3.And(
-                                list(z3.Implies(z3.And(has_lab(c.time()), has_lab(d.time())), labs_on_same_day(
-                                    c.time(), d.time())) for c, d in itertools.combinations(courses, 2))
-                            ))
+                    courses = [c for c in self.courses if c.faculty == name]
+                    if len(courses) > 2:
+                        yield z3.Not(z3.And(has_lab(courses[0].time()), *(z3.And(has_lab(r.time()), labs_on_same_day(courses[0].time(), r.time())) for r in courses[1:])))
 
             yield from assign_to_faculty()
             yield from non_overlapping()
             yield from same_adjacent()
-            # NOTE: may need to comment this out
             yield from no_crazy_days()
 
         def conflict_constraints():

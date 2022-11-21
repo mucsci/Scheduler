@@ -34,41 +34,41 @@ class Course(Identifiable, default_id=0):
         self.conflicts = conflicts
         self.faculty = faculty
         # z3 variables for each course -- must assign a timeslot, a room, and a lab
-        self._lab = z3.Int(f'{self.__repr__()}_lab')
-        self._room = z3.Int(f'{self.__repr__()}_room')
-        self._time = z3.Int(f'{self.__repr__()}_time')
-
-    def __str__(self):
+        self._lab = z3.Int(f'{repr(self)}_lab')
+        self._room = z3.Int(f'{repr(self)}_room')
+        self._time = z3.Int(f'{repr(self)}_time')
+        
+    def __str__(self) -> str:
         """
         Pretty Print representation of a course is its subject, number, and section
         """
         return f'{self.subject}{self.num}.{self.section:02d}'
 
-    def time(self):
+    def time(self) -> z3.ArithRef:
         """
         the z3 variable used for assigning a time slot
         """
         return self._time
 
-    def room(self):
+    def room(self) -> z3.ArithRef:
         """
         the z3 variable used for assigning a room
         """
         return self._room
 
-    def lab(self):
+    def lab(self) -> z3.ArithRef:
         """
         the z3 variable used for assigning a lab
         """
         return self._lab
 
-    def evaluate(self, m: z3.ModelRef):
+    def evaluate(self, m: z3.ModelRef) -> dict:
         timeslot = m.eval(self.time()).as_long()
         room = m.eval(self.room()).as_long()
         lab = None if not self.labs else m.eval(self.lab()).as_long()
         return {'name': str(self), 'time': timeslot, 'room': room, 'lab': lab, 'faculty': self.faculty}
 
-    def csv(self, m: z3.ModelRef):
+    def csv(self, m: z3.ModelRef) -> str:
         timeslot = str(TimeSlot.get(m.eval(self.time()).as_long()))
         room = str(Room.get(m.eval(self.room()).as_long()))
         lab = 'None' if not self.labs else str(
