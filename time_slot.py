@@ -211,6 +211,10 @@ class TimeSlot(Identifiable, default_id=0):
         if self.has_lab() and other.has_lab():
             t1: TimeInstance = self.lab_time()
             t2: TimeInstance = other.lab_time()
+            # forcefully disallow T/W split labs -- messes up fall schedules otherwise!
+            # keep uncommented unless you really want this
+            # if {t1.day, t2.day} == {Day.TUE, Day.WED}:
+            #     return False
             if diff(t1, t2) > MAX_TIME_DELTA:
                 return False
             for t1 in self.times():
@@ -218,7 +222,7 @@ class TimeSlot(Identifiable, default_id=0):
                     for t2 in other.times():
                         if other.lab_time() != t2:
                             if t1.day == t2.day:
-                                if diff(t1, t2) > MAX_TIME_DELTA:
+                                if diff(t1, t2) > MAX_TIME_DELTA_NO_LAB:
                                     return False
             return True
         else:
