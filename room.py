@@ -15,9 +15,3 @@ class Room(Identifiable, default_id=100):
 
     def __str__(self):
         return self.name
-
-    def __repr__(self):
-        return f'"{self.name}"'
-
-    def __json__(self):
-        return self.name

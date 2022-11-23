@@ -178,6 +178,23 @@ class TimeSlot(Identifiable, default_id=0):
         """
         return self._lab_index > 0
 
+    def not_next_to(self, other: 'TimeSlot') -> bool:
+        """
+        Ensure that a time slot has padding between all possibly adjacent times
+        """
+        MAX_TIME_DIFF = Duration(50)
+
+        def diff(t1: TimeInstance, t2: TimeInstance) -> Duration:
+            return min(abs(t1.start - t2.stop), abs(t2.start - t1.stop))
+
+        for t1 in self._times:
+            for t2 in other._times:
+                if t1.day == t2.day:
+                    if diff(t1, t2) <= MAX_TIME_DIFF:
+                        return False
+
+        return True
+
     def next_to(self, other: 'TimeSlot') -> bool:
         """
         Check if a time slot is logically next to another (same day + adjacent or next day + same time)
@@ -185,35 +202,33 @@ class TimeSlot(Identifiable, default_id=0):
         MAX_TIME_DELTA = Duration(70)
         MAX_TIME_DELTA_NO_LAB = Duration(60)
 
-        def diff_same_day(t1: TimeInstance, t2: TimeInstance) -> Duration:
-            return min(abs(t1.start - t2.stop), abs(t2.start - t1.stop))
-
-        def diff_diff_day(t1: TimeInstance, t2: TimeInstance) -> Duration:
-            return abs(t1.start - t2.start)
+        def diff(t1: TimeInstance, t2: TimeInstance) -> Duration:
+            if t1.day == t2.day:
+                return min(abs(t1.start - t2.stop), abs(t2.start - t1.stop))
+            else:
+                return abs(t1.start - t2.start)
 
         if self.has_lab() and other.has_lab():
             t1: TimeInstance = self.lab_time()
             t2: TimeInstance = other.lab_time()
-            lab_adjacent = (diff_same_day(t1, t2) if t1.day ==
-                            t2.day else diff_diff_day(t1, t2)) <= MAX_TIME_DELTA
-            lecture_adjacent = True
-            for i1, t1 in enumerate(self.times()):
-                if self._lab_index == i1:
-                    continue
-                for i2, t2 in enumerate(other.times()):
-                    if other._lab_index == i2:
-                        continue
-                    if t1.day == t2.day:
-                        if diff_same_day(t1, t2) > MAX_TIME_DELTA:
-                            lecture_adjacent = False
-            return lab_adjacent and lecture_adjacent
+            if diff(t1, t2) > MAX_TIME_DELTA:
+                return False
+            for t1 in self.times():
+                if self.lab_time() != t1:
+                    for t2 in other.times():
+                        if other.lab_time() != t2:
+                            if t1.day == t2.day:
+                                if diff(t1, t2) > MAX_TIME_DELTA:
+                                    return False
+            return True
         else:
             if len(self.times()) != len(other.times()):
                 return False
-            for t1, t2 in zip(self.times(), other.times()):
-                if t1.day == t2.day:
-                    if diff_same_day(t1, t2) > MAX_TIME_DELTA_NO_LAB:
-                        return False
+            for t1 in self._times:
+                for t2 in other._times:
+                    if t1.day == t2.day:
+                        if diff(t1, t2) > MAX_TIME_DELTA_NO_LAB:
+                            return False
             return True
 
     def overlaps(self, other: 'TimeSlot') -> bool:
@@ -253,15 +268,7 @@ class TimeSlot(Identifiable, default_id=0):
         """
         Returns true if this time slot fits into the passed range list (day mask, start time, and end time)
         """
-        for t in self.times():
-            fits = False
-            for slot in ranges:
-                if t.day == slot.day:
-                    fits = fits or (t.day == slot.day and slot.start <=
-                                    t.start and t.stop <= slot.stop)
-            if not fits:
-                return False
-        return True
+        return all(any((t.day == slot.day and slot.start <= t.start and t.stop <= slot.stop) for slot in ranges if t.day == slot.day) for t in self.times())
 
     def __repr__(self) -> str:
         return str(list(repr(t) for t in self.times()))

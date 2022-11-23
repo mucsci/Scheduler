@@ -114,9 +114,11 @@ class Scheduler:
             'next_to', TimeSlot.next_to)
         has_lab, l_constraints = self._z3ify_time_slot_fn(
             'has_lab', TimeSlot.has_lab)
+        not_next_to, n_constraints2 = self._z3ify_time_constraint(
+            'not_next_to', TimeSlot.not_next_to)
 
         fn_constraints = o_constraints + i_constraints + \
-            n_constraints + o_labs_on_same_day + l_constraints
+            n_constraints + o_labs_on_same_day + l_constraints + n_constraints2
 
         # basic identity constraints and bounds
         def basic_constraints():
@@ -138,19 +140,22 @@ class Scheduler:
                     yield z3.And(list(z3.Not(overlaps(i, j)) for i, j in itertools.combinations(assigned, 2)))
 
             # - ensure sections of the same class are adjacent
+            # - and that sections of different classes are NOT adjacent
             def same_adjacent():
                 for name in self.faculty.keys():
-                    courses = [c for c in self.courses if c.faculty == name]
+                    courses = (c for c in self.courses if c.faculty == name)
                     for i, j in itertools.combinations(courses, 2):
                         if i.subject == j.subject and i.num == j.num:
                             yield next_to(i.time(), j.time())
                             yield i.room() == j.room()
                             yield z3.Implies(z3.And(has_lab(i.time()), has_lab(j.time())), i.lab() == j.lab())
+                        else:
+                            yield not_next_to(i.time(), j.time())
 
             # add constraint that all three two-hour period must be on different days
             def no_crazy_days():
                 for name in self.faculty.keys():
-                    courses = [c for c in self.courses if c.faculty == name]
+                    courses = [c for c in self.courses if c.faculty == name and c.labs]
                     if len(courses) > 2:
                         yield z3.Not(z3.And(has_lab(courses[0].time()), *(z3.And(has_lab(r.time()), labs_on_same_day(courses[0].time(), r.time())) for r in courses[1:])))
 
@@ -224,10 +229,10 @@ def concretize(map: Dict):
     def iter():
         for k, v in map.items():
             if k == 'room':
-                yield (k, Room.get(map["room"]))
+                yield (k, Room.get(map["room"]).id)
             elif k == 'lab':
                 if v:
-                    yield (k, {'room': Lab.get(map["lab"]), 'time': TimeSlot.get(map["time"]).lab_time()})
+                    yield (k, {'room': Lab.get(map["lab"]).id, 'time': TimeSlot.get(map["time"]).lab_time()})
             elif k == 'time':
                 yield (k, list(t for t in TimeSlot.get(map["time"])._times))
             else:
@@ -241,7 +246,11 @@ def generate_models(data, limit):
     def all():
         for _, m, _ in s.get_models(limit):
             yield list(concretize(c.evaluate(m)) for c in s.courses)
-    return json.dumps({'schedules': list(all())}, cls=MyEncoder)
+    return json.dumps({
+        'schedules': list(all()),
+        'rooms': { str(v.id) : v.name for v in s.rooms.values() },
+        'labs': { str(v.id) : v.name for v in s.labs.values() }
+    }, cls=MyEncoder, separators=[',',':'])
 
 
 if __name__ == '__main__':

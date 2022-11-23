@@ -46,3 +46,6 @@ class Identifiable(ABC):
             return cls._all[id]
         else:
             return None
+
+    def __repr__(self):
+        return str(self.id)
