@@ -4,12 +4,10 @@
 # Copyright 2021
 # All Rights Reserved
 
-from typing import Callable, DefaultDict, Dict, List, Tuple
+from typing import DefaultDict, Dict, List
 from collections import defaultdict
 import json
-import functools
 import itertools
-import operator
 import z3
 import sys
 
@@ -70,7 +68,7 @@ class Scheduler:
 
     @staticmethod
     def _simplify(x):
-        return z3.simplify(x, cache_all=True, elim_and=True)
+        return z3.simplify(x, cache_all=True, elim_and=True, rewrite_patterns=True)
 
     def _z3ify_time_constraint(self, name: str, fn):
         z3fn = z3.Function(name, z3.IntSort(), z3.IntSort(), z3.BoolSort())
@@ -104,21 +102,20 @@ class Scheduler:
     def _build(self):
 
         # abstract function constraints
-        overlaps, o_constraints = self._z3ify_time_constraint(
+        overlaps, overlaps_C = self._z3ify_time_constraint(
             'overlaps', TimeSlot.overlaps)
-        labs_on_same_day, o_labs_on_same_day = self._z3ify_time_constraint(
+        labs_on_same_day, labs_on_same_day_C = self._z3ify_time_constraint(
             'labs_on_same_day', TimeSlot.labs_on_same_day)
-        lab_overlaps, i_constraints = self._z3ify_time_constraint(
+        lab_overlaps, lab_overlaps_C = self._z3ify_time_constraint(
             'lab_overlaps', TimeSlot.lab_overlaps)
-        next_to, n_constraints = self._z3ify_time_constraint(
+        next_to, next_to_C = self._z3ify_time_constraint(
             'next_to', TimeSlot.next_to)
-        has_lab, l_constraints = self._z3ify_time_slot_fn(
+        has_lab, has_lab_C = self._z3ify_time_slot_fn(
             'has_lab', TimeSlot.has_lab)
-        not_next_to, n_constraints2 = self._z3ify_time_constraint(
+        not_next_to, not_next_to_C = self._z3ify_time_constraint(
             'not_next_to', TimeSlot.not_next_to)
 
-        fn_constraints = o_constraints + i_constraints + \
-            n_constraints + o_labs_on_same_day + l_constraints + n_constraints2
+        fn_constraints = overlaps_C + lab_overlaps_C + next_to_C + labs_on_same_day_C + has_lab_C + not_next_to_C
 
         # basic identity constraints and bounds
         def basic_constraints():
@@ -137,7 +134,7 @@ class Scheduler:
                 for name in self.faculty.keys():
                     assigned = list(c.time()
                                     for c in self.courses if c.faculty == name)
-                    yield z3.And(list(z3.Not(overlaps(i, j)) for i, j in itertools.combinations(assigned, 2)))
+                    yield z3.Not(z3.Or(list(overlaps(i, j) for i, j in itertools.combinations(assigned, 2))))
 
             # - ensure sections of the same class are adjacent
             # - and that sections of different classes are NOT adjacent
@@ -155,7 +152,8 @@ class Scheduler:
             # add constraint that all three two-hour period must be on different days
             def no_crazy_days():
                 for name in self.faculty.keys():
-                    courses = [c for c in self.courses if c.faculty == name and c.labs]
+                    courses = [
+                        c for c in self.courses if c.faculty == name and c.labs]
                     if len(courses) > 2:
                         yield z3.Not(z3.And(has_lab(courses[0].time()), *(z3.And(has_lab(r.time()), labs_on_same_day(courses[0].time(), r.time())) for r in courses[1:])))
 
@@ -169,38 +167,34 @@ class Scheduler:
             # - check the other courses time slot constraint(s)
             for c in self.courses:
                 for conflict_num in c.conflicts:
-                    for other in filter(lambda x: x.num == conflict_num, (c for c in self.courses)):
-                        yield z3.Not(overlaps(c.time(), other.time()))
+                    for d in self.courses:
+                        if c != d and d.num == conflict_num:
+                            yield z3.Not(overlaps(c.time(), d.time()))
 
         # assign to a lab (or none)
         # - ensure no timeslot + lab conflicts exist
         def lab_assign_constraints():
-            # make all constraints for room assignment for lab
-            def gen(c):
-                for name, lab in self.labs.items():
-                    if name in c.labs:
-                        yield c.lab() == lab.id
-
             # we must assign to a lab when we have options
-            yield from (z3.simplify(z3.Or(list(gen(c)))) for c in self.courses if c.labs)
+            yield from (z3.simplify(z3.Or(
+                list(c.lab() == lab.id for name,
+                     lab in self.labs.items() if name in c.labs)
+            )) for c in self.courses if c.labs)
 
             # any two courses with a lab must not have a resource overlap
             with_labs = list(filter(lambda x: len(x.labs) >= 1, self.courses))
-            for i, j in itertools.combinations(with_labs, 2):
-                yield z3.Implies(i.lab() == j.lab(), z3.Not(lab_overlaps(i.time(), j.time())))
+            yield from (z3.Implies(i.lab() == j.lab(), z3.Not(lab_overlaps(i.time(), j.time()))) for i, j in itertools.combinations(with_labs, 2))
 
         # assign to a classroom
         # - ensure no timeslot + classroom conflicts exist
         def room_assign_constraints():
-            # make all constraints for room assignment for lab
-            def gen(c):
-                yield from (c.room() == room.id for name, room in self.rooms.items() if name in c.rooms)
-
             # we must assign to a lab when we have options
-            yield from (z3.simplify(z3.Or(list(gen(c)))) for c in self.courses if c.rooms)
+            yield from (z3.simplify(z3.Or(
+                list(c.room() == room.id for name,
+                     room in self.rooms.items() if name in c.rooms)
+            )) for c in self.courses if c.rooms)
 
-            # any two courses with a lab must not have a resource overlap
-            yield from (z3.Implies(overlaps(i.time(), j.time()), i.room() != j.room()) for i, j in itertools.combinations(self.courses, 2))
+            # any two courses must not have a resource overlap
+            yield from (z3.Implies(i.room() == j.room(), z3.Not(overlaps(i.time(), j.time()))) for i, j in itertools.combinations(self.courses, 2))
 
         C = list(Scheduler._simplify(x) for x in itertools.chain(basic_constraints(), faculty_constraints(
         ), conflict_constraints(), lab_assign_constraints(), room_assign_constraints()))
@@ -248,9 +242,9 @@ def generate_models(data, limit):
             yield list(concretize(c.evaluate(m)) for c in s.courses)
     return json.dumps({
         'schedules': list(all()),
-        'rooms': { str(v.id) : v.name for v in s.rooms.values() },
-        'labs': { str(v.id) : v.name for v in s.labs.values() }
-    }, cls=MyEncoder, separators=[',',':'])
+        'rooms': {str(v.id): v.name for v in s.rooms.values()},
+        'labs': {str(v.id): v.name for v in s.labs.values()}
+    }, cls=MyEncoder, separators=[',', ':'])
 
 
 if __name__ == '__main__':

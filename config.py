@@ -27,8 +27,8 @@ def time_slots(credits : int) -> Iterable[TimeSlot]:
     elif credits == 4:
         # TR
         for (h, m) in [(8, 0), (9, 0), (10, 0), (13, 10), (14, 10), (15, 10)]:
-            yield TimeSlot.make_tr(TimePoint.make_from(h, m), LONG, 0)
-            yield TimeSlot.make_tr(TimePoint.make_from(h, m), LONG, 1)
+            yield TimeSlot.make_tr(TimePoint.make_from(h, m), LONG, lab_index=0)
+            yield TimeSlot.make_tr(TimePoint.make_from(h, m), LONG, lab_index=1)
             for lab in [Day.TUE, Day.THU]:
                 yield TimeSlot([
                     TimeInstance(Day.MON, TimePoint.make_from(h, 0), SHORT),
@@ -55,7 +55,7 @@ def time_slots(credits : int) -> Iterable[TimeSlot]:
             ], lab_index=1)
         # evenings
         for (h, m) in [(17, 0), (17, 30), (18, 0), (18, 30)]:
-            yield TimeSlot.make_mw(TimePoint.make_from(h, m), LONG, 0)
-            yield TimeSlot.make_mw(TimePoint.make_from(h, m), LONG, 1)
-            yield TimeSlot.make_tr(TimePoint.make_from(h, m), LONG, 0)
-            yield TimeSlot.make_tr(TimePoint.make_from(h, m), LONG, 1)
+            yield TimeSlot.make_mw(TimePoint.make_from(h, m), LONG, lab_index=0)
+            yield TimeSlot.make_mw(TimePoint.make_from(h, m), LONG, lab_index=1)
+            yield TimeSlot.make_tr(TimePoint.make_from(h, m), LONG, lab_index=0)
+            yield TimeSlot.make_tr(TimePoint.make_from(h, m), LONG, lab_index=1)

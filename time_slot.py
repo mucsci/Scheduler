@@ -258,15 +258,12 @@ class TimeSlot(Identifiable, default_id=0):
         """
         Internal utility function that returns true if two time slot instances overlap at any point
         """
-        return all([
-            (a.day == b.day),
-            any([
-                (a.start <= b.start <= a.stop),
-                (b.start <= a.start <= b.stop),
-                (a.start <= b.stop <= a.stop),
-                (b.start <= a.stop <= b.stop)
-            ])
-        ])
+        return (a.day == b.day) and (
+            (a.start <= b.start < a.stop) or
+            (a.start <= b.stop < a.stop) or
+            (b.start <= a.start < b.stop) or
+            (b.start <= a.stop < b.stop)
+        )
 
     def in_time_ranges(self, ranges: List[TimeInstance]) -> bool:
         """
