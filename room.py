@@ -1,11 +1,4 @@
-# Author: Will Killian
-#         https://www.github.com/willkill07
-#
-# Copyright 2021
-# All Rights Reserved
-
 from identifiable import Identifiable
-import json_fix
 
 
 class Room(Identifiable, default_id=100):

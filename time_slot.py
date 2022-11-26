@@ -1,19 +1,7 @@
-# Author: Will Killian
-#         https://www.github.com/willkill07
-#
-# Copyright 2021
-# All Rights Reserved
-
 from dataclasses import dataclass
 from identifiable import Identifiable
 from typing import List
 from day import Day
-import json
-import json_fix
-
-
-def hhmm_to_timeid(hour: int, minute: int) -> int:
-    return 60 * hour + minute
 
 
 @dataclass
@@ -68,7 +56,7 @@ class TimePoint:
 
     @staticmethod
     def make_from(hr: int, min: int) -> 'TimePoint':
-        return TimePoint(hhmm_to_timeid(hr, min))
+        return TimePoint(60 * hr + min)
 
     @property
     def value(self):
@@ -133,18 +121,6 @@ class TimeInstance:
 
 
 class TimeSlot(Identifiable, default_id=0):
-
-    @staticmethod
-    def make_mwf(hour, minute, duration: Duration):
-        return TimeSlot(list(TimeInstance(day, TimePoint.make_from(hour, minute), duration) for day in [Day.MON, Day.WED, Day.FRI]))
-
-    @staticmethod
-    def make_tr(time_point: TimePoint, duration: Duration, lab_index=-1):
-        return TimeSlot(list(TimeInstance(day, time_point, duration) for day in [Day.TUE, Day.THU]), lab_index=lab_index)
-
-    @staticmethod
-    def make_mw(time_point: TimePoint, duration: Duration, lab_index=-1):
-        return TimeSlot(list(TimeInstance(day, time_point, duration) for day in [Day.MON, Day.WED]), lab_index=lab_index)
 
     def __init__(self, times, lab_index=-1):
         """

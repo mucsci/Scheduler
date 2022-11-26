@@ -1,9 +1,3 @@
-# Author: Will Killian
-#         https://www.github.com/willkill07
-#
-# Copyright 2021
-# All Rights Reserved
-
 from lab import Lab
 from room import Room
 from time_slot import TimeSlot
@@ -37,7 +31,7 @@ class Course(Identifiable, default_id=0):
         self._lab = z3.Int(f'{repr(self)}_lab')
         self._room = z3.Int(f'{repr(self)}_room')
         self._time = z3.Int(f'{repr(self)}_time')
-        
+
     def __str__(self) -> str:
         """
         Pretty Print representation of a course is its subject, number, and section

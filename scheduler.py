@@ -1,23 +1,19 @@
-# Author: Will Killian
-#         https://www.github.com/willkill07
-#
-# Copyright 2021
-# All Rights Reserved
-
 from typing import DefaultDict, Dict, List
 from collections import defaultdict
 import json
 import itertools
 import z3
 import sys
+from json import JSONEncoder
+import json_fix
 
 from course import Course
 from lab import Lab
 from room import Room
-from time_slot import Day, Duration, TimeInstance, TimePoint, TimeSlot, hhmm_to_timeid
+from time_slot import Day, TimeInstance, TimePoint, TimeSlot
 from config import time_slots
 
-from json import JSONEncoder
+
 
 
 def load_from_file(filename):
@@ -48,9 +44,10 @@ class Scheduler:
             def walk():
                 for d, times in zip(days, person['times']):
                     for start, end in times:
-                        duration = Duration(hhmm_to_timeid(
-                            *end) - hhmm_to_timeid(*start))
-                        yield TimeInstance(d, TimePoint.make_from(start[0], start[1]), duration)
+                        start_time = TimePoint.make_from(*start)
+                        end_time = TimePoint.make_from(*end)
+                        duration = end_time - start_time
+                        yield TimeInstance(d, start_time, duration)
             return list(walk())
         self.faculty = {x: get_info(
             json_data['faculty'][x]) for x in json_data['faculty']}
@@ -115,7 +112,8 @@ class Scheduler:
         not_next_to, not_next_to_C = self._z3ify_time_constraint(
             'not_next_to', TimeSlot.not_next_to)
 
-        fn_constraints = overlaps_C + lab_overlaps_C + next_to_C + labs_on_same_day_C + has_lab_C + not_next_to_C
+        fn_constraints = overlaps_C + lab_overlaps_C + next_to_C + \
+            labs_on_same_day_C + has_lab_C + not_next_to_C
 
         # basic identity constraints and bounds
         def basic_constraints():
@@ -244,7 +242,7 @@ def generate_models(data, limit):
         'schedules': list(all()),
         'rooms': {str(v.id): v.name for v in s.rooms.values()},
         'labs': {str(v.id): v.name for v in s.labs.values()}
-    }, cls=MyEncoder, separators=[',', ':'])
+    }, cls=MyEncoder, separators=(',', ':'))
 
 
 if __name__ == '__main__':

@@ -1,9 +1,3 @@
-# Author: Will Killian
-#         https://www.github.com/willkill07
-#
-# Copyright 2021
-# All Rights Reserved
-
 from enum import IntEnum, auto
 
 
