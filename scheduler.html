@@ -1,0 +1,208 @@
+<html>
+    <head>
+        <title>Scheduler</title>
+        <style>
+html,body {
+    font-family:'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;
+}
+@media not print {
+    #schedule>div {
+        display: inline-block;
+    }
+}
+@media print {
+    #top {
+        display: none;
+    }
+}
+        </style>
+    </head>
+    <body>
+        <div id="top">
+            <input id="file-select" name="file-select" type="file" accept=".json" />
+            <span id="nav">
+                <input id="prev" name="prev" type="button" value="<" />
+                <span id="curr"></span>
+                <input id="next" name="next" type="button" value=">" />
+            </div>
+        </div>
+        <div id="schedule">
+
+        </div>
+        <script src="https://d3js.org/d3.v7.min.js"></script>
+        <script type="text/javascript">
+var root_json = null;
+var root_courses = null;
+var faculty = Object();
+var curr_index = -1;
+
+const getHashCode = (val) => {
+    if (!(val in faculty)) {
+        faculty[val] = Object.keys(faculty).length;
+    }
+    return faculty[val];
+};
+
+const intToHSL = (val) => {
+    var shortened = (val * 25) % 360;
+    return "hsla(" + shortened + ",100%,30%,20%)";
+};
+
+function map_course(course) {
+    var result = Array();
+    const name = course.name;
+    const room = course.room;
+    const faculty = course.faculty;
+    for (const t in course.time) {
+        var entry = {...course.time[t]};
+        entry['name'] = name;
+        entry['room'] = room;
+        entry['faculty'] = faculty;
+        result.push(entry);
+    }
+    if (course.lab) {
+        var entry = {...course.lab.time};
+        entry['name'] = name;
+        entry['room'] = course.lab.room;
+        entry['faculty'] = faculty;
+        result.push(entry);
+    }
+    return result;
+}
+
+function load_index(index) {
+    document.getElementById("curr").textContent = (index + 1) + " of " + root_json.length;
+    document.getElementById("next").disabled = index == root_json.length - 1;
+    document.getElementById("prev").disabled = index == 0;
+    curr_index = index;
+
+    d3.select('#schedule').html("");
+    
+    const the_data = root_json[index].flatMap(map_course);
+
+    for (const room of ["Roddy 136", "Roddy 140", "Roddy 147", "Mac", "Linux", "elsewhere"]) {
+
+        const div = d3.select("#schedule")
+            .append("div");
+
+        div.append("h2")
+            .text(room);
+
+        const days = div.append("div");
+        
+        days.append('div')
+            .style('width', '40px')
+            .style("display", "inline-block");
+        const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        for (const i in DAYS) {
+            days.append('span')
+                .text(DAYS[i])
+                .style("font-size", "10px")
+                .style("width", "150px")
+                .style("display", "inline-block")
+                .style("text-align", "center");
+        }
+            
+        const svg = div.append("svg")
+            .attr("width", 800)
+            .attr("height", 720);
+        
+        div.append("p")
+            .style("page-break-after", "always");
+        
+        const TIMES = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+        
+        svg.selectAll('line')
+            .data(TIMES)
+            .enter()
+            .append('line')
+            .style("stroke", "lightgrey")
+            .style("stroke-width", 1)
+            .attr('x1', 0).attr('y1', d => (d - 8) * 60)
+            .attr('x2', 800).attr('y2', d => (d - 8) * 60);
+        svg.selectAll('text')
+            .data(TIMES)
+            .enter()
+            .append('text')
+            .attr('x', 0).attr('y', d => (d - 8) * 60)
+            .attr('dy', 12)
+            .text(d => {
+                const h = (d > 12) ? d - 12 : d;
+                const ap = (d >= 12) ? "PM" : "AM";
+                return h + ":00 " + ap;
+            })
+            .style("font-size", "10px");
+        
+        const filtered = the_data.filter(x => x.room == room);
+        svg.selectAll('rect')
+            .data(filtered)
+            .enter()
+            .append('rect')
+            .attr('x', d => (d.day - 1) * 150 + 45 + 5)
+            .attr('y', d => d.start - 8 * 60)
+            .attr('width', 140)
+            .attr('height', d => d.duration)
+            .style('fill', d => intToHSL(getHashCode(d.faculty)))
+            .style('stroke', 'black')
+        const group = svg.selectAll('g')
+            .data(filtered)
+            .enter()
+            .append('g');
+        group.append('text')
+            .attr('dy', 12)
+            .attr('x', d => (d.day - 1) * 150 + 50 + 5)
+            .attr('y', d => d.start - 8 * 60)
+            .text(d => d.name)
+            .style('font-weight', 700)
+            .style("font-size", "12px");
+        group.append('text')
+            .attr('dy', 12)
+            .attr('x', d => (d.day - 1) * 150 + 50 + 5)
+            .attr('y', d => d.start - 8 * 60 + 15)
+            .text(d => d.faculty)
+            .style("font-size", "10px");
+        group.append('text')
+            .attr('dy', 12)
+            .attr('x', d => (d.day - 1) * 150 + 50 + 5)
+            .attr('y', d => d.start - 8 * 60 + 30)
+            .text(d => {
+                const fn = (t) => {
+                    const hh = Math.floor(t / 60);
+                    const mm = t % 60;
+                    const h = (hh > 12) ? hh - 12 : hh;
+                    const ap = (hh >= 12) ? "PM" : "AM";
+                    return h + ":" + String(mm).padStart(2, '0') + " " + ap;
+                };
+                return fn(d.start) + " - " + fn(d.start + d.duration);
+            })
+            .style("font-size", "10px");
+    }
+}
+
+function read_json(event) {
+    const result = event.target.result;
+    root_json = JSON.parse(result);
+    document.getElementById('nav').style.display = "initial";
+    load_index(0);
+}
+
+function file_reader() {
+    if (this.files && this.files[0]) {
+        const file = this.files[0];
+        const reader = new FileReader();
+        reader.addEventListener('load', read_json);
+        reader.readAsText(file);
+    }
+}
+
+document.getElementById('file-select').addEventListener("change", file_reader);
+document.getElementById('nav').style.display = "none";
+document.getElementById('prev').addEventListener("click", () => {
+    load_index(curr_index - 1);
+});
+document.getElementById('next').addEventListener("click", () => {
+    load_index(curr_index + 1);
+});
+        </script>
+    </body>
+</html>

@@ -117,7 +117,7 @@ class TimeInstance:
         return f'{self.day.name} {str(self.start)}-{str(self.stop)}'
 
     def __json__(self):
-        return {'day': self.day, 'start': self.start, 'duration': self.duration, 'stop': self.stop}
+        return {'day': self.day, 'start': self.start, 'duration': self.duration}
 
 
 class TimeSlot(Identifiable, default_id=0):
@@ -189,8 +189,8 @@ class TimeSlot(Identifiable, default_id=0):
             t2: TimeInstance = other.lab_time()
             # forcefully disallow T/W split labs -- messes up fall schedules otherwise!
             # keep uncommented unless you really want this
-            # if {t1.day, t2.day} == {Day.TUE, Day.WED}:
-            #     return False
+            #if {t1.day, t2.day} == {Day.TUE, Day.WED}:
+            #    return False
             if diff(t1, t2) > MAX_TIME_DELTA:
                 return False
             for t1 in self.times():

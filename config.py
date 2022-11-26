@@ -2,12 +2,6 @@ from typing import Iterable
 from day import Day
 from time_slot import Duration, TimeInstance, TimePoint, TimeSlot
 
-# other departments (such as math) would want to define all of their
-# - 3 credit course times
-# - 4 credit course times
-# here -- programmatically would probably be best but a sequence of yield statements
-# could also work
-
 
 def time_slots(credits: int) -> Iterable[TimeSlot]:
     """
@@ -40,7 +34,7 @@ def time_slots(credits: int) -> Iterable[TimeSlot]:
                             Day.FRI, TimePoint.make_from(hh, 0), SHORT)
                     ], lab_index=1)
         # W
-        for (h, m) in [(8, 0), (9, 0), (10, 0), (11, 0), (12, 0), (13, 0), (14, 0), (15, 0)]:
+        for (h, m) in [(8, 0), (9, 0), (10, 0), (11, 0), (12, 0), (13, 0)]:
             for hh in [h, h + 1]:
                 yield TimeSlot([
                     TimeInstance(Day.MON, TimePoint.make_from(hh, 0), SHORT),

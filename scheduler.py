@@ -221,10 +221,10 @@ def concretize(map: Dict):
     def iter():
         for k, v in map.items():
             if k == 'room':
-                yield (k, Room.get(map["room"]).id)
+                yield (k, Room.get(map["room"]).name)
             elif k == 'lab':
                 if v:
-                    yield (k, {'room': Lab.get(map["lab"]).id, 'time': TimeSlot.get(map["time"]).lab_time()})
+                    yield (k, {'room': Lab.get(map["lab"]).name, 'time': TimeSlot.get(map["time"]).lab_time()})
             elif k == 'time':
                 yield (k, list(t for t in TimeSlot.get(map["time"])._times))
             else:
@@ -238,11 +238,7 @@ def generate_models(data, limit):
     def all():
         for _, m, _ in s.get_models(limit):
             yield list(concretize(c.evaluate(m)) for c in s.courses)
-    return json.dumps({
-        'schedules': list(all()),
-        'rooms': {str(v.id): v.name for v in s.rooms.values()},
-        'labs': {str(v.id): v.name for v in s.labs.values()}
-    }, cls=MyEncoder, separators=(',', ':'))
+    return json.dumps(list(all()), cls=MyEncoder, separators=(',', ':'))
 
 
 if __name__ == '__main__':
