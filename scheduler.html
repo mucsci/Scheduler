@@ -33,18 +33,28 @@ html,body {
         <script type="text/javascript">
 var root_json = null;
 var root_courses = null;
-var faculty = Object();
 var curr_index = -1;
 
-const getHashCode = (val) => {
-    if (!(val in faculty)) {
-        faculty[val] = Object.keys(faculty).length;
+const getHashCode = (str) => {
+    let h1 = 0x10293847;
+    let h2 = 0xfeedf00d;
+    for (let i = 0, ch; i < str.length; i++) {
+        ch = str.charCodeAt(i);
+        h1 = Math.imul(h1 ^ ch, 2654435761);
+        h2 = Math.imul(h2 ^ ch, 1597334677);
     }
-    return faculty[val];
+    
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    
+    return 4294967296 * (2097151 & h2) + (h1 >>> 0);
 };
 
 const intToHSL = (val) => {
-    var shortened = (val * 25) % 360;
+    val ^= val << 13;
+    val ^= val >> 17;
+    val ^= val << 5;
+    const shortened = val % 360;
     return "hsla(" + shortened + ",100%,30%,20%)";
 };
 
