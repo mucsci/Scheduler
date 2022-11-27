@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from identifiable import Identifiable
-from typing import List
+from typing import List, Optional
 from day import Day
 
 
@@ -122,7 +122,7 @@ class TimeInstance:
 
 class TimeSlot(Identifiable, default_id=0):
 
-    def __init__(self, times, lab_index=-1):
+    def __init__(self, times, lab_index=None):
         """
         Constructs a time slot.
 
@@ -130,10 +130,10 @@ class TimeSlot(Identifiable, default_id=0):
         ----------
         times : vararg of (Day, hour, minute, duration) tuples
             meeting times
-        lab_index : int = -1
+        lab_index : Optional[int] = None
             an integral number representing index of which a lab period occurs (or none at all)
         """
-        self._lab_index: int = lab_index
+        self._lab_index: Optional[int] = lab_index
         self._times: List[TimeInstance] = times
 
     def times(self) -> List[TimeInstance]:
@@ -152,7 +152,7 @@ class TimeSlot(Identifiable, default_id=0):
         """
         Returns True IFF the timeslot has a lab (two hour component)
         """
-        return self._lab_index > 0
+        return self._lab_index is not None
 
     def not_next_to(self, other: 'TimeSlot') -> bool:
         """
@@ -189,8 +189,8 @@ class TimeSlot(Identifiable, default_id=0):
             t2: TimeInstance = other.lab_time()
             # forcefully disallow T/W split labs -- messes up fall schedules otherwise!
             # keep uncommented unless you really want this
-            #if {t1.day, t2.day} == {Day.TUE, Day.WED}:
-            #    return False
+            # if {t1.day, t2.day} == {Day.TUE, Day.WED}:
+            #     return False
             if diff(t1, t2) > MAX_TIME_DELTA:
                 return False
             for t1 in self.times():
