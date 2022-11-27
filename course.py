@@ -32,6 +32,9 @@ class Course(Identifiable, default_id=0):
         self._room = z3.Int(f'{repr(self)}_room')
         self._time = z3.Int(f'{repr(self)}_time')
 
+    def uid(self) -> str:
+        return f'{self.subject} {self.num}'
+
     def __str__(self) -> str:
         """
         Pretty Print representation of a course is its subject, number, and section

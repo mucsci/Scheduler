@@ -207,15 +207,15 @@ class Scheduler:
             yield i, m, s.statistics()
             i += 1
             block = []
-            for d in m:
-                # d is a declaration     # ignore room differences in schedules
-                if d.arity() <= 0 and not d.name().endswith('room') and not d.name().endswith('lab'):
-                    # create a constant from declaration
-                    c = d()
-                    if not z3.is_array(c) and c.sort().kind() != z3.Z3_UNINTERPRETED_SORT:
-                        block.append(c == m[d])
-            s.add(z3.simplify(z3.Not(z3.And(*block))))
-
+            for _, courses in itertools.groupby(self.courses, lambda c: c.faculty):
+                for _, v in itertools.groupby(courses, Course.uid):
+                    ordered = list(v)
+                    realized = list(m[c.time()] for c in ordered)
+                    curr = []
+                    for r in itertools.permutations(ordered):
+                        curr.append(z3.And(list(act == exp.time() for act,exp in zip(realized, r))))
+                    block.append(z3.Not(z3.Or(*curr)))
+            s.add(Scheduler._simplify(z3.Or(*block)))
 
 def concretize(map: Dict):
     def iter():
