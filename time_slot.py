@@ -142,11 +142,14 @@ class TimeSlot(Identifiable, default_id=0):
         """
         return self._times
 
-    def lab_time(self) -> TimeInstance:
+    def lab_time(self) -> Optional[TimeInstance]:
         """
         Returns only the two hour time (if necessary) for a lab
         """
-        return self.times()[self._lab_index]
+        if self._lab_index is not None:
+            return self.times()[self._lab_index]
+        else:
+            return None
 
     def has_lab(self) -> bool:
         """
@@ -185,8 +188,10 @@ class TimeSlot(Identifiable, default_id=0):
                 return abs(t1.start - t2.start)
 
         if self.has_lab() and other.has_lab():
-            t1: TimeInstance = self.lab_time()
-            t2: TimeInstance = other.lab_time()
+            t1: Optional[TimeInstance] = self.lab_time()
+            t2: Optional[TimeInstance] = other.lab_time()
+            if t1 is None or t2 is None:
+                return False
             # forcefully disallow T/W split labs -- messes up fall schedules otherwise!
             # keep uncommented unless you really want this
             # if {t1.day, t2.day} == {Day.TUE, Day.WED}:
@@ -221,13 +226,21 @@ class TimeSlot(Identifiable, default_id=0):
         """
         Returns true IFF this timeslot's two-hour block has any overlap with the passed time slot's two-hour block
         """
-        return self.has_lab() and other.has_lab() and TimeSlot._overlaps(self.lab_time(), other.lab_time())
+        a : Optional[TimeInstance] = self.lab_time()
+        b : Optional[TimeInstance] = other.lab_time()
+        if a is None or b is None:
+            return False
+        return TimeSlot._overlaps(a, b)
 
     def labs_on_same_day(self, other: 'TimeSlot') -> bool:
         """
         Returns true IFF the labs of this timeslot and the passed are on the same day
         """
-        return self.has_lab() and other.has_lab() and self.lab_time().day == other.lab_time().day
+        a : Optional[TimeInstance] = self.lab_time()
+        b : Optional[TimeInstance] = other.lab_time()
+        if a is None or b is None:
+            return False
+        return a.day == b.day
 
     @staticmethod
     def _overlaps(a: TimeInstance, b: TimeInstance) -> bool:
