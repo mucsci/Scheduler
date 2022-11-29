@@ -1,10 +1,12 @@
+from collections import defaultdict
+from typing import DefaultDict, List
+
+import z3
+
 from lab import Lab
 from room import Room
 from time_slot import TimeSlot
 from identifiable import Identifiable
-from typing import DefaultDict, List
-from collections import defaultdict
-import z3
 
 
 class Course(Identifiable, default_id=0):
@@ -26,7 +28,7 @@ class Course(Identifiable, default_id=0):
         self.labs = labs
         self.rooms = rooms
         self.conflicts = conflicts
-        self.faculty = faculty
+        self.faculty_name = faculty
         # z3 variables for each course -- must assign a timeslot, a room, and a lab
         self._lab = z3.Int(f'{repr(self)}_lab')
         self._room = z3.Int(f'{repr(self)}_room')
@@ -34,6 +36,9 @@ class Course(Identifiable, default_id=0):
 
     def uid(self) -> str:
         return f'{self.subject} {self.num}'
+
+    def faculty(self) -> str:
+        return self.faculty_name
 
     def __str__(self) -> str:
         """
@@ -63,11 +68,11 @@ class Course(Identifiable, default_id=0):
         timeslot = m.eval(self.time()).as_long()
         room = m.eval(self.room()).as_long()
         lab = None if not self.labs else m.eval(self.lab()).as_long()
-        return {'name': str(self), 'time': timeslot, 'room': room, 'lab': lab, 'faculty': self.faculty}
+        return {'name': str(self), 'time': timeslot, 'room': room, 'lab': lab, 'faculty': self.faculty_name}
 
     def csv(self, m: z3.ModelRef) -> str:
         timeslot = str(TimeSlot.get(m.eval(self.time()).as_long()))
         room = str(Room.get(m.eval(self.room()).as_long()))
         lab = 'None' if not self.labs else str(
             Lab.get(m.eval(self.lab()).as_long()))
-        return f'{self},{self.faculty},{room},{lab},{timeslot}'
+        return f'{self},{self.faculty_name},{room},{lab},{timeslot}'

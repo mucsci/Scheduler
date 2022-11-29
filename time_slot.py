@@ -122,7 +122,7 @@ class TimeInstance:
 
 class TimeSlot(Identifiable, default_id=0):
 
-    def __init__(self, times, lab_index=None):
+    def __init__(self, times: List[TimeInstance], lab_index: Optional[int]=None):
         """
         Constructs a time slot.
 
@@ -172,6 +172,17 @@ class TimeSlot(Identifiable, default_id=0):
                     if diff(t1, t2) <= MAX_TIME_DIFF:
                         return False
 
+        return True
+
+    def next_to_tues_wed(self, other: 'TimeSlot') -> bool:
+        if self.has_lab() and other.has_lab():
+            t1: Optional[TimeInstance] = self.lab_time()
+            t2: Optional[TimeInstance] = other.lab_time()
+            if t1 is None or t2 is None:
+                return False
+            # forcefully disallow T/W split labs -- messes up fall schedules otherwise!
+            if {t1.day, t2.day} == {Day.TUE, Day.WED}:
+                return False
         return True
 
     def next_to(self, other: 'TimeSlot') -> bool:
