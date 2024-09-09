@@ -43,18 +43,16 @@ const getHashCode = (str) => {
         h1 = Math.imul(h1 ^ ch, 2654435761);
         h2 = Math.imul(h2 ^ ch, 1597334677);
     }
-    
-    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
-    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-    
+    h1  = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+    h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2  = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+    h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  
     return 4294967296 * (2097151 & h2) + (h1 >>> 0);
 };
 
 const intToHSL = (val) => {
-    val ^= val << 13;
-    val ^= val >> 17;
-    val ^= val << 5;
-    const shortened = val % 360;
+    const shortened = Math.imul(val, Math.imul(val, val)) % 360;
     return "hsla(" + shortened + ",100%,30%,20%)";
 };
 

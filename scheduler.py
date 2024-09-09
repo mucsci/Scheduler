@@ -151,6 +151,7 @@ class Scheduler:
                 ])
 
             for _, courses in itertools.groupby(self.courses, Course.faculty):
+                courses = list(c for c in courses)
 
                 for i, j in itertools.combinations(courses, 2):
                     yield z3.And([
@@ -166,7 +167,6 @@ class Scheduler:
                             not_next_to(i.time(), j.time())
                         ))
                     ])
-
                 for i, j, k in itertools.combinations((c for c in courses if c.labs), 3):
                     # add constraint that all three two-hour period must be on different days
                     yield z3.Or(

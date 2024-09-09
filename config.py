@@ -42,7 +42,7 @@ def time_slots(credits: int) -> Iterable[TimeSlot]:
                     TimeInstance(Day.FRI, TimePoint.make_from(hh, 0), SHORT)
                 ], lab_index=1)
         # evenings
-        for (h, m) in [(17, 0), (17, 30), (18, 0), (18, 30)]:
+        for (h, m) in [(16, 0), (16, 30), (17, 0), (17, 30), (18, 0), (18, 30)]:
             for index in [0, 1]:
                 for (d1, d2) in [(Day.MON, Day.WED), (Day.TUE, Day.THU)]:
                     yield TimeSlot([
