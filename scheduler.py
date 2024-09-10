@@ -212,15 +212,15 @@ class Scheduler:
 
             def constraints():
                 for _, courses in itertools.groupby(self.courses, Course.faculty):
-                    for _, v in itertools.groupby(courses, Course.uid):
+                    for _, v in itertools.groupby(list(courses), Course.uid):
                         ordered = list(v)
                         yield z3.And(*(
-                            z3.Or(list(act != exp.time()
+                            z3.And(list(act != exp.time()
                                         for act, exp in zip((m[c.time()] for c in ordered), r)
                                         ))
                             for r in itertools.permutations(ordered)
                         ))
-            s.add(Scheduler._simplify(z3.Or(*constraints())))
+            s.add(Scheduler._simplify(z3.And(*constraints())))
 
         s = z3.Solver()
         s.add(self.constraints)
