@@ -67,6 +67,9 @@ class TimePoint:
 
     def __sub__(self, other: 'TimePoint') -> Duration:
         return Duration(self.value - other.value)
+    
+    def __abs__(self) -> Duration:
+        return Duration(abs(self.value))
 
     def __lt__(self, other: 'TimePoint') -> bool:
         return self.value < other.value
@@ -184,6 +187,13 @@ class TimeSlot(Identifiable, default_id=0):
             if {t1.day, t2.day} == {Day.TUE, Day.WED}:
                 return False
         return True
+    
+    def lab_starts_with_lecture(self) -> bool:
+        if not self.has_lab():
+            return True
+        lab_start = self.lab_time().start
+        lecture_start = self.times()[0].start
+        return abs(lecture_start - lab_start) <= Duration(10)
 
     def next_to(self, other: 'TimeSlot') -> bool:
         """

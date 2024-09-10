@@ -120,6 +120,8 @@ class Scheduler:
             'lab_overlaps', TimeSlot.lab_overlaps)
         next_to, next_to_C = self._z3ify_time_constraint(
             'next_to', TimeSlot.next_to)
+        lab_starts_with_lecture, lab_starts_with_lecture_C = self._z3ify_time_slot_fn(
+            'lab_starts_with_lecture', TimeSlot.lab_starts_with_lecture)
         has_lab, has_lab_C = self._z3ify_time_slot_fn(
             'has_lab', TimeSlot.has_lab)
         not_next_to, not_next_to_C = self._z3ify_time_constraint(
@@ -130,7 +132,7 @@ class Scheduler:
         fn_constraints = overlaps_C + lab_overlaps_C + next_to_C + \
             labs_on_same_day_C + has_lab_C + not_next_to_C
 
-        soft_fn_constraints = next_to_tues_wed_C
+        soft_fn_constraints = next_to_tues_wed_C + lab_starts_with_lecture_C
 
         def hard_constraints():
 
@@ -192,7 +194,15 @@ class Scheduler:
         def soft_constraints():
             for _, courses in itertools.groupby(self.courses, Course.faculty):
                 for _, v in itertools.groupby(courses, Course.uid):
+                    # useful for fall schedules -- ensures no T/W split between different sections for labs
                     yield z3.And([z3.Not(next_to_tues_wed(i.time(), j.time())) for i, j in itertools.combinations(v, 2)])
+
+            for _, courses in itertools.groupby(self.courses, Course.faculty):
+                for _, v in itertools.groupby(courses, Course.uid):
+                    v = list(x for x in v)
+                    if len(v) == 1:
+                        # if we only have a single course, make sure the lab start time aligns with lecture start time
+                        yield lab_starts_with_lecture(v[0].time());
 
         C = [Scheduler._simplify(x) for x in hard_constraints()]
         S = [Scheduler._simplify(x) for x in soft_constraints()]
@@ -214,20 +224,28 @@ class Scheduler:
                 for _, courses in itertools.groupby(self.courses, Course.faculty):
                     for _, v in itertools.groupby(list(courses), Course.uid):
                         ordered = list(v)
-                        yield z3.And(*(
-                            z3.And(list(act != exp.time()
-                                        for act, exp in zip((m[c.time()] for c in ordered), r)
-                                        ))
-                            for r in itertools.permutations(ordered)
-                        ))
-            s.add(Scheduler._simplify(z3.And(*constraints())))
+                        if ordered[0].labs:
+                            yield z3.Or([
+                                z3.And([z3.And(act_time == exp.time(), act_room == exp.room(), act_lab == exp.lab())
+                                            for (act_time, act_room, act_lab), exp in zip(((m[c.time()], m[c.room()], m[c.lab()]) for c in ordered), r)
+                                ])
+                                for r in itertools.permutations(ordered)
+                            ])
+                        else:
+                            yield z3.Or([
+                                z3.And([z3.And(act_time == exp.time(), act_room == exp.room())
+                                            for (act_time, act_room), exp in zip(((m[c.time()], m[c.room()]) for c in ordered), r)
+                                ])
+                                for r in itertools.permutations(ordered)
+                            ])
+            s.add(Scheduler._simplify(z3.Not(z3.And(*constraints()))))
 
         s = z3.Solver()
         s.add(self.constraints)
         s.push()
         s.add(self.soft_constraints)
         if s.check() != z3.sat:
-            print("WARNING: Soft constraints are non-sat", file=sys.stderr)
+            print("WARNING: Soft constraints are non-sat... relaxing constraints", file=sys.stderr)
             s.pop()
         for i in range(limit):
             if s.check() != z3.sat:
