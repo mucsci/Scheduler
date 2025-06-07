@@ -1,47 +1,178 @@
 {
-    "rooms": ["Roddy 136", "Roddy 140", "Roddy 147", "elsewhere"],
-    "labs": ["Linux", "Mac"],
-    "courses": [
-
-        { "subj": "CSCI", "num": 161, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": [140] , "faculty": "Antonucci"},
-
-        { "subj": "CSCI", "num": 162, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac","Linux"], "conflicts": [140], "faculty": "Hogg"},
-        { "subj": "CSCI", "num": 162, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac","Linux"], "conflicts": [140] , "faculty": "Hogg"},        
-        { "subj": "CSCI", "num": 419, "credits": 4, "room": ["Roddy 140","Roddy 147","Roddy 136"], "lab": ["Mac"], "conflicts": [420, 467, 415, 380] , "faculty": "Hogg"},
-
-
-        { "subj": "CSCI", "num": 362, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": [330, 366, 340] , "faculty": "Cain"},
-        { "subj": "CSCI", "num": 151, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac"], "conflicts": [] , "faculty": "Cain"},
-        { "subj": "CSCI", "num": 330, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux","Mac"], "conflicts": [362, 366] , "faculty": "Cain"},
-    
-        { "subj": "CSCI", "num": 380, "credits": 4, "room": ["Roddy 136", "Roddy 147"], "lab": ["Linux"], "conflicts": [420, 419, 452, 467, 415] , "faculty": "Zoppetti"},
-        { "subj": "CSCI", "num": 140, "credits": 4, "room": ["Roddy 136", "Roddy 147"], "lab": [], "conflicts": [] , "faculty": "Zoppetti"},
-        { "subj": "CSCI", "num": 140, "credits": 4, "room": ["Roddy 136", "Roddy 147"], "lab": [], "conflicts": [] , "faculty": "Zoppetti"},
-             
-    
-        { "subj": "CSCI", "num": 420, "credits": 4, "room": ["Roddy 140"], "lab": ["Mac"], "conflicts": [380, 419, 467, 415, 452, 340] , "faculty": "Schwartz"},
-        { "subj": "CSCI", "num": 452, "credits": 4, "room": ["Roddy 140"], "lab": ["Mac"], "conflicts": [420, 467, 415, 419, 380] , "faculty": "Schwartz"},
-
-        { "subj": "CSCI", "num": 415, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": [420, 467, 452, 419, 380, 340] , "faculty": "Hobbs"},
-
-        { "subj": "UNIV", "num": 103, "credits": 3, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": [], "conflicts": [], "faculty": "Hardy"},
-        { "subj": "UNIV", "num": 103, "credits": 3, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": [], "conflicts": [] , "faculty": "Hardy"}, 
-        { "subj": "CSCI", "num": 161, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": [] , "faculty": "Hardy"},       
-        
-        { "subj": "CSCI", "num": 366, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac","Linux"], "conflicts": [362, 330, 340] , "faculty": "Xie"},
-        { "subj": "CSCI", "num": 366, "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac","Linux"], "conflicts": [362, 330, 340] , "faculty": "Xie"},
-        { "subj": "CSCI", "num": 467, "credits": 4, "room": ["Roddy 140","Roddy 147","Roddy 136"], "lab": ["Linux","Mac"], "conflicts": [380, 419, 415, 452, 330, 340] , "faculty": "Xie"}    
+    "rooms": [
+        "Roddy 136",
+        "Roddy 140",
+        "Roddy 147",
+        "elsewhere"
     ],
-
+    "labs": [
+        "Linux",
+        "Mac"
+    ],
+    "courses": [
+        {"course_id": "CSCI 140", "credits": 4, "room": ["Roddy 136", "Roddy 147"], "lab": [], "conflicts": []},
+        {"course_id": "CSCI 140", "credits": 4, "room": ["Roddy 136", "Roddy 147"], "lab": [], "conflicts": []},
+        {"course_id": "CSCI 151", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": []},
+        {"course_id": "CSCI 161", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": ["CSCI 140"]},
+        {"course_id": "CSCI 161", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": []},
+        {"course_id": "CSCI 162", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": ["CSCI 140"]},
+        {"course_id": "CSCI 162", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": ["CSCI 140"]},
+        {"course_id": "CSCI 330", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": ["CSCI 362", "CSCI 366"]},
+        {"course_id": "CSCI 362", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": ["CSCI 330", "CSCI 366", "CSCI 340"]},
+        {"course_id": "CSCI 366", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": ["CSCI 362", "CSCI 330", "CSCI 340"]},
+        {"course_id": "CSCI 366", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": ["CSCI 362", "CSCI 330", "CSCI 340"]},
+        {"course_id": "CSCI 380", "credits": 4, "room": ["Roddy 136", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": ["CSCI 420", "CSCI 419", "CSCI 452", "CSCI 467", "CSCI 415"]},
+        {"course_id": "CSCI 415", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": ["CSCI 420", "CSCI 467", "CSCI 452", "CSCI 419", "CSCI 380", "CSCI 340"]},
+        {"course_id": "CSCI 419", "credits": 4, "room": ["Roddy 140", "Roddy 147", "Roddy 136"], "lab": ["Mac", "Linux"], "conflicts": ["CSCI 420", "CSCI 467", "CSCI 415", "CSCI 380"]},
+        {"course_id": "CSCI 420", "credits": 4, "room": ["Roddy 140"], "lab": ["Mac", "Linux"], "conflicts": ["CSCI 380", "CSCI 419", "CSCI 467", "CSCI 415", "CSCI 452", "CSCI 340"]},
+        {"course_id": "CSCI 452", "credits": 4, "room": ["Roddy 140"], "lab": ["Mac", "Linux"], "conflicts": ["CSCI 420", "CSCI 467", "CSCI 415", "CSCI 419", "CSCI 380"]},
+        {"course_id": "CSCI 467", "credits": 4, "room": ["Roddy 140", "Roddy 147", "Roddy 136"], "lab": ["Mac", "Linux"], "conflicts": ["CSCI 380", "CSCI 419", "CSCI 415", "CSCI 452", "CSCI 330", "CSCI 340"]},
+        {"course_id": "UNIV 103", "credits": 3, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": [], "conflicts": []},
+        {"course_id": "UNIV 103", "credits": 3, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": [], "conflicts": []}
+    ],
     "faculty": {
-        "Zoppetti"    : {"times": [[[[10, 0], [16, 0]]] , [], [[[10, 0], [17, 0]]] , [[[10, 0], [17, 0]]] , [[[10, 0], [16, 0]]] ] },
-        "Schwartz"    : {"times": [[], [[[10, 0], [15, 0]]] , [], [[[10, 0], [15, 0]]] , []] },
-        "Cain"        : {"times": [[[[ 8, 0], [15, 0]]] , [[[ 8, 0], [15, 0]]] , [[[ 8, 0], [15, 0]]] , [], [[[ 8, 0], [15, 0]]] ] },
-        "Hardy"       : {"times": [[[[ 9, 0], [15, 0]]] , [[[ 9, 0], [15, 0]]] , [[[ 9, 0], [15, 0]]] , [], [[[ 9, 0], [15, 0]]] ] },
-        "Hogg"        : {"times": [[[[ 9, 0], [15, 0]]] , [], [[[ 9, 0], [15, 0]]] , [[[ 8, 0], [15, 0]]] , [[[ 9, 0], [15, 0]]] ] },
-        "Xie"         : {"times": [[[[10, 0], [16, 0]]] , [[[10, 0], [17, 0]]] , [[[10, 0], [17, 0]]] , [], [[[10, 0], [16, 0]]] ] },
-        "Rogers"      : {"times": [[[[18,0], [20, 0]]] , [] , [[[18,0], [20, 0]]] , [] , []] },
-        "Antonucci"   : {"times": [[] , [[[8,0], [11, 0]]] , [] , [[[8,0], [11, 0]]] , []] },     
-        "Hobbs"       : {"times": [[[[15, 0], [19, 0]]] , [[[15, 0], [19, 0]]], [[[15, 0], [19, 0]]] , [[[15, 0], [19, 0]]] , [] ] }
+        "Zoppetti": {
+            "times": {
+                "MON": [ "10:00-16:00" ],
+                "WED": [ "10:00-17:00" ],
+                "THU": [ "10:00-12:00", "13:00-17:00" ],
+                "FRI": [ "10:00-16:00" ]
+            },
+            "preferences": {
+                "CSCI 380": 5,
+                "CSCI 476": 5,
+                "CSCI 362": 5,
+                "CSCI 330": 5,
+                "CSCI 370": 5,
+                "CSCI 140": 3,
+                "CSCI 161": 4,
+                "CSCI 162": 4
+            }
+        },
+        "Schwartz": {
+            "maximum_credits": 8,
+            "minimum_credits": 8,
+            "unique_course_limit": 2,
+            "times": {
+                "TUE": [ "10:00-12:00", "13:00-15:00" ],
+                "THU": [ "10:00-12:00", "13:00-15:00" ]
+            },
+            "preferences": {
+                "CSCI 420": 5,
+                "CSCI 452": 5,
+                "CSCI 450": 5
+            }
+        },
+        "Cain": {
+            "unique_course_limit": 3,
+            "times": {
+                "MON": [ "08:00-15:00" ],
+                "TUE": [ "08:00-12:00", "13:00-15:00" ],
+                "WED": [ "08:00-15:00" ],
+                "FRI": [ "08:00-15:00" ]
+            },
+            "preferences": {
+                "CSCI 362": 3,
+                "CSCI 151": 4,
+                "CSCI 161": 4,
+                "CSCI 162": 4,
+                "CSCI 330": 3,
+                "CSCI 420": 3,
+                "CSCI 475": 5
+            }
+        },
+        "Hardy": {
+            "maximum_credits": 14,
+            "minimum_credits": 12,
+            "unique_course_limit": 2,
+            "times": {
+                "MON": [ "09:00-15:00" ],
+                "TUE": [ "09:00-12:00", "13:00-15:00" ],
+                "WED": [ "09:00-15:00" ],
+                "FRI": [ "09:00-15:00" ]
+            },
+            "preferences": {
+                "UNIV 103": 5,
+                "CSCI 140": 5,
+                "CSCI 161": 4,
+                "CSCI 395": 4,
+                "CSCI 415": 3
+            }
+        },
+        "Hogg": {
+            "unique_course_limit": 2,
+            "times": {
+                "MON": [ "09:00-15:00" ],
+                "WED": [ "09:00-15:00" ],
+                "THU": [ "08:00-12:00", "13:00-15:00" ],
+                "FRI": [ "09:00-15:00" ]
+            },
+            "preferences": {
+                "CSCI 162": 5,
+                "CSCI 161": 5,
+                "CSCI 380": 5,
+                "CSCI 366": 4,
+                "CSCI 450": 4,
+                "CSCI 419": 4
+            }
+        },
+        "Xie": {
+            "unique_course_limit": 3,
+            "times": {
+                "MON": [ "10:00-16:00" ],
+                "TUE": [ "10:00-12:00", "13:00-17:00" ],
+                "WED": [ "10:00-17:00" ],
+                "THU": [ "10:00-12:00", "13:00-17:00" ],
+                "FRI": [ "10:00-16:00" ]
+            },
+            "preferences": {
+                "CSCI 161": 4,
+                "CSCI 162": 5,
+                "CSCI 362": 5,
+                "CSCI 340": 3,
+                "CSCI 140": 3,
+                "CSCI 366": 5,
+                "CSCI 467": 4
+            }
+        },
+        "Rogers": {
+            "maximum_credits": 4,
+            "minimum_credits": 0,
+            "unique_course_limit": 1,
+            "times": {
+                "MON": [ "17:00-20:00" ],
+                "WED": [ "17:00-20:00" ]
+            },
+            "preferences": {
+                "CSCI 161": 5
+            }
+        },
+        "Antonucci": {
+            "maximum_credits": 4,
+            "minimum_credits": 0,
+            "unique_course_limit": 1,
+            "times": {
+                "TUE": [ "08:00-11:00" ],
+                "THU": [ "08:00-11:00" ]
+            },
+            "preferences": {
+                "CSCI 161": 5
+            }
+        },
+        "Hobbs": {
+            "maximum_credits": 4,
+            "minimum_credits": 0,
+            "unique_course_limit": 2,
+            "times": {
+                "MON": [ "15:00-19:00" ],
+                "TUE": [ "15:00-19:00" ],
+                "WED": [ "15:00-19:00" ],
+                "THU": [ "15:00-19:00" ]
+            },
+            "preferences": {
+                "CSCI 415": 5,
+                "CSCI 420": 4
+            }
+        }
     }
 }
