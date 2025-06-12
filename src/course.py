@@ -19,7 +19,15 @@ class Course(Identifiable, default_id=0):
         Course._total_sections[course_id] += 1
         return Course._total_sections[course_id]
 
-    def __init__(self, credits: int, course_id: str, labs: List[str], rooms: List[str], faculties: List[str], conflicts: List[str]):
+    def __init__(
+        self,
+        credits: int,
+        course_id: str,
+        labs: List[str],
+        rooms: List[str],
+        faculties: List[str],
+        conflicts: List[str],
+    ):
         # set credits and course identifier
         self.credits = credits
         self.course_id = course_id
@@ -30,10 +38,10 @@ class Course(Identifiable, default_id=0):
         self.conflicts = conflicts
         self.faculties = faculties
         # z3 variables for each course -- must assign a timeslot, a room, a lab, and a faculty
-        self._lab = z3.Int(f'{repr(self)}_lab')
-        self._room = z3.Int(f'{repr(self)}_room')
-        self._time = z3.Int(f'{repr(self)}_time')
-        self._faculty = z3.Int(f'{repr(self)}_faculty')
+        self._lab = z3.Int(f"{repr(self)}_lab")
+        self._room = z3.Int(f"{repr(self)}_room")
+        self._time = z3.Int(f"{repr(self)}_time")
+        self._faculty = z3.Int(f"{repr(self)}_faculty")
 
     def uid(self) -> str:
         return self.course_id
@@ -45,7 +53,7 @@ class Course(Identifiable, default_id=0):
         """
         Pretty Print representation of a course is its course_id and section
         """
-        return f'{self.course_id}.{self.section:02d}'
+        return f"{self.course_id}.{self.section:02d}"
 
     def time(self) -> z3.ArithRef:
         """
@@ -70,12 +78,38 @@ class Course(Identifiable, default_id=0):
         room = m.eval(self.room()).as_long()
         faculty = m.eval(self.faculty()).as_long()
         lab = None if not self.labs else m.eval(self.lab()).as_long()
-        return {'name': str(self), 'time': timeslot, 'room': room, 'lab': lab, 'faculty': faculty}
+        return {
+            "name": str(self),
+            "time": timeslot,
+            "room": room,
+            "lab": lab,
+            "faculty": faculty,
+        }
+
+    def json(self, m: z3.ModelRef) -> dict:
+        lookup = self.evaluate(m)
+        out = dict()
+        for k, v in lookup.items():
+            if k == "room":
+                out[k] = Room.get(v).name
+            elif k == "lab":
+                if v:
+                    out[k] = {
+                        "room": Lab.get(v).name,
+                        "time": TimeSlot.get(lookup["time"]).lab_time(),
+                    }
+            elif k == "time":
+                out[k] = list(t for t in TimeSlot.get(v).times())
+            elif k == "faculty":
+                out[k] = Faculty.get(v).name
+            else:
+                out[k] = v
+        return out
 
     def csv(self, m: z3.ModelRef) -> str:
         lookup = self.evaluate(m)
-        timeslot = str(TimeSlot.get(lookup['time']))
-        room = str(Room.get(lookup['room']))
-        faculty = str(Faculty.get(lookup['faculty']))
-        lab = 'None' if not self.labs else str(Lab.get(lookup['lab']))
-        return f'{self},{faculty},{room},{lab},{timeslot}'
+        timeslot = str(TimeSlot.get(lookup["time"]))
+        room = str(Room.get(lookup["room"]))
+        faculty = str(Faculty.get(lookup["faculty"]))
+        lab = "None" if not self.labs else str(Lab.get(lookup["lab"]))
+        return f"{self},{faculty},{room},{lab},{timeslot}"

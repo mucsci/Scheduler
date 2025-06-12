@@ -1,15 +1,23 @@
 import json
 import itertools
 import sys
-from typing import Any, Callable, Dict, Iterable, List, Tuple, Optional
+from typing import Callable, Dict, Iterable, List, Tuple, Optional
 
-import json_fix
+import click
 import z3
 from pydantic import BaseModel, Field
+import json_fix  # type: ignore
+
+from course import Course
+from lab import Lab
+from room import Room
+from faculty import Faculty
+from time_slot import Day, Duration, TimeInstance, TimePoint, TimeSlot
+from config import TimeSlotConfiguration
 
 # Configure Z3 to use parallel solving with advanced optimization parameters
 z3.set_param("parallel.enable", True)
-z3.set_param("parallel.threads.max", 8)  # Reduced from 16 for better efficiency
+z3.set_param("parallel.threads.max", 8)  # Reduced from 16 for efficiency
 
 # Optimized Z3 parameters for faster solving
 z3.set_param("sat.restart.max", 50)  # Reduced restart limit
@@ -22,14 +30,7 @@ z3.set_param("sat.branching.heuristic", "vsids")  # VSIDS heuristic
 z3.set_param("smt.core.minimize", False)  # Disable for speed
 z3.set_param("smt.relevancy", 1)  # Minimal relevancy
 z3.set_param("model.compact", True)  # Compact models
-z3.set_param("auto_config", False)  # Disable auto-config for predictable performance
-
-from course import Course
-from lab import Lab
-from room import Room
-from faculty import Faculty
-from time_slot import Day, Duration, TimeInstance, TimePoint, TimeSlot
-from config import time_slots
+z3.set_param("auto_config", False)  # Disable auto-config for performance
 
 
 # Pydantic models for JSON configuration
@@ -60,26 +61,17 @@ class SchedulerConfig(BaseModel):
 
 
 def load_from_file(filename: str) -> SchedulerConfig:
-    with open(filename) as f:
+    with open(filename, encoding="utf-8") as f:
         data = json.load(f)
     return SchedulerConfig(**data)
 
 
 class Scheduler:
 
-    def __init__(self, config: SchedulerConfig):
+    def __init__(self, config: SchedulerConfig, time_slots_config_file: str):
         # Enhanced cache for simplification and precomputed values
         self._simplify_cache = {}
         self._slot_relationship_cache = {}
-
-        LOOKUP: List[str] = [
-            "credits",
-            "course_id",
-            "lab",
-            "room",
-            "faculty",
-            "conflicts",
-        ]
 
         # Create faculty instances first
         self.faculty_instances: Dict[str, Faculty] = dict()
@@ -97,8 +89,7 @@ class Scheduler:
             self.faculty_preferences[faculty_name] = faculty_data.preferences
 
         self.rooms: Dict[str, Room] = dict((r, Room(r)) for r in config.rooms)
-
-        self.labs: Dict[str, Lab] = dict((l, Lab(l)) for l in config.labs)
+        self.labs: Dict[str, Lab] = dict((lab, Lab(lab)) for lab in config.labs)
 
         self.courses: List[Course] = []
         # Pre-compute required credits to optimize slot generation
@@ -125,10 +116,6 @@ class Scheduler:
                 c.conflicts,
             ]
             self.courses.append(Course(*course_args))
-
-        Time = Tuple[int, int]
-        Range = Tuple[Time, Time]
-        DayRanges = List[Range]
 
         def get_info(faculty_config: FacultyConfig) -> List[TimeInstance]:
             days: List[Day] = [Day.MON, Day.TUE, Day.WED, Day.THU, Day.FRI]
@@ -160,11 +147,13 @@ class Scheduler:
             slots: List[TimeSlot] = list()
             low = TimeSlot.min_id()
             # Only generate slots for credits actually needed
-            for credits in sorted(required_credits):
-                for s in time_slots(credits):
+            time_slot_config = TimeSlotConfiguration(time_slots_config_file)
+
+            for creds in sorted(required_credits):
+                for s in time_slot_config.time_slots(creds):
                     slots.append(s)
                 high = TimeSlot.max_id()
-                ranges[credits] = (low, high)
+                ranges[creds] = (low, high)
                 low = TimeSlot.max_id() + 1
             return ranges, slots
 
@@ -216,9 +205,9 @@ class Scheduler:
         for slot in self.slots:
             # Determine credits by checking which range this slot was originally in
             slot_credits = None
-            for credits, (start, stop) in self.ranges.items():
+            for creds, (start, stop) in self.ranges.items():
                 if start <= slot.id <= stop:
-                    slot_credits = credits
+                    slot_credits = creds
                     break
 
             if slot_credits is not None:
@@ -227,20 +216,20 @@ class Scheduler:
                 slots_by_credits[slot_credits].append(slot.id)
 
         # Update ranges to only include valid slot IDs
-        for credits in self.ranges.keys():
-            if credits in slots_by_credits:
-                valid_ids = sorted(slots_by_credits[credits])
+        for creds, _ in self.ranges.items():
+            if creds in slots_by_credits:
+                valid_ids = sorted(slots_by_credits[creds])
                 if valid_ids:
-                    self.ranges[credits] = (min(valid_ids), max(valid_ids))
+                    self.ranges[creds] = (min(valid_ids), max(valid_ids))
                     # Store the actual valid IDs for constraint generation
-                    setattr(self, f"_valid_slot_ids_{credits}", valid_ids)
+                    setattr(self, f"_valid_slot_ids_{creds}", valid_ids)
                 else:
                     # No valid slots for this credit level
-                    self.ranges[credits] = (0, -1)  # Invalid range
-                    setattr(self, f"_valid_slot_ids_{credits}", [])
+                    self.ranges[creds] = (0, -1)  # Invalid range
+                    setattr(self, f"_valid_slot_ids_{creds}", [])
             else:
-                self.ranges[credits] = (0, -1)  # Invalid range
-                setattr(self, f"_valid_slot_ids_{credits}", [])
+                self.ranges[creds] = (0, -1)  # Invalid range
+                setattr(self, f"_valid_slot_ids_{creds}", [])
 
     def _simplify(self, x):
         """Cached simplification to avoid redundant computation"""
@@ -275,7 +264,7 @@ class Scheduler:
         return self._slot_relationship_cache[cache_key]
 
     def _z3ify_time_constraint_optimized(
-        self, name: str, fn: Callable[[TimeSlot, TimeSlot], bool]
+        self, name: str
     ) -> Tuple[z3.Function, List[z3.ArithRef]]:
         z3fn = z3.Function(name, z3.IntSort(), z3.IntSort(), z3.BoolSort())
 
@@ -283,17 +272,15 @@ class Scheduler:
         true_pairs = []
         false_pairs = []
 
-        # Process combinations more efficiently with caching
-        for i, slot_i in enumerate(self.slots):
-            for j, slot_j in enumerate(self.slots[i + 1 :], i + 1):
-                if self._cached_slot_relationship(name, slot_i, slot_j):
-                    true_pairs.extend([(slot_i.id, slot_j.id), (slot_j.id, slot_i.id)])
-                else:
-                    false_pairs.extend([(slot_i.id, slot_j.id), (slot_j.id, slot_i.id)])
-
         # Handle diagonal (self-relations) - always true for most relationships
-        for slot in self.slots:
-            true_pairs.append((slot.id, slot.id))
+        true_pairs.extend([(slot.id, slot.id) for slot in self.slots])
+
+        # Process combinations more efficiently with caching
+        for slot_i, slot_j in itertools.combinations(self.slots, 2):
+            if self._cached_slot_relationship(name, slot_i, slot_j):
+                true_pairs.extend([(slot_i.id, slot_j.id), (slot_j.id, slot_i.id)])
+            else:
+                false_pairs.extend([(slot_i.id, slot_j.id), (slot_j.id, slot_i.id)])
 
         # Generate constraints in batches for better Z3 performance
         constraints = []
@@ -310,9 +297,9 @@ class Scheduler:
         return z3fn, constraints
 
     def _z3ify_time_constraint(
-        self, name: str, fn: Callable[[TimeSlot, TimeSlot], bool]
+        self, name: str
     ) -> Tuple[z3.Function, List[z3.ArithRef]]:
-        return self._z3ify_time_constraint_optimized(name, fn)
+        return self._z3ify_time_constraint_optimized(name)
 
     def _z3ify_time_slot_fn(
         self, name: str, fn: Callable[[TimeSlot], bool]
@@ -378,27 +365,21 @@ class Scheduler:
 
     def _build(self):
         # abstract function constraints
-        overlaps, overlaps_C = self._z3ify_time_constraint(
-            "overlaps", TimeSlot.overlaps
-        )
+        overlaps, overlaps_C = self._z3ify_time_constraint("overlaps")
 
-        lab_overlaps, lab_overlaps_C = self._z3ify_time_constraint(
-            "lab_overlaps", TimeSlot.lab_overlaps
-        )
+        lab_overlaps, lab_overlaps_C = self._z3ify_time_constraint("lab_overlaps")
 
         labs_on_same_day, labs_on_same_day_C = self._z3ify_time_constraint(
-            "labs_on_same_day", TimeSlot.labs_on_same_day
+            "labs_on_same_day"
         )
 
-        next_to, next_to_C = self._z3ify_time_constraint("next_to", TimeSlot.next_to)
+        next_to, next_to_C = self._z3ify_time_constraint("next_to")
 
         next_to_tues_wed, next_to_tues_wed_C = self._z3ify_time_constraint(
-            "next_to_tues_wed", TimeSlot.next_to_tues_wed
+            "next_to_tues_wed"
         )
 
-        not_next_to, not_next_to_C = self._z3ify_time_constraint(
-            "not_next_to", TimeSlot.not_next_to
-        )
+        not_next_to, not_next_to_C = self._z3ify_time_constraint("not_next_to")
 
         has_lab, has_lab_C = self._z3ify_time_slot_fn("has_lab", TimeSlot.has_lab)
 
@@ -657,7 +638,7 @@ class Scheduler:
 
         return hard, soft
 
-    def get_models(self, limit=10, optimize_preferences=True):
+    def get_models(self, limit=10, optimize=True):
         def update(
             i: int, s: z3.Optimize
         ) -> Iterable[Tuple[int, z3.ModelRef, z3.Statistics]]:
@@ -778,7 +759,7 @@ class Scheduler:
             s.add_soft(batch)
 
         # Add faculty preferences as optimization goals with improved caching - only if requested
-        if optimize_preferences:
+        if optimize:
             preference_terms = []
             faculty_id_cache = {
                 name: faculty.id for name, faculty in self.faculty_instances.items()
@@ -854,58 +835,137 @@ def concretize(map: Dict):
     return dict(iter())
 
 
-def generate_models(data, limit, optimize_preferences=True):
-    config = load_from_file(data)
-    s = Scheduler(config)
+def _display_model_stats(s) -> None:
+    """Display model statistics."""
+    click.echo("  ", nl=False)
+    for j in s.keys():
+        click.echo(f"{j}:{s.get_key_value(j)}  ", nl=False)
+    click.echo("\n")
 
-    def all():
-        for _, m, _ in s.get_models(limit, optimize_preferences):
-            yield list(concretize(c.evaluate(m)) for c in s.courses)
 
-    return json.dumps(list(all()), separators=(",", ":"))
+class CSVWriter:
+    """Writer class for CSV output with consistent interface."""
+
+    def __init__(self, filename: str = None):
+        self.filename = filename
+        self.schedules = []
+
+    def __enter__(self):
+        return self
+
+    def add_schedule(self, courses: List[Course], model: z3.ModelRef) -> None:
+        """Add a schedule to be written."""
+        schedule_data = "\n".join(c.csv(model) for c in courses)
+        if self.filename:
+            self.schedules.append(schedule_data)
+        else:
+            click.echo(schedule_data)
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        """Write all accumulated schedules."""
+        if self.filename:
+            content = "\n\n".join(self.schedules)
+            with open(self.filename, "w", encoding="utf-8") as f:
+                f.write(content)
+            click.echo(f"CSV output written to {self.filename}")
+
+
+class JSONWriter:
+    """Writer class for JSON output with consistent interface."""
+
+    def __init__(self, filename: str = None):
+        self.filename = filename
+        self.schedules = []
+
+    def __enter__(self):
+        return self
+
+    def add_schedule(self, courses: List[Course], model: z3.ModelRef) -> None:
+        """Add a schedule to be written."""
+
+        schedule_data = [c.json(model) for c in courses]
+        if self.filename:
+            self.schedules.append(schedule_data)
+        else:
+            click.echo(json.dumps(schedule_data, separators=(",", ":")))
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        """Write all accumulated schedules as one JSON array."""
+        if self.filename:
+            content = json.dumps(self.schedules, separators=(",", ":"))
+            with open(self.filename, "w", encoding="utf-8") as f:
+                f.write(content)
+            click.echo(f"JSON output written to {self.filename}")
+
+
+def get_writer(format: str, output_file: str) -> JSONWriter | CSVWriter:
+    if format == "json":
+        return JSONWriter(output_file)
+    else:
+        return CSVWriter(output_file)
+
+
+@click.command()
+@click.argument("config", type=click.Path(exists=True), required=True)
+@click.option(
+    "--timeslot-config",
+    "-t",
+    type=click.Path(exists=True),
+    default="time_slots.json",
+    help="Path to the time slot configuration file",
+)
+@click.option("--limit", "-l", default=10, help="Maximum number of models to generate")
+@click.option(
+    "--format",
+    "-f",
+    type=click.Choice(["csv", "json"]),
+    default="csv",
+    help="Output format",
+)
+@click.option("--output", "-o", help="Output basename (extension added automatically)")
+@click.option(
+    "--optimize",
+    "-O",
+    is_flag=True,
+    help="Enable optimization of preferences (slower)",
+)
+def main(
+    config: str,
+    timeslot_config: str,
+    limit: int,
+    format: str,
+    output: str,
+    optimize: bool,
+):
+    """Generate course schedules using constraint satisfaction solving."""
+
+    if optimize:
+        limit = 1
+
+    click.echo(f"> Using limit={limit}, optimize={optimize}")
+    config = load_from_file(config)
+    sched = Scheduler(config, timeslot_config)
+    click.echo("> Created all constraints")
+
+    # Determine output filename
+    output_file = f"{output}.{format}" if output else None
+
+    # Create appropriate writer
+    with get_writer(format, output_file) as writer:
+        for i, m, s in sched.get_models(limit, optimize):
+            if output:
+                click.echo(f"Model {i} written to {output_file}")
+            else:
+                click.echo(f"Model {i}:")
+
+            _display_model_stats(s)
+            writer.add_schedule(sched.courses, m)
+
+            # For interactive mode (no output file), prompt user
+            if not output and i + 1 < limit:
+                if not click.confirm("Generate next model?", default=True):
+                    break
 
 
 if __name__ == "__main__":
-
-    if len(sys.argv) < 2:
-        print(
-            f"Usage: {sys.argv[0]} <json_config> [limit=10] [json] [--no-preferences]"
-        )
-        exit(1)
-
-    config_file = sys.argv[1]
-
-    limit = 10 if len(sys.argv) == 2 else int(sys.argv[2])
-
-    dump_json = len(sys.argv) >= 4 and "json" in sys.argv[3:]
-
-    optimize_preferences = "--no-preferences" not in sys.argv
-
-    if dump_json:
-        print(generate_models(config_file, limit, optimize_preferences))
-        exit(0)
-
-    print(
-        f"> Using limit={limit}, optimize_preferences={optimize_preferences}",
-        file=sys.stderr,
-    )
-    config = load_from_file(config_file)
-    sched = Scheduler(config)
-    print(f"> Created all constraints", file=sys.stderr)
-
-    for i, m, s in sched.get_models(limit, optimize_preferences):
-        print(f"Model {i}:", file=sys.stderr)
-        print("  ", end="", file=sys.stderr)
-        for j in s.keys():
-            print(f"{j}:{s.get_key_value(j)}  ", end="", file=sys.stderr)
-        print("\n", file=sys.stderr)
-
-        print("\n".join(c.csv(m) for c in sched.courses))
-
-        try:
-            print(file=sys.stderr)
-            input()
-            print(file=sys.stderr)
-            print("> Getting next model...", file=sys.stderr)
-        except:
-            exit(0)
+    main()

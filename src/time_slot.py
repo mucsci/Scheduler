@@ -12,19 +12,19 @@ class Duration:
     def value(self):
         return self.duration
 
-    def __abs__(self) -> 'Duration':
+    def __abs__(self) -> "Duration":
         return Duration(abs(self.value))
 
-    def __lt__(self, other: 'Duration') -> bool:
+    def __lt__(self, other: "Duration") -> bool:
         return self.value < other.value
 
-    def __le__(self, other: 'Duration') -> bool:
+    def __le__(self, other: "Duration") -> bool:
         return self.value <= other.value
 
-    def __gt__(self, other: 'Duration') -> bool:
+    def __gt__(self, other: "Duration") -> bool:
         return self.value > other.value
 
-    def __ge__(self, other: 'Duration') -> bool:
+    def __ge__(self, other: "Duration") -> bool:
         return self.value >= other.value
 
     def __eq__(self, other: object) -> bool:
@@ -55,32 +55,32 @@ class TimePoint:
         self.timepoint = value
 
     @staticmethod
-    def make_from(hr: int, min: int) -> 'TimePoint':
+    def make_from(hr: int, min: int) -> "TimePoint":
         return TimePoint(60 * hr + min)
 
     @property
     def value(self):
         return self.timepoint
 
-    def __add__(self, dur: Duration) -> 'TimePoint':
+    def __add__(self, dur: Duration) -> "TimePoint":
         return TimePoint(self.value + dur.value)
 
-    def __sub__(self, other: 'TimePoint') -> Duration:
+    def __sub__(self, other: "TimePoint") -> Duration:
         return Duration(self.value - other.value)
-    
+
     def __abs__(self) -> Duration:
         return Duration(abs(self.value))
 
-    def __lt__(self, other: 'TimePoint') -> bool:
+    def __lt__(self, other: "TimePoint") -> bool:
         return self.value < other.value
 
-    def __le__(self, other: 'TimePoint') -> bool:
+    def __le__(self, other: "TimePoint") -> bool:
         return self.value <= other.value
 
-    def __gt__(self, other: 'TimePoint') -> bool:
+    def __gt__(self, other: "TimePoint") -> bool:
         return self.value > other.value
 
-    def __ge__(self, other: 'TimePoint') -> bool:
+    def __ge__(self, other: "TimePoint") -> bool:
         return self.value >= other.value
 
     def __eq__(self, other: object) -> bool:
@@ -94,7 +94,7 @@ class TimePoint:
         return self.value != other.value
 
     def __str__(self) -> str:
-        return f'{self.value // 60:02d}:{self.value % 60:02d}'
+        return f"{self.value // 60:02d}:{self.value % 60:02d}"
 
     def __repr__(self):
         return self.value
@@ -114,18 +114,25 @@ class TimeInstance:
         return TimePoint(self.start.value + self.duration.value)
 
     def __repr__(self) -> str:
-        return str({'day': str(self.day), 'start': self.start.value, 'duration': self.duration.value, 'stop': self.stop.value})
+        return str(
+            {
+                "day": str(self.day),
+                "start": self.start.value,
+                "duration": self.duration.value,
+                "stop": self.stop.value,
+            }
+        )
 
     def __str__(self) -> str:
-        return f'{self.day.name} {str(self.start)}-{str(self.stop)}'
+        return f"{self.day.name} {str(self.start)}-{str(self.stop)}"
 
     def __json__(self):
-        return {'day': self.day, 'start': self.start, 'duration': self.duration}
+        return {"day": self.day, "start": self.start, "duration": self.duration}
 
 
 class TimeSlot(Identifiable, default_id=0):
 
-    def __init__(self, times: List[TimeInstance], lab_index: Optional[int]=None):
+    def __init__(self, times: List[TimeInstance], lab_index: Optional[int] = None):
         """
         Constructs a time slot.
 
@@ -160,7 +167,7 @@ class TimeSlot(Identifiable, default_id=0):
         """
         return self._lab_index is not None
 
-    def not_next_to(self, other: 'TimeSlot') -> bool:
+    def not_next_to(self, other: "TimeSlot") -> bool:
         """
         Ensure that a time slot has padding between all possibly adjacent times
         """
@@ -177,7 +184,7 @@ class TimeSlot(Identifiable, default_id=0):
 
         return True
 
-    def next_to_tues_wed(self, other: 'TimeSlot') -> bool:
+    def next_to_tues_wed(self, other: "TimeSlot") -> bool:
         if self.has_lab() and other.has_lab():
             t1: Optional[TimeInstance] = self.lab_time()
             t2: Optional[TimeInstance] = other.lab_time()
@@ -187,7 +194,7 @@ class TimeSlot(Identifiable, default_id=0):
             if {t1.day, t2.day} == {Day.TUE, Day.WED}:
                 return False
         return True
-    
+
     def lab_starts_with_lecture(self) -> bool:
         if not self.has_lab():
             return True
@@ -195,7 +202,7 @@ class TimeSlot(Identifiable, default_id=0):
         lecture_start = self.times()[0].start
         return abs(lecture_start - lab_start) <= Duration(10)
 
-    def next_to(self, other: 'TimeSlot') -> bool:
+    def next_to(self, other: "TimeSlot") -> bool:
         """
         Check if a time slot is logically next to another (same day + adjacent or next day + same time)
         """
@@ -237,28 +244,30 @@ class TimeSlot(Identifiable, default_id=0):
                             return False
             return True
 
-    def overlaps(self, other: 'TimeSlot') -> bool:
+    def overlaps(self, other: "TimeSlot") -> bool:
         """
         Returns true IFF this timeslot has any overlap with the passed time slot
         """
-        return any(TimeSlot._overlaps(a, b) for a in self.times() for b in other.times())
+        return any(
+            TimeSlot._overlaps(a, b) for a in self.times() for b in other.times()
+        )
 
-    def lab_overlaps(self, other: 'TimeSlot') -> bool:
+    def lab_overlaps(self, other: "TimeSlot") -> bool:
         """
         Returns true IFF this timeslot's two-hour block has any overlap with the passed time slot's two-hour block
         """
-        a : Optional[TimeInstance] = self.lab_time()
-        b : Optional[TimeInstance] = other.lab_time()
+        a: Optional[TimeInstance] = self.lab_time()
+        b: Optional[TimeInstance] = other.lab_time()
         if a is None or b is None:
             return False
         return TimeSlot._overlaps(a, b)
 
-    def labs_on_same_day(self, other: 'TimeSlot') -> bool:
+    def labs_on_same_day(self, other: "TimeSlot") -> bool:
         """
         Returns true IFF the labs of this timeslot and the passed are on the same day
         """
-        a : Optional[TimeInstance] = self.lab_time()
-        b : Optional[TimeInstance] = other.lab_time()
+        a: Optional[TimeInstance] = self.lab_time()
+        b: Optional[TimeInstance] = other.lab_time()
         if a is None or b is None:
             return False
         return a.day == b.day
@@ -268,21 +277,29 @@ class TimeSlot(Identifiable, default_id=0):
         """
         Internal utility function that returns true if two time slot instances overlap at any point
         """
-        return (a.day == b.day) and (
-            (a.start <= b.start < a.stop) or
-            (a.start <= b.stop < a.stop) or
-            (b.start <= a.start < b.stop) or
-            (b.start <= a.stop < b.stop)
-        )
+        return (a.day == b.day) and (a.start < b.stop) and (b.start < a.stop)
 
     def in_time_ranges(self, ranges: List[TimeInstance]) -> bool:
         """
         Returns true if this time slot fits into the passed range list (day mask, start time, and end time)
         """
-        return all(any((t.day == slot.day and slot.start <= t.start and t.stop <= slot.stop) for slot in ranges if t.day == slot.day) for t in self.times())
+        return all(
+            any(
+                (t.day == slot.day and slot.start <= t.start and t.stop <= slot.stop)
+                for slot in ranges
+                if t.day == slot.day
+            )
+            for t in self.times()
+        )
 
     def __repr__(self) -> str:
         return str(list(repr(t) for t in self.times()))
 
     def __str__(self) -> str:
-        return ','.join(f'{str(t)}{"^" if i == self._lab_index else ""}' for i, t in enumerate(self.times()))
+        return ",".join(
+            f'{str(t)}{"^" if i == self._lab_index else ""}'
+            for i, t in enumerate(self.times())
+        )
+
+    def __json__(self):
+        return [t.__json__() for t in self.times()]

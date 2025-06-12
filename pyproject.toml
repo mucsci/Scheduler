@@ -1,0 +1,38 @@
+[project]
+name = "scheduler"
+version = "1.0.0"
+description = "A constraint solver for generating schedules"
+license = "MIT"
+license-files = ["LICENSE*"]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "click>=8.1.0",
+    "json-fix>=1.0.0",
+    "mypy>=1.16.0",
+    "pydantic>=2.11.5",
+    "z3-solver>=4.15.1.0"
+]
+
+classifiers = [
+  # How mature is this project? Common values are
+  #   3 - Alpha
+  #   4 - Beta
+  #   5 - Production/Stable
+  "Development Status :: 4 - Beta",
+
+  # Indicate who your project is intended for
+  "Intended Audience :: Developers",
+
+  # Specify the Python versions you support here.
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+
+  "Private :: Do Not Upload"
+]
+
+[project.scripts]
+scheduler = "scheduler:main"
+
+[tool.uv]
+package = true

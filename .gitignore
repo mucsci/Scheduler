@@ -1,5 +1,12 @@
+.venv
+
 **/__pycache__
 **/*.pyc
+**/*egg-info*
+
 **/*~
 **/#*#
-**/venv
+
+**/*.json
+!time_slots.json
+!sample.json
