@@ -40,15 +40,13 @@ class CourseConfig(BaseModel):
     room: List[str]
     lab: List[str]
     conflicts: List[str]
-    faculty: Optional[List[str]] = (
-        None  # Optional override - if not specified, derive from preferences
-    )
+    faculty: List[str]
 
 
 class FacultyConfig(BaseModel):
-    maximum_credits: int = Field(default=12)
-    minimum_credits: int = Field(default=12)
-    unique_course_limit: int = Field(default=2)
+    maximum_credits: int
+    minimum_credits: int
+    unique_course_limit: int
     times: Dict[str, List[str]]  # {day_name: ["HH:MM-HH:MM", ...]}
     preferences: Dict[str, int] = Field(default_factory=dict)
 
@@ -96,13 +94,8 @@ class Scheduler:
         required_credits = set()
         for c in config.courses:
             required_credits.add(c.credits)
-            # Determine faculty for this course
-            if c.faculty is not None:
-                # Use explicit faculty list as override
-                course_faculty = c.faculty
-            else:
-                # Automatically determine faculty from preferences
-                course_faculty = []
+            course_faculty = c.faculty
+            if not course_faculty:
                 for faculty_name, faculty_config in config.faculty.items():
                     if c.course_id in faculty_config.preferences:
                         course_faculty.append(faculty_name)
@@ -167,69 +160,7 @@ class Scheduler:
             file=sys.stderr,
         )
 
-        # Pre-filter slots based on faculty availability to reduce constraint space
-        self._prefilter_slots()
-
-        # Update ranges after pre-filtering to only include valid slot IDs
-        self._update_ranges_after_filtering()
-
         self.constraints, self.soft_constraints = self._build()
-
-    def _prefilter_slots(self):
-        """Pre-filter time slots to remove those that are impossible given faculty availability"""
-        # This is an optimization to reduce the constraint space upfront
-        valid_slots = []
-
-        for slot in self.slots:
-            # Check if at least one faculty member can teach at this time
-            slot_feasible = False
-            for faculty_name, faculty_times in self.faculty_availability.items():
-                if slot.in_time_ranges(faculty_times):
-                    slot_feasible = True
-                    break
-
-            if slot_feasible:
-                valid_slots.append(slot)
-
-        removed_count = len(self.slots) - len(valid_slots)
-        if removed_count > 0:
-            print(
-                f"Pre-filtered {removed_count} infeasible time slots", file=sys.stderr
-            )
-            self.slots = valid_slots
-
-    def _update_ranges_after_filtering(self):
-        """Update slot ranges after pre-filtering to only include valid slot IDs"""
-        # Group remaining slots by credits
-        slots_by_credits = {}
-        for slot in self.slots:
-            # Determine credits by checking which range this slot was originally in
-            slot_credits = None
-            for creds, (start, stop) in self.ranges.items():
-                if start <= slot.id <= stop:
-                    slot_credits = creds
-                    break
-
-            if slot_credits is not None:
-                if slot_credits not in slots_by_credits:
-                    slots_by_credits[slot_credits] = []
-                slots_by_credits[slot_credits].append(slot.id)
-
-        # Update ranges to only include valid slot IDs
-        for creds, _ in self.ranges.items():
-            if creds in slots_by_credits:
-                valid_ids = sorted(slots_by_credits[creds])
-                if valid_ids:
-                    self.ranges[creds] = (min(valid_ids), max(valid_ids))
-                    # Store the actual valid IDs for constraint generation
-                    setattr(self, f"_valid_slot_ids_{creds}", valid_ids)
-                else:
-                    # No valid slots for this credit level
-                    self.ranges[creds] = (0, -1)  # Invalid range
-                    setattr(self, f"_valid_slot_ids_{creds}", [])
-            else:
-                self.ranges[creds] = (0, -1)  # Invalid range
-                setattr(self, f"_valid_slot_ids_{creds}", [])
 
     def _simplify(self, x):
         """Cached simplification to avoid redundant computation"""
@@ -467,8 +398,8 @@ class Scheduler:
             # Course constraints with optimized conflict checking - batch generation
             course_constraints = []
             for c in self.courses:
-                # Get valid slot IDs for this course's credit level after pre-filtering
-                valid_slot_ids = getattr(self, f"_valid_slot_ids_{c.credits}", [])
+                # Get valid slot IDs for this course's credit level
+                start, stop = self.ranges[c.credits]
 
                 # Build conflict constraints more efficiently
                 conflict_constraints = []
@@ -481,47 +412,56 @@ class Scheduler:
                                 )
 
                 course_constraint_list = []
-                # basic timeslot constraint - only allow valid slot IDs after filtering
-                if valid_slot_ids:
+                # basic timeslot constraint - allow all slots for this credit level
+                if stop >= start:
                     course_constraint_list.append(
-                        z3.Or(
-                            [
-                                c.time() == z3.IntVal(slot_id)
-                                for slot_id in valid_slot_ids
-                            ]
+                        z3.And(
+                            z3.IntVal(start) <= c.time(), c.time() <= z3.IntVal(stop)
                         )
                     )
                 if c.labs:
                     # we must assign to a lab when we have options
                     course_constraint_list.append(
-                        z3.Or(
-                            [
-                                c.lab() == lab.id
-                                for name, lab in self.labs.items()
-                                if name in c.labs
-                            ]
+                        z3.And(
+                            z3.IntVal(Lab.min_id()) <= c.lab(),
+                            c.lab() <= z3.IntVal(Lab.max_id()),
+                            z3.Or(
+                                [
+                                    c.lab() == lab.id
+                                    for name, lab in self.labs.items()
+                                    if name in c.labs
+                                ]
+                            ),
                         )
                     )
                 if c.rooms:
                     # we must assign to a room when we have options
                     course_constraint_list.append(
-                        z3.Or(
-                            [
-                                c.room() == room.id
-                                for name, room in self.rooms.items()
-                                if name in c.rooms
-                            ]
+                        z3.And(
+                            z3.IntVal(Room.min_id()) <= c.room(),
+                            c.room() <= z3.IntVal(Room.max_id()),
+                            z3.Or(
+                                [
+                                    c.room() == room.id
+                                    for name, room in self.rooms.items()
+                                    if name in c.rooms
+                                ]
+                            ),
                         )
                     )
                 if c.faculties:
                     # we must assign to a faculty from the candidates
                     course_constraint_list.append(
-                        z3.Or(
-                            [
-                                c.faculty() == faculty.id
-                                for name, faculty in self.faculty_instances.items()
-                                if name in c.faculties
-                            ]
+                        z3.And(
+                            z3.IntVal(Faculty.min_id()) <= c.faculty(),
+                            c.faculty() <= z3.IntVal(Faculty.max_id()),
+                            z3.Or(
+                                [
+                                    c.faculty() == faculty.id
+                                    for name, faculty in self.faculty_instances.items()
+                                    if name in c.faculties
+                                ]
+                            ),
                         )
                     )
                 if conflict_constraints:
@@ -939,9 +879,6 @@ def main(
 ):
     """Generate course schedules using constraint satisfaction solving."""
 
-    if optimize:
-        limit = 1
-
     click.echo(f"> Using limit={limit}, optimize={optimize}")
     config = load_from_file(config)
     sched = Scheduler(config, timeslot_config)
@@ -953,10 +890,7 @@ def main(
     # Create appropriate writer
     with get_writer(format, output_file) as writer:
         for i, m, s in sched.get_models(limit, optimize):
-            if output:
-                click.echo(f"Model {i} written to {output_file}")
-            else:
-                click.echo(f"Model {i}:")
+            click.echo(f"Model {i}:")
 
             _display_model_stats(s)
             writer.add_schedule(sched.courses, m)

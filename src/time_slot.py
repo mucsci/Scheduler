@@ -130,7 +130,7 @@ class TimeInstance:
         return {"day": self.day, "start": self.start, "duration": self.duration}
 
 
-class TimeSlot(Identifiable, default_id=0):
+class TimeSlot(Identifiable):
 
     def __init__(self, times: List[TimeInstance], lab_index: Optional[int] = None):
         """

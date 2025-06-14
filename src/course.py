@@ -10,7 +10,7 @@ from time_slot import TimeSlot
 from identifiable import Identifiable
 
 
-class Course(Identifiable, default_id=0):
+class Course(Identifiable):
 
     _total_sections: ClassVar[DefaultDict[str, int]] = defaultdict(int)
 

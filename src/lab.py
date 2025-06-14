@@ -1,7 +1,7 @@
 from identifiable import Identifiable
 
 
-class Lab(Identifiable, default_id=200):
+class Lab(Identifiable):
 
     def __init__(self, name: str):
         self.name = name
