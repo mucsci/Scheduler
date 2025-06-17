@@ -1,11 +1,12 @@
-from dataclasses import dataclass
-from identifiable import Identifiable
 from typing import List, Optional
-from day import Day
+
+from pydantic import BaseModel, Field
+
+from .identifiable import Identifiable
+from .day import Day
 
 
-@dataclass
-class Duration:
+class Duration(BaseModel):
     duration: int
 
     @property
@@ -13,7 +14,7 @@ class Duration:
         return self.duration
 
     def __abs__(self) -> "Duration":
-        return Duration(abs(self.value))
+        return Duration(duration=abs(self.value))
 
     def __lt__(self, other: "Duration") -> bool:
         return self.value < other.value
@@ -47,29 +48,33 @@ class Duration:
         return self.value
 
 
-@dataclass
-class TimePoint:
+class TimePoint(BaseModel):
     timepoint: int
-
-    def __init__(self, value):
-        self.timepoint = value
 
     @staticmethod
     def make_from(hr: int, min: int) -> "TimePoint":
-        return TimePoint(60 * hr + min)
+        return TimePoint(timepoint=(60 * hr + min))
+
+    @property
+    def hour(self):
+        return self.timepoint // 60
+    
+    @property
+    def minute(self):
+        return self.timepoint % 60
 
     @property
     def value(self):
         return self.timepoint
 
     def __add__(self, dur: Duration) -> "TimePoint":
-        return TimePoint(self.value + dur.value)
+        return TimePoint(timepoint=(self.value + dur.value))
 
     def __sub__(self, other: "TimePoint") -> Duration:
-        return Duration(self.value - other.value)
+        return Duration(duration=(self.value - other.value))
 
     def __abs__(self) -> Duration:
-        return Duration(abs(self.value))
+        return Duration(duration=abs(self.value))
 
     def __lt__(self, other: "TimePoint") -> bool:
         return self.value < other.value
@@ -96,32 +101,21 @@ class TimePoint:
     def __str__(self) -> str:
         return f"{self.value // 60:02d}:{self.value % 60:02d}"
 
-    def __repr__(self):
-        return self.value
+    def __repr__(self) -> str:
+        return f"TimePoint(timepoint={self.value})"
 
     def __json__(self):
         return self.value
 
 
-@dataclass
-class TimeInstance:
+class TimeInstance(BaseModel):
     day: Day
     start: TimePoint
     duration: Duration
 
     @property
     def stop(self) -> TimePoint:
-        return TimePoint(self.start.value + self.duration.value)
-
-    def __repr__(self) -> str:
-        return str(
-            {
-                "day": str(self.day),
-                "start": self.start.value,
-                "duration": self.duration.value,
-                "stop": self.stop.value,
-            }
-        )
+        return TimePoint(timepoint=(self.start.value + self.duration.value))
 
     def __str__(self) -> str:
         return f"{self.day.name} {str(self.start)}-{str(self.stop)}"
@@ -131,33 +125,15 @@ class TimeInstance:
 
 
 class TimeSlot(Identifiable):
-
-    def __init__(self, times: List[TimeInstance], lab_index: Optional[int] = None):
-        """
-        Constructs a time slot.
-
-        Parameters
-        ----------
-        times : vararg of (Day, hour, minute, duration) tuples
-            meeting times
-        lab_index : Optional[int] = None
-            an integral number representing index of which a lab period occurs (or none at all)
-        """
-        self._lab_index: Optional[int] = lab_index
-        self._times: List[TimeInstance] = times
-
-    def times(self) -> List[TimeInstance]:
-        """
-        Returns a list of Day - StartTime - Duration tuples
-        """
-        return self._times
+    times: List[TimeInstance]
+    lab_index: Optional[int] = Field(default=None)
 
     def lab_time(self) -> Optional[TimeInstance]:
         """
         Returns only the two hour time (if necessary) for a lab
         """
-        if self._lab_index is not None:
-            return self.times()[self._lab_index]
+        if self.lab_index is not None:
+            return self.times[self.lab_index]
         else:
             return None
 
@@ -165,19 +141,19 @@ class TimeSlot(Identifiable):
         """
         Returns True IFF the timeslot has a lab (two hour component)
         """
-        return self._lab_index is not None
+        return self.lab_index is not None
 
     def not_next_to(self, other: "TimeSlot") -> bool:
         """
         Ensure that a time slot has padding between all possibly adjacent times
         """
-        MAX_TIME_DIFF = Duration(50)
+        MAX_TIME_DIFF = Duration(duration=50)
 
         def diff(t1: TimeInstance, t2: TimeInstance) -> Duration:
             return min(abs(t1.start - t2.stop), abs(t2.start - t1.stop))
 
-        for t1 in self._times:
-            for t2 in other._times:
+        for t1 in self.times:
+            for t2 in other.times:
                 if t1.day == t2.day:
                     if diff(t1, t2) <= MAX_TIME_DIFF:
                         return False
@@ -199,15 +175,15 @@ class TimeSlot(Identifiable):
         if not self.has_lab():
             return True
         lab_start = self.lab_time().start
-        lecture_start = self.times()[0].start
-        return abs(lecture_start - lab_start) <= Duration(10)
+        lecture_start = self.times[0].start
+        return abs(lecture_start - lab_start) <= Duration(duration=10)
 
     def next_to(self, other: "TimeSlot") -> bool:
         """
         Check if a time slot is logically next to another (same day + adjacent or next day + same time)
         """
-        MAX_TIME_DELTA = Duration(70)
-        MAX_TIME_DELTA_NO_LAB = Duration(60)
+        MAX_TIME_DELTA = Duration(duration=70)
+        MAX_TIME_DELTA_NO_LAB = Duration(duration=60)
 
         def diff(t1: TimeInstance, t2: TimeInstance) -> Duration:
             if t1.day == t2.day:
@@ -226,19 +202,19 @@ class TimeSlot(Identifiable):
             #     return False
             if diff(t1, t2) > MAX_TIME_DELTA:
                 return False
-            for t1 in self.times():
+            for t1 in self.times:
                 if self.lab_time() != t1:
-                    for t2 in other.times():
+                    for t2 in other.times:
                         if other.lab_time() != t2:
                             if t1.day == t2.day:
                                 if diff(t1, t2) > MAX_TIME_DELTA_NO_LAB:
                                     return False
             return True
         else:
-            if len(self.times()) != len(other.times()):
+            if len(self.times) != len(other.times):
                 return False
-            for t1 in self._times:
-                for t2 in other._times:
+            for t1 in self.times:
+                for t2 in other.times:
                     if t1.day == t2.day:
                         if diff(t1, t2) > MAX_TIME_DELTA_NO_LAB:
                             return False
@@ -249,7 +225,7 @@ class TimeSlot(Identifiable):
         Returns true IFF this timeslot has any overlap with the passed time slot
         """
         return any(
-            TimeSlot._overlaps(a, b) for a in self.times() for b in other.times()
+            TimeSlot._overlaps(a, b) for a in self.times for b in other.times
         )
 
     def lab_overlaps(self, other: "TimeSlot") -> bool:
@@ -289,17 +265,20 @@ class TimeSlot(Identifiable):
                 for slot in ranges
                 if t.day == slot.day
             )
-            for t in self.times()
+            for t in self.times
         )
 
     def __repr__(self) -> str:
-        return str(list(repr(t) for t in self.times()))
+        return str(list(repr(t) for t in self.times))
 
     def __str__(self) -> str:
         return ",".join(
-            f'{str(t)}{"^" if i == self._lab_index else ""}'
-            for i, t in enumerate(self.times())
+            f'{str(t)}{"^" if i == self.lab_index else ""}'
+            for i, t in enumerate(self.times)
         )
 
     def __json__(self):
-        return [t.__json__() for t in self.times()]
+        object = {"times": [t.__json__() for t in self.times]}
+        if self.lab_index is not None:
+            object["lab_index"] = self.lab_index
+        return object

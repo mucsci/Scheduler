@@ -1,14 +1,13 @@
-from abc import ABC
-from typing import ClassVar
+from typing import ClassVar, Any
+from pydantic import BaseModel, Field
 
-
-class Identifiable(ABC):
+class Identifiable(BaseModel):
 
     _default_id: ClassVar[int]
     _id: ClassVar[int]
     _all: ClassVar[dict]
 
-    id: int
+    id: int = Field(default=None)
 
     def __init_subclass__(cls, /, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -16,12 +15,12 @@ class Identifiable(ABC):
         cls._id = cls._default_id
         cls._all = dict()
 
-    def __new__(cls, *args, **kwargs):
-        instance = super(Identifiable, cls).__new__(cls)
-        instance.id = cls._id
-        cls._all[cls._id] = instance
-        cls._id += 1
-        return instance
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(**kwargs)
+        if not hasattr(self, 'id') or self.id is None:
+            self.id = self.__class__._id
+            self.__class__._all[self.id] = self
+            self.__class__._id += 1
 
     @classmethod
     def min_id(cls):
@@ -48,4 +47,4 @@ class Identifiable(ABC):
             return None
 
     def __repr__(self):
-        return str(self.id)
+        return str(self.id) 
