@@ -101,7 +101,7 @@ class CourseInstance(BaseModel):
             object["lab"] = self.lab.name
         if self.time:
             object["times"] = self.time.times
-            if self.time.lab_index is not None:
+            if self.lab and self.time.lab_index is not None:
                 object["lab_index"] = self.time.lab_index
         return object
     
