@@ -106,4 +106,9 @@ class CourseInstance(BaseModel):
         return object
     
     def csv(self):
-        return f"{self.course},{self.faculty.name},{self.room.name if self.room else 'None'},{self.lab.name if self.lab else 'None'},{self.time}"
+        room_str = self.room.name if self.room else 'None'
+        lab_str = self.lab.name if self.lab else 'None'
+        time_str = str(self.time)
+        if not self.lab:
+            time_str = time_str.replace("^", "")
+        return f"{self.course},{self.faculty.name},{room_str},{lab_str},{time_str}"
