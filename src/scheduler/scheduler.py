@@ -12,7 +12,17 @@ import click
 import z3
 import json_fix  # type: ignore
 
-from .models import Course, Lab, Room, Faculty, Day, Duration, TimeInstance, TimePoint, TimeSlot
+from .models import (
+    Course,
+    Lab,
+    Room,
+    Faculty,
+    Day,
+    Duration,
+    TimeInstance,
+    TimePoint,
+    TimeSlot,
+)
 from .config import SchedulerConfig, FacultyConfig, TimeBlock, TimeSlotConfig
 
 # Configure logging
@@ -38,35 +48,43 @@ class TimeSlotConfiguration:
 
     def _parse_time(self, time_str: str) -> int:
         """Convert time string (HH:MM) to minutes since midnight."""
-        hour, minute = map(int, time_str.split(':'))
+        hour, minute = map(int, time_str.split(":"))
         return hour * 60 + minute
 
-    def _generate_day_slots(self, day: str, duration: int, time_blocks: List[TimeBlock], start_time: Optional[str] = None) -> List[TimeInstance]:
+    def _generate_day_slots(
+        self,
+        day: str,
+        duration: int,
+        time_blocks: List[TimeBlock],
+        start_time: Optional[str] = None,
+    ) -> List[TimeInstance]:
         """Generate all possible time slots for a given day and duration."""
         day_slots = []
         for block in time_blocks:
             block_start = self._parse_time(block.start)
             block_end = self._parse_time(block.end)
-            
+
             if start_time:
                 pattern_start = self._parse_time(start_time)
                 if pattern_start < block_start or pattern_start + duration > block_end:
                     continue
                 block_start = pattern_start
-            
+
             current_start = block_start
             while current_start + duration <= block_end:
                 time_instance = TimeInstance(
                     day=Day[day],
                     start=TimePoint.make_from(current_start // 60, current_start % 60),
-                    duration=Duration(duration=duration)
+                    duration=Duration(duration=duration),
                 )
                 day_slots.append(time_instance)
                 current_start += block.spacing
-                
+
         return day_slots
 
-    def _validate_time_combination(self, time_combination: List[TimeInstance], min_overlap: int) -> bool:
+    def _validate_time_combination(
+        self, time_combination: List[TimeInstance], min_overlap: int
+    ) -> bool:
         """
         Validate a time combination by checking:
         1. No overlapping meetings on the same day
@@ -78,8 +96,10 @@ class TimeSlotConfiguration:
                 if i != j:
                     # Check for same-day overlaps
                     if t1.day == t2.day:
-                        if (t1.start < t2.start + t2.duration and 
-                            t2.start < t1.start + t1.duration):
+                        if (
+                            t1.start < t2.start + t2.duration
+                            and t2.start < t1.start + t1.duration
+                        ):
                             return False
                     # Check for sufficient overlap between different days
                     else:
@@ -87,11 +107,11 @@ class TimeSlotConfiguration:
                         t1_end = t1_start + t1.duration.value
                         t2_start = t2.start.value
                         t2_end = t2_start + t2.duration.value
-                        
+
                         overlap_start = max(t1_start, t2_start)
                         overlap_end = min(t1_end, t2_end)
                         overlap_minutes = overlap_end - overlap_start
-                        
+
                         if overlap_minutes < min_overlap:
                             return False
         return True
@@ -107,7 +127,9 @@ class TimeSlotConfiguration:
     def time_slots(self, credits: int, *, min_overlap: int = 45) -> list[TimeSlot]:
 
         # Find matching class patterns for the requested credits
-        matching_patterns = [p for p in self.config.classes if p.credits == credits and not p.disabled]
+        matching_patterns = [
+            p for p in self.config.classes if p.credits == credits and not p.disabled
+        ]
         if not matching_patterns:
             return []
 
@@ -120,7 +142,7 @@ class TimeSlotConfiguration:
                     day=meeting.day,
                     duration=meeting.duration,
                     time_blocks=self.config.times.get(meeting.day, []),
-                    start_time=pattern.start_time
+                    start_time=pattern.start_time,
                 )
                 meeting_slots.append(day_slots)
 
@@ -129,7 +151,7 @@ class TimeSlotConfiguration:
                 # Skip if there are same-day overlaps or insufficient overlap between days
                 if not self._validate_time_combination(time_combination, min_overlap):
                     continue
-                    
+
                 # Skip if there aren't at least two meetings starting at the same time
                 if not self._has_matching_start_times(time_combination):
                     continue
@@ -142,7 +164,9 @@ class TimeSlotConfiguration:
                         break
 
                 # Create TimeSlot with this combination
-                result.append(TimeSlot(times=list(time_combination), lab_index=lab_index))
+                result.append(
+                    TimeSlot(times=list(time_combination), lab_index=lab_index)
+                )
 
         return result
 
@@ -153,7 +177,7 @@ class Scheduler:
     def __init__(self, config: SchedulerConfig, time_slots_config_file: str):
         """
         Initialize the scheduler.
-        
+
         Args:
             config: Configuration object containing courses, faculty, rooms, and labs
             time_slots_config_file: Path to the time slots configuration file
@@ -324,7 +348,7 @@ class Scheduler:
             self._slot_relationship_cache[cache_key] = result
         return self._slot_relationship_cache[cache_key]
 
-    def _z3ify_time_constraint_optimized(
+    def _z3ify_time_constraint(
         self, name: str
     ) -> Tuple[z3.Function, List[z3.ArithRef]]:
         z3fn = z3.Function(
@@ -334,71 +358,38 @@ class Scheduler:
             z3.BoolSort(ctx=self._ctx),
         )
 
-        # Pre-compute all slot evaluations and group by result
-        true_pairs = []
-        false_pairs = []
-
-        # Handle diagonal (self-relations) - always true for most relationships
-        true_pairs.extend([(slot.id, slot.id) for slot in self.slots])
-
-        # Process combinations more efficiently with caching
+        true = [(slot.id, slot.id) for slot in self.slots]
+        false = []
         for slot_i, slot_j in itertools.combinations(self.slots, 2):
             if self._cached_slot_relationship(name, slot_i, slot_j):
-                true_pairs.extend([(slot_i.id, slot_j.id), (slot_j.id, slot_i.id)])
+                true.extend([(slot_i.id, slot_j.id), (slot_j.id, slot_i.id)])
             else:
-                false_pairs.extend([(slot_i.id, slot_j.id), (slot_j.id, slot_i.id)])
+                false.extend([(slot_i.id, slot_j.id), (slot_j.id, slot_i.id)])
 
-        # Generate constraints in batches for better Z3 performance
         constraints = []
+        constraints.append(z3.And([z3fn(sid_i, sid_j) for sid_i, sid_j in true]))
+        constraints.append(
+            z3.And([z3.Not(z3fn(sid_i, sid_j)) for sid_i, sid_j in false])
+        )
 
-        # Batch true constraints
-        for sid_i, sid_j in true_pairs:
-            constraints.append(
-                z3fn(z3.IntVal(sid_i, ctx=self._ctx), z3.IntVal(sid_j, ctx=self._ctx))
-            )
-
-        # Batch false constraints
-        for sid_i, sid_j in false_pairs:
-            constraints.append(
-                z3.Not(
-                    z3fn(
-                        z3.IntVal(sid_i, ctx=self._ctx), z3.IntVal(sid_j, ctx=self._ctx)
-                    )
-                )
-            )
-
-        # Minimal simplification - only on smaller batches
         return z3fn, constraints
-
-    def _z3ify_time_constraint(
-        self, name: str
-    ) -> Tuple[z3.Function, List[z3.ArithRef]]:
-        return self._z3ify_time_constraint_optimized(name)
 
     def _z3ify_time_slot_fn(
         self, name: str, fn: Callable[[TimeSlot], bool]
     ) -> Tuple[z3.Function, List[z3.ArithRef]]:
         z3fn = z3.Function(name, z3.IntSort(ctx=self._ctx), z3.BoolSort(ctx=self._ctx))
 
-        # Pre-compute slot evaluations and batch constraints
-        true_slots = []
-        false_slots = []
-
+        true = []
+        false = []
         for slot in self.slots:
             if fn(slot):
-                true_slots.append(slot.id)
+                true.append(slot.id)
             else:
-                false_slots.append(slot.id)
+                false.append(slot.id)
 
         constraints = []
-        # Batch positive constraints
-        for slot_id in true_slots:
-            constraints.append(z3fn(z3.IntVal(slot_id, ctx=self._ctx)))
-
-        # Batch negative constraints
-        for slot_id in false_slots:
-            constraints.append(z3.Not(z3fn(z3.IntVal(slot_id, ctx=self._ctx))))
-
+        constraints.append(z3.And([z3fn(slot_id) for slot_id in true]))
+        constraints.append(z3.And([z3.Not(z3fn(slot_id)) for slot_id in false]))
         return z3fn, constraints
 
     def _z3ify_faculty_time_constraint(
@@ -411,46 +402,37 @@ class Scheduler:
             z3.BoolSort(ctx=self._ctx),
         )
 
-        constraints = []
-        # Pre-compute faculty availability for all slots to avoid repeated computation
-        faculty_slot_availability = {}
+        availability = {}
         for faculty_name, faculty in self.faculty_instances.items():
             faculty_times = self.faculty_availability[faculty_name]
-            faculty_slot_availability[faculty_name] = {
+            availability[faculty_name] = {
                 slot.id: slot.in_time_ranges(faculty_times) for slot in self.slots
             }
 
-        # Batch constraint generation by availability
-        available_pairs = []
-        unavailable_pairs = []
-
+        constraints = []
         for faculty_name, faculty in self.faculty_instances.items():
+            true = []
+            false = []
             faculty_id = faculty.id
             for slot in self.slots:
                 slot_id = slot.id
-                if faculty_slot_availability[faculty_name][slot_id]:
-                    available_pairs.append((faculty_id, slot_id))
+                if availability[faculty_name][slot_id]:
+                    true.append((faculty_id, slot_id))
                 else:
-                    unavailable_pairs.append((faculty_id, slot_id))
-
-        # Generate constraints in batches
-        for faculty_id, slot_id in available_pairs:
-            constraints.append(
-                z3fn(
-                    z3.IntVal(faculty_id, ctx=self._ctx),
-                    z3.IntVal(slot_id, ctx=self._ctx),
+                    false.append((faculty_id, slot_id))
+            if true:
+                constraints.append(
+                    z3.And([z3fn(faculty_id, slot_id) for faculty_id, slot_id in true])
                 )
-            )
-
-        for faculty_id, slot_id in unavailable_pairs:
-            constraints.append(
-                z3.Not(
-                    z3fn(
-                        z3.IntVal(faculty_id, ctx=self._ctx),
-                        z3.IntVal(slot_id, ctx=self._ctx),
+            if false:
+                constraints.append(
+                    z3.And(
+                        [
+                            z3.Not(z3fn(faculty_id, slot_id))
+                            for faculty_id, slot_id in false
+                        ]
                     )
                 )
-            )
 
         return z3fn, constraints
 
@@ -459,9 +441,6 @@ class Scheduler:
         overlaps, overlaps_C = self._z3ify_time_constraint("overlaps")
         lab_overlaps, lab_overlaps_C = self._z3ify_time_constraint("lab_overlaps")
         next_to, next_to_C = self._z3ify_time_constraint("next_to")
-        next_to_tues_wed, next_to_tues_wed_C = self._z3ify_time_constraint(
-            "next_to_tues_wed"
-        )
         not_next_to, not_next_to_C = self._z3ify_time_constraint("not_next_to")
         faculty_available, faculty_available_C = self._z3ify_faculty_time_constraint(
             "faculty_available"
@@ -474,6 +453,8 @@ class Scheduler:
             + not_next_to_C
             + faculty_available_C
         )
+
+        logger.debug(f"Added {len(fn_constraints)} function constraints")
 
         def hard_constraints():
             # Pre-compute course groupings to reduce repeated calculations
@@ -518,11 +499,7 @@ class Scheduler:
                                 z3.Or([c.faculty() == faculty.id for c in course_group])
                             )
                         limit = self._simplify(
-                            z3.PbLe(
-                                [(tc, 1) for tc in teaches_course],
-                                unique_limit,
-                                ctx=self._ctx,
-                            )
+                            z3.PbLe([(tc, 1) for tc in teaches_course], unique_limit)
                         )
                         faculty_constraints.append(limit)
 
@@ -537,7 +514,7 @@ class Scheduler:
                 for d in self.courses:
                     if d != c and d.course_id in c.conflicts:
                         conflict_constraints.append(
-                            z3.Not(overlaps(c.time(), d.time()), ctx=self._ctx)
+                            z3.Not(overlaps(c.time(), d.time()))
                         )
 
                 course_constraint_list = []
@@ -547,16 +524,16 @@ class Scheduler:
                 if stop >= start:
                     course_constraint_list.append(
                         z3.And(
-                            z3.IntVal(start, ctx=self._ctx) <= c.time(),
-                            c.time() <= z3.IntVal(stop, ctx=self._ctx),
+                            start <= c.time(),
+                            c.time() <= stop,
                         )
                     )
                 if c.labs:
                     # we must assign to a lab when we have options
                     course_constraint_list.append(
                         z3.And(
-                            z3.IntVal(self._min_ids[Lab], ctx=self._ctx) <= c.lab(),
-                            c.lab() <= z3.IntVal(self._max_ids[Lab], ctx=self._ctx),
+                            self._min_ids[Lab] <= c.lab(),
+                            c.lab() <= self._max_ids[Lab],
                             z3.Or(
                                 [
                                     c.lab() == lab.id
@@ -570,8 +547,8 @@ class Scheduler:
                     # we must assign to a room when we have options
                     course_constraint_list.append(
                         z3.And(
-                            z3.IntVal(self._min_ids[Room], ctx=self._ctx) <= c.room(),
-                            c.room() <= z3.IntVal(self._max_ids[Room], ctx=self._ctx),
+                            self._min_ids[Room] <= c.room(),
+                            c.room() <= self._max_ids[Room],
                             z3.Or(
                                 [
                                     c.room() == room.id
@@ -585,10 +562,8 @@ class Scheduler:
                     # we must assign to a faculty from the candidates
                     course_constraint_list.append(
                         z3.And(
-                            z3.IntVal(self._min_ids[Faculty], ctx=self._ctx)
-                            <= c.faculty(),
-                            c.faculty()
-                            <= z3.IntVal(self._max_ids[Faculty], ctx=self._ctx),
+                            self._min_ids[Faculty] <= c.faculty(),
+                            c.faculty() <= self._max_ids[Faculty],
                             z3.Or(
                                 [
                                     c.faculty() == faculty.id
@@ -615,49 +590,41 @@ class Scheduler:
             for i, j in course_pairs:
 
                 resource = []
-
-                # Room overlap check - if any two courses use the same room, they cannot overlap in time
-                shared_rooms = set(i.rooms) & set(j.rooms)
-                if shared_rooms:  # Only if they can potentially share rooms
-                    resource.append(
-                        z3.Implies(
-                            i.room() == j.room(),
-                            z3.Not(overlaps(i.time(), j.time()), ctx=self._ctx),
-                        )
-                    )
-
-                # Lab overlap check - if any two courses use the same lab, their labs cannot overlap
-                shared_labs = set(i.labs) & set(j.labs)
-                if shared_labs:  # Only if they can potentially share labs
-                    resource.append(
-                        z3.Implies(
-                            i.lab() == j.lab(),
-                            z3.Not(lab_overlaps(i.time(), j.time()), ctx=self._ctx),
-                        )
-                    )
-
-                # Prevent time overlap for courses taught by same faculty
-                constraint_parts = [
-                    z3.Not(overlaps(i.time(), j.time()), ctx=self._ctx),
-                    z3.If(
-                        i.course_id == j.course_id,
-                        next_to(i.time(), j.time()),
-                        not_next_to(i.time(), j.time()),
-                        ctx=self._ctx,
-                    ),
-                ]
+                constraint_parts = []
 
                 # Enforce same room usage when both courses can use the same rooms
                 if set(i.rooms) & set(j.rooms):
-                    constraint_parts.append(
-                        z3.Implies(i.course_id == j.course_id, i.room() == j.room())
+                    resource.append(
+                        z3.Implies(
+                            i.room() == j.room(),
+                            z3.Not(overlaps(i.time(), j.time())),
+                        )
                     )
+                    if i.course_id == j.course_id:
+                        constraint_parts.append(i.room() == j.room())
 
                 # Enforce same lab usage when both courses have labs and can use the same labs
                 if set(i.labs) & set(j.labs):
-                    constraint_parts.append(
-                        z3.Implies(i.course_id == j.course_id, i.lab() == j.lab())
+                    resource.append(
+                        z3.Implies(
+                            i.lab() == j.lab(),
+                            z3.Not(lab_overlaps(i.time(), j.time())),
+                        )
                     )
+                    if i.course_id == j.course_id:
+                        constraint_parts.append(i.lab() == j.lab())
+
+                # Prevent time overlap for courses taught by same faculty
+                constraint_parts.append(
+                    z3.And(
+                        z3.Not(overlaps(i.time(), j.time())),
+                        z3.If(
+                            i.course_id == j.course_id,
+                            next_to(i.time(), j.time()),
+                            not_next_to(i.time(), j.time()),
+                        ),
+                    )
+                )
 
                 resource_constraints.append(
                     z3.And(
@@ -674,6 +641,7 @@ class Scheduler:
 
         # Generate constraints without excessive simplification
         C = list(hard_constraints())
+        logger.debug(f"Added {len(C)} hard constraints")
 
         hard = fn_constraints + C
 
@@ -690,7 +658,7 @@ class Scheduler:
             lab: z3.ArithRef
             room: z3.ArithRef
 
-        def get_course_assignments(course) -> ModelAssignment:
+        def get_course_assignments(course: Course) -> ModelAssignment:
             """Get the actual assignments for a course from the model."""
             return ModelAssignment(
                 time=m[course.time()],
@@ -699,44 +667,41 @@ class Scheduler:
                 room=m[course.room()],
             )
 
-        def create_permutation_constraint(courses):
-            """Create constraint for all possible permutations of course assignments."""
-            ordered = courses
-            assignments = [get_course_assignments(c) for c in ordered]
-
-            # Create constraints for each permutation
-            permutation_constraints = []
-            for perm in itertools.permutations(ordered):
-                # For each permutation, create a constraint that all assignments match
-                assignment_constraints = []
-                for actual_assignments, expected_course in zip(assignments, perm):
-                    if expected_course.labs:
-                        assignment_constraints.append(
-                            z3.And(
-                                actual_assignments.time == expected_course.time(),
-                                actual_assignments.faculty == expected_course.faculty(),
-                                actual_assignments.lab == expected_course.lab(),
-                                actual_assignments.room == expected_course.room(),
-                            )
+        rearranged = []
+        per_course = []
+        # group courses by faculty first
+        for _, group in itertools.groupby(self.courses, key=lambda x: m[x.faculty()]):
+            group = list(group)
+            for _, cs in itertools.groupby(group, key=lambda x: x.course_id):
+                cs = list(cs)
+                if len(cs) > 1:
+                    rearranged.append(
+                        z3.And(
+                            [
+                                z3.And(i.time() != m[j.time()], j.time() != m[i.time()])
+                                for i, j in itertools.combinations(cs, 2)
+                            ]
                         )
-                    else:
-                        assignment_constraints.append(
-                            z3.And(
-                                actual_assignments.time == expected_course.time(),
-                                actual_assignments.faculty == expected_course.faculty(),
-                                actual_assignments.room == expected_course.room(),
-                            )
-                        )
-                permutation_constraints.append(z3.And(assignment_constraints))
+                    )
+                for c in cs:
+                    per_instance = []
+                    per_instance.append(c.time() == m[c.time()])
+                    if c.rooms:
+                        per_instance.append(c.room() == m[c.room()])
+                    if c.labs:
+                        per_instance.append(c.lab() == m[c.lab()])
+                    per_course.append(z3.Not(z3.And(per_instance)))
 
-            return z3.Or(permutation_constraints)
-
-        # Process all course pairs that share faculty and course ID
-        for i, j in itertools.combinations(self.courses, 2):
-            if m[i.faculty()] == m[j.faculty()] and i.course_id == j.course_id:
-                constraints.append(create_permutation_constraint([i, j]))
-
-        s.add(self._simplify(z3.Not(z3.And(constraints))))
+        if rearranged:
+            logger.debug(
+                f"Adding 1 course rearrangement constraint with {len(rearranged)} predicates"
+            )
+            s.add(z3.And(rearranged))
+        if per_course:
+            logger.debug(
+                f"Adding 1 per-course constraint with {len(per_course)} predicates"
+            )
+            s.add(z3.Or(per_course))
 
     def get_models(self, limit=10, optimize=True):
         s = z3.Optimize(ctx=self._ctx)
@@ -754,7 +719,6 @@ class Scheduler:
         s.set("opt.maxres.pivot_on_correction_set", False)  # Disable for speed
         s.set("opt.maxres.add_upper_bound_block", True)  # Better bounds
 
-        logger.debug(f"Adding {len(self.constraints)} constraints to solver")
         for c in self.constraints:
             s.add(c)
 
@@ -793,19 +757,44 @@ class Scheduler:
                     for i in range(0, len(preference_terms), batch_size):
                         batch = preference_terms[i : i + batch_size]
                         sub_sums.append(z3.Sum(batch))
-                    goal = s.maximize(z3.Sum(sub_sums))
+                    s.maximize(z3.Sum(sub_sums))
                 else:
-                    # Maximize the sum of preference values
-                    goal = s.maximize(z3.Sum(preference_terms))
+                    s.maximize(z3.Sum(preference_terms))
+
+            same_rooms = []
+            for i, j in itertools.combinations(self.courses, 2):
+                if set(i.rooms) & set(j.rooms):
+                    same_rooms.append(
+                        z3.If(
+                            z3.And(i.faculty() == j.faculty(), i.room() == j.room()),
+                            1,
+                            0,
+                        )
+                    )
+            if same_rooms:
+                logger.debug(f"Adding {len(same_rooms)} same room optimization goals")
+                s.maximize(z3.Sum(same_rooms))
+
+            same_labs = []
+            for i, j in itertools.combinations(self.courses, 2):
+                if set(i.labs) & set(j.labs):
+                    same_labs.append(
+                        z3.If(
+                            z3.And(i.faculty() == j.faculty(), i.lab() == j.lab()), 1, 0
+                        )
+                    )
+            if same_labs:
+                logger.debug(f"Adding {len(same_labs)} same lab optimization goals")
+                s.maximize(z3.Sum(same_labs))
+
+            logger.info("Created all optimization goals")
         else:
             logger.info(
-                "Skipping faculty preference optimization for faster solving",
+                "Skipping optimization goals",
             )
 
         for i in range(limit):
             if s.check() == z3.sat:
-                if optimize:
-                    s.upper(goal)
                 yield s.model()
                 self._update(s)
                 i += 1
