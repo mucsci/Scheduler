@@ -530,26 +530,15 @@ class Scheduler:
             for c in faculty_constraints:
                 yield self._simplify(c)
 
-            # Pre-compute conflict mapping for efficiency
-            conflict_map = {}
-            for c in self.courses:
-                for conflict_id in c.conflicts:
-                    if conflict_id not in conflict_map:
-                        conflict_map[conflict_id] = []
-                    conflict_map[conflict_id].append(c)
-
             # Course constraints with optimized conflict checking - batch generation
             course_constraints = []
             for c in self.courses:
-                # Build conflict constraints more efficiently
                 conflict_constraints = []
-                for conflict_id in c.conflicts:
-                    if conflict_id in conflict_map:
-                        for d in conflict_map[conflict_id]:
-                            if d != c and d.course_id == conflict_id:
-                                conflict_constraints.append(
-                                    z3.Not(overlaps(c.time(), d.time()), ctx=self._ctx)
-                                )
+                for d in self.courses:
+                    if d != c and d.course_id in c.conflicts:
+                        conflict_constraints.append(
+                            z3.Not(overlaps(c.time(), d.time()), ctx=self._ctx)
+                        )
 
                 course_constraint_list = []
 
@@ -610,8 +599,8 @@ class Scheduler:
                         )
                     )
                 if conflict_constraints:
-                    # check the other courses time slot constraint(s)
                     course_constraint_list.append(z3.And(conflict_constraints))
+
                 # check the faculty time constraint - ensure assigned faculty is available at assigned time
                 course_constraint_list.append(faculty_available(c.faculty(), c.time()))
                 course_constraints.append(z3.And(course_constraint_list))
