@@ -1,6 +1,5 @@
 from enum import IntEnum, auto
 
-
 class Day(IntEnum):
     MON = auto()
     TUE = auto()
@@ -18,4 +17,4 @@ class Day(IntEnum):
         return next(val.name for val in Day if self.value == val)
 
     def __json__(self):
-        return self.value
+        return self.value 

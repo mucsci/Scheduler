@@ -32,7 +32,7 @@ html,body {
         <script src="https://d3js.org/d3.v7.min.js"></script>
         <script type="text/javascript">
 var root_json = null;
-var root_courses = null;
+var locations = null;
 var curr_index = -1;
 
 const getHashCode = (str) => {
@@ -56,22 +56,20 @@ const intToHSL = (val) => {
     return "hsla(" + shortened + ",100%,30%,20%)";
 };
 
-function map_course(course) {
+function map_course(c) {
     var result = Array();
-    const name = course.name;
-    const room = course.room;
-    const faculty = course.faculty;
-    for (const t in course.time) {
-        var entry = {...course.time[t]};
-        entry['name'] = name;
+    const {course, faculty, room, times, lab, lab_index} = c;
+    for (const t in times) {
+        var entry = {...times[t]};
+        entry['name'] = course;
         entry['room'] = room;
         entry['faculty'] = faculty;
         result.push(entry);
     }
-    if (course.lab) {
-        var entry = {...course.lab.time};
-        entry['name'] = name;
-        entry['room'] = course.lab.room;
+    if (lab) {
+        var entry = {...times[lab_index]};
+        entry['name'] = course;
+        entry['room'] = lab;
         entry['faculty'] = faculty;
         result.push(entry);
     }
@@ -88,7 +86,7 @@ function load_index(index) {
     
     const the_data = root_json[index].flatMap(map_course);
 
-    for (const room of ["Roddy 136", "Roddy 140", "Roddy 147", "Mac", "Linux"]) {
+    for (const room of locations) {
 
         const div = d3.select("#schedule")
             .append("div");
@@ -190,6 +188,19 @@ function load_index(index) {
 function read_json(event) {
     const result = event.target.result;
     root_json = JSON.parse(result);
+    rooms = new Set()
+    labs = new Set()
+    for (const i in root_json) {
+        for (const c of root_json[i]) {
+            if (c.room) {
+                rooms.add(c.room);
+            }
+            if (c.lab) {
+                labs.add(c.lab);
+            }
+        }
+    }
+    locations = Array.from(rooms).sort().concat(Array.from(labs).sort());
     document.getElementById('nav').style.display = "initial";
     load_index(0);
 }
