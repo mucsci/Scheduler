@@ -121,7 +121,7 @@ class TimeInstance(BaseModel):
         return f"{self.day.name} {str(self.start)}-{str(self.stop)}"
 
     def __json__(self):
-        return {"day": self.day, "start": self.start, "duration": self.duration}
+        return {"day": self.day, "start": self.start.timepoint, "duration": self.duration.duration}
 
 
 class TimeSlot(Identifiable):

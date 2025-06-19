@@ -1,62 +1,238 @@
-# Constraint-Sastisfaction Scheduler
+# Course Scheduler
 
-### Dependencies
+A constraint satisfaction solver for generating course schedules using Z3 theorem prover.
 
-- `python` (version >= 3.12)
-- `uv`
+## Features
 
-### Build / Install
+- **Constraint Satisfaction**: Uses Z3 theorem prover for optimal schedule generation
+- **Faculty Preferences**: Supports faculty course preferences and availability
+- **Room & Lab Assignment**: Intelligent assignment of rooms and labs
+- **Conflict Resolution**: Handles course conflicts and scheduling constraints
+- **HTTP API**: RESTful API for schedule generation with session management
+- **Concurrent Processing**: Thread pool for handling multiple Z3 operations simultaneously
+- **Performance Optimized**: Aggressive Z3 settings for faster solving
 
-```
-$ uv venv
-$ source .venv/bin/activate
-$ uv sync
-```
+## Installation
 
-### Usage
-
-A `scheduler` executable should be in the virtual environment's path
-
-```
-Usage: scheduler [OPTIONS] CONFIG
-
-  Generate course schedules using constraint satisfaction solving.
-
-Options:
-  -t, --timeslot-config PATH  Path to the time slot configuration file
-  -l, --limit INTEGER         Maximum number of models to generate
-  -f, --format [csv|json]     Output format
-  -o, --output TEXT           Output basename (extension added automatically)
-  --optimize                  Enable optimization of preferences (slower)
-  --help                      Show this message and exit.
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd Sched
 ```
 
-### Constraints Modeled
-
-- **Faculty** are assigned to teach specific **Courses**, of which they may have preferences
-  - **Faculty** have credit minimums and maximums
-  - **Faculty** have unique course maximums
-  - **Faculty** have *time-of-day* and *day-of-week* preferences, of which they will not be assigned to any time block outside of their specified window
-  - **Faculty** teaching two sections of the same course will have both sections assigned "next to" the other. These courses will also be in the same rooms
-- **Courses** may have specific **Lab** assignments or **Room** assignments
-- **Rooms** may only be occupied by a single **Course** at any given time
-- **Labs** may only be occupied by a single **Course** at any given time
-
-### Output
-
-Output will be listed in the same order as courses are in the JSON file and will include
-- Assigned Room
-- Assigned Lab (if any needed)
-- Comma-delimited list of times
-
-```
-CSCI 140.01,Cain,Roddy 140,None,MON 10:00-10:50,TUE 10:00-11:50^,FRI 10:00-10:50
-CSCI 140.02,Cain,Roddy 140,None,MON 09:00-09:50,WED 09:00-10:50^,FRI 09:00-09:50
-...
-...
-CSCI 375.01,Hogg,Roddy 147,Linux,MON 11:00-11:50,THU 11:00-12:50^,FRI 11:00-11:50
+2. Install dependencies:
+```bash
+pip install -e .
 ```
 
-### Contact / Bug Reporting / Feature Requests
+## Usage
 
-Any bugs or feature requests should be filed as issues on this repository.
+### Command Line Interface
+
+Generate schedules using the CLI:
+
+```bash
+# Using the installed script
+scheduler --config config.json --time-slots time_slots.json --limit 10
+
+# Or directly with Python
+python -m scheduler.main --config config.json --time-slots time_slots.json --limit 10
+```
+
+### HTTP API Server
+
+Start the HTTP API server:
+
+```bash
+# Using the installed script with default settings
+scheduler-server
+
+# With custom configuration
+scheduler-server --port 8000 --host 0.0.0.0 --log-level info --workers 6
+
+# Or directly with Python
+python -m scheduler.server --port 8000 --workers 6
+```
+
+#### Server Options
+
+- `--port, -p`: Port to run the server on (default: 8000)
+- `--host, -h`: Host to bind the server to (default: 0.0.0.0)
+- `--log-level, -l`: Log level (debug, info, warning, error, critical) (default: info)
+- `--workers, -w`: Number of Z3 worker threads for concurrent processing (default: 4)
+
+#### Performance Tuning
+
+The server uses a thread pool to handle Z3 operations concurrently. For optimal performance:
+
+- **CPU-bound workloads**: Set workers to number of CPU cores
+- **I/O-bound workloads**: Set workers to 2-4x number of CPU cores
+- **Memory-constrained**: Reduce workers to avoid memory pressure
+
+Example for high-performance server:
+```bash
+scheduler-server --workers 8 --log-level warning
+```
+
+### API Endpoints
+
+#### Submit Schedule Request
+```http
+POST /submit
+Content-Type: application/json
+
+{
+  "config": {
+    "courses": [...],
+    "faculty": [...],
+    "rooms": [...],
+    "labs": [...]
+  },
+  "time_slot_config": {
+    "start_time": "08:00",
+    "end_time": "18:00",
+    "slot_duration": 60,
+    "break_duration": 15
+  },
+  "limit": 10,
+  "optimize": true
+}
+```
+
+#### Generate Next Schedule
+```http
+POST /schedules/{schedule_id}/next
+```
+
+#### Get Schedule by Index
+```http
+GET /schedules/{schedule_id}/index/{index}
+```
+
+#### Get Schedule Details
+```http
+GET /schedules/{schedule_id}/details
+```
+
+#### Delete Schedule Session
+```http
+DELETE /schedules/{schedule_id}/delete
+```
+
+#### Health Check
+```http
+GET /health
+```
+
+## Configuration
+
+### Course Configuration (`config.json`)
+
+```json
+{
+  "courses": [
+    {
+      "course_id": "CS101",
+      "credits": 3,
+      "faculty": ["Dr. Smith"],
+      "room": ["Room A", "Room B"],
+      "lab": ["Lab 1"],
+      "conflicts": []
+    }
+  ],
+  "faculty": [
+    {
+      "name": "Dr. Smith",
+      "maximum_credits": 12,
+      "minimum_credits": 6,
+      "unique_course_limit": 2,
+      "preferences": {"CS101": 5},
+      "times": {
+        "MON": ["09:00-12:00", "14:00-17:00"],
+        "TUE": ["09:00-12:00", "14:00-17:00"]
+      }
+    }
+  ],
+  "rooms": ["Room A", "Room B"],
+  "labs": ["Lab 1", "Lab 2"]
+}
+```
+
+### Time Slot Configuration (`time_slots.json`)
+
+```json
+{
+  "start_time": "08:00",
+  "end_time": "18:00",
+  "slot_duration": 60,
+  "break_duration": 15
+}
+```
+
+## Testing
+
+### Basic API Test
+```bash
+python examples/rest_api.py
+```
+
+### Concurrent Client Test
+```bash
+python examples/concurrent_clients.py
+```
+
+### Stress Test
+```bash
+python examples/stress_test.py
+```
+
+The stress test creates multiple concurrent sessions and generates schedules to test server performance under load.
+
+## Performance Optimizations
+
+### Z3 Configuration
+The scheduler uses aggressive Z3 settings for faster solving:
+
+- **Parallel solving**: Enabled with configurable thread count
+- **Timeouts**: 30-second timeout per solve operation
+- **Resource limits**: Optimized memory and CPU usage
+- **Caching**: Extensive caching of slot relationships and simplifications
+
+### Thread Pool
+- **Concurrent Z3 operations**: Multiple schedule generations can run simultaneously
+- **Configurable workers**: Adjust based on system resources
+- **Non-blocking API**: Async endpoints with thread pool execution
+
+### Memory Management
+- **Session cleanup**: Automatic cleanup of completed sessions
+- **Resource limits**: Z3 resource limits prevent memory exhaustion
+- **Garbage collection**: Aggressive GC settings for faster memory cleanup
+
+## Architecture
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   HTTP Client   │───▶│  FastAPI Server │───▶│  Thread Pool    │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                │                       │
+                                ▼                       ▼
+                       ┌─────────────────┐    ┌─────────────────┐
+                       │ Session Manager │    │   Z3 Solver     │
+                       └─────────────────┘    └─────────────────┘
+```
+
+## Development
+
+### Project Structure
+```
+src/scheduler/
+├── __init__.py
+├── main.py              # CLI entry point
+├── server.py            # HTTP API server
+├── scheduler.py         # Core scheduler logic
+├── config.py            # Configuration models
+├── time_slot_generator.py
+├── logging.py
+├── models/              # Data models
+└── writers/             # Output writers
+```

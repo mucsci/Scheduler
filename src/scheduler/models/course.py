@@ -100,7 +100,7 @@ class CourseInstance(BaseModel):
         if self.lab:
             object["lab"] = self.lab.name
         if self.time:
-            object["times"] = self.time.times
+            object["times"] = [t.__json__() for t in self.time.times]
             if self.lab and self.time.lab_index is not None:
                 object["lab_index"] = self.time.lab_index
         return object

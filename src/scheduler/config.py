@@ -1,6 +1,6 @@
-from typing import List, Dict, Optional
-import json
+from typing import Optional
 
+import json
 from pydantic import BaseModel, Field
 
 
@@ -18,23 +18,23 @@ class Meeting(BaseModel):
 
 class ClassPattern(BaseModel):
     credits: int
-    meetings: List[Meeting]
+    meetings: list[Meeting]
     disabled: Optional[bool] = Field(default=False)
     start_time: Optional[str] = Field(default=None)
 
 
 class TimeSlotConfig(BaseModel):
-    times: Dict[str, List[TimeBlock]]
-    classes: List[ClassPattern]
+    times: dict[str, list[TimeBlock]]
+    classes: list[ClassPattern]
 
 
 class CourseConfig(BaseModel):
     course_id: str
     credits: int
-    room: List[str]
-    lab: List[str]
-    conflicts: List[str]
-    faculty: List[str]
+    room: list[str]
+    lab: list[str]
+    conflicts: list[str]
+    faculty: list[str]
 
 
 class FacultyConfig(BaseModel):
@@ -42,12 +42,12 @@ class FacultyConfig(BaseModel):
     maximum_credits: int
     minimum_credits: int
     unique_course_limit: int
-    times: Dict[str, List[str]]  # {day_name: ["HH:MM-HH:MM", ...]}
-    preferences: Dict[str, int] = Field(default_factory=dict)
+    times: dict[str, list[str]]  # {day_name: ["HH:MM-HH:MM", ...]}
+    preferences: dict[str, int] = Field(default_factory=dict)
 
 
 class SchedulerConfig(BaseModel):
-    rooms: List[str]
-    labs: List[str]
-    courses: List[CourseConfig]
-    faculty: List[FacultyConfig]
+    rooms: list[str]
+    labs: list[str]
+    courses: list[CourseConfig]
+    faculty: list[FacultyConfig]

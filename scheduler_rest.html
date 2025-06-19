@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Scheduler REST API</title>
+        <style>
+            html, body {
+                font-family: 'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background-color: #f5f5f5;
+            }
+            
+            .container {
+                max-width: 1200px;
+                margin: 0 auto;
+                background: white;
+                padding: 20px;
+                border-radius: 8px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+            
+            .form-section {
+                background: #f8f9fa;
+                padding: 20px;
+                border-radius: 6px;
+                margin-bottom: 20px;
+                border: 1px solid #dee2e6;
+            }
+            
+            .form-group {
+                margin-bottom: 15px;
+            }
+            
+            .form-group label {
+                display: block;
+                margin-bottom: 5px;
+                font-weight: bold;
+                color: #495057;
+            }
+            
+            .form-group input, .form-group select {
+                width: 100%;
+                padding: 8px 12px;
+                border: 1px solid #ced4da;
+                border-radius: 4px;
+                font-size: 14px;
+                box-sizing: border-box;
+            }
+            
+            .form-row {
+                display: flex;
+                gap: 15px;
+                align-items: end;
+            }
+            
+            .form-row .form-group {
+                flex: 1;
+            }
+            
+            .btn {
+                background: #007bff;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+                transition: background-color 0.2s;
+            }
+            
+            .btn:hover {
+                background: #0056b3;
+            }
+            
+            .btn:disabled {
+                background: #6c757d;
+                cursor: not-allowed;
+            }
+            
+            .btn-secondary {
+                background: #6c757d;
+            }
+            
+            .btn-secondary:hover {
+                background: #545b62;
+            }
+            
+            .status {
+                padding: 10px;
+                border-radius: 4px;
+                margin: 10px 0;
+                font-weight: bold;
+            }
+            
+            .status.success {
+                background: #d4edda;
+                color: #155724;
+                border: 1px solid #c3e6cb;
+            }
+            
+            .status.error {
+                background: #f8d7da;
+                color: #721c24;
+                border: 1px solid #f5c6cb;
+            }
+            
+            .status.info {
+                background: #d1ecf1;
+                color: #0c5460;
+                border: 1px solid #bee5eb;
+            }
+            
+            .nav-controls {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin: 20px 0 10px 0;
+                padding: 10px 0;
+                background: none;
+                border-radius: 0;
+            }
+            
+            .nav-controls button {
+                min-width: 60px;
+            }
+            
+            .schedule-info {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin: 0;
+            }
+            
+            .schedule-count {
+                font-size: 16px;
+                font-weight: bold;
+                color: #495057;
+            }
+            
+            .loading {
+                display: none;
+                text-align: center;
+                padding: 20px;
+                color: #6c757d;
+            }
+            
+            .loading.show {
+                display: block;
+            }
+            
+            @media not print {
+                #schedule > div {
+                    display: inline-block;
+                    margin-right: 20px;
+                    margin-bottom: 20px;
+                    vertical-align: top;
+                }
+            }
+            
+            @media print {
+                .form-section, .nav-controls {
+                    display: none;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1 style="font-size:1.5em;margin-bottom:0.5em;">Course Scheduler REST API</h1>
+            <form id="main-form" style="display:flex;align-items:center;gap:8px;margin-bottom:1em;padding:0;">
+                <input type="text" id="server-url" value="http://localhost:8000" placeholder="Server URL" style="width:200px;padding:4px 6px;font-size:1em;">
+                <button type="button" id="check-btn" class="btn" style="padding:4px 12px;font-size:1em;">Check</button>
+                <span id="status-dot" style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#bbb;margin-left:2px;"></span>
+                <input type="file" id="config-file" accept=".json" style="font-size:1em;">
+                <button type="button" class="btn" style="padding:4px 12px;font-size:1em;" onclick="submitConfiguration()">Submit</button>
+            </form>
+            <div id="config-status"></div>
+            <div class="nav-controls" id="nav-controls" style="display: none;">
+                <button class="btn btn-secondary" id="prev" onclick="previousSchedule()">Previous</button>
+                <span id="curr">0 of 0</span>
+                <button class="btn" id="next" onclick="nextSchedule()">Next</button>
+                <span class="schedule-count" id="schedule-count"></span>
+                <button class="btn btn-secondary" onclick="deleteSession()">Delete Session</button>
+                <span id="status-message" style="margin-left:16px;min-width:180px;display:inline-block;"></span>
+            </div>
+            <div class="loading" id="loading">
+                <p>Loading...</p>
+            </div>
+            <div id="schedule"></div>
+        </div>
+        
+        <script src="https://d3js.org/d3.v7.min.js"></script>
+        <script type="text/javascript">
+            let currentSessionId = null;
+            let currentIndex = -1;
+            let totalGenerated = 0;
+            let scheduleLimit = 10;
+            let schedules = [];
+            
+            // Utility functions
+            function showStatus(elementId, message, type = 'info') {
+                const element = document.getElementById('status-message');
+                let color = '#444';
+                if (type === 'success') color = '#2ecc40';
+                if (type === 'error') color = '#e74c3c';
+                if (type === 'info') color = '#2980b9';
+                element.innerHTML = `<span style="color:${color};font-weight:500;">${message}</span>`;
+                if (type !== 'loading') {
+                    setTimeout(() => { element.innerHTML = ''; }, 5000);
+                }
+            }
+            
+            function showLoading(show) {
+                const element = document.getElementById('status-message');
+                if (show) {
+                    element.innerHTML = '<span style="color:#888;">Loading...</span>';
+                } else {
+                    // Do not clear here, let showStatus handle it
+                }
+            }
+            
+            function getBaseUrl() {
+                return document.getElementById('server-url').value.replace(/\/$/, '');
+            }
+            
+            // API functions
+            document.getElementById('check-btn').onclick = async function() {
+                const dot = document.getElementById('status-dot');
+                dot.style.background = '#bbb'; // gray (checking)
+                try {
+                    const url = getBaseUrl();
+                    const response = await fetch(`${url}/health`, {method: 'GET'});
+                    if (response.ok) {
+                        dot.style.background = '#2ecc40'; // green
+                    } else {
+                        dot.style.background = '#e74c3c'; // red
+                    }
+                } catch {
+                    dot.style.background = '#e74c3c'; // red
+                }
+            };
+            
+            async function submitConfiguration() {
+                const fileInput = document.getElementById('config-file');
+                
+                if (!fileInput.files[0]) {
+                    showStatus('config-status', 'Please select a configuration file', 'error');
+                    return;
+                }
+                
+                showLoading(true);
+                
+                try {
+                    const fileContent = await fileInput.files[0].text();
+                    const configData = JSON.parse(fileContent);
+                    
+                    const url = getBaseUrl();
+                    const response = await fetch(`${url}/submit`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(configData)
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        currentSessionId = result.schedule_id;
+                        scheduleLimit = configData.limit;
+                        schedules = [];
+                        currentIndex = -1;
+                        totalGenerated = 0;
+                        
+                        showStatus('config-status', 
+                            `[OK] Configuration submitted successfully! Session ID: ${currentSessionId}`, 'success');
+                        
+                        document.getElementById('nav-controls').style.display = 'flex';
+                        updateNavigation();
+                    } else {
+                        const errorText = await response.text();
+                        showStatus('config-status', 
+                            `[ERROR] Failed to submit configuration: ${response.status} - ${errorText}`, 'error');
+                    }
+                } catch (error) {
+                    showStatus('config-status', 
+                        `[ERROR] Error: ${error.message}`, 'error');
+                } finally {
+                    showLoading(false);
+                }
+            }
+            
+            async function nextSchedule() {
+                if (!currentSessionId) return;
+                // If not at the end, just advance to the next already-generated schedule
+                if (currentIndex < schedules.length - 1) {
+                    currentIndex++;
+                    displaySchedule(schedules[currentIndex]);
+                    updateNavigation();
+                    return;
+                }
+                // Otherwise, generate a new schedule
+                showLoading(true);
+                try {
+                    const url = getBaseUrl();
+                    const response = await fetch(`${url}/schedules/${currentSessionId}/next`, {
+                        method: 'POST'
+                    });
+                    if (response.ok) {
+                        const result = await response.json();
+                        schedules.push(result.schedule);
+                        currentIndex = schedules.length - 1;
+                        totalGenerated = result.index + 1;
+                        displaySchedule(result.schedule);
+                        updateNavigation();
+                        showStatus('config-status', `[OK] Generated schedule ${totalGenerated}`, 'success');
+                    } else if (response.status === 400) {
+                        const errorData = await response.json();
+                        showStatus('config-status', `[INFO] ${errorData.detail}`, 'info');
+                    } else {
+                        const errorText = await response.text();
+                        showStatus('config-status', `[ERROR] Failed to generate schedule: ${response.status} - ${errorText}`, 'error');
+                    }
+                } catch (error) {
+                    showStatus('config-status', `[ERROR] Error: ${error.message}`, 'error');
+                } finally {
+                    showLoading(false);
+                }
+            }
+            
+            async function previousSchedule() {
+                if (currentIndex > 0) {
+                    currentIndex--;
+                    displaySchedule(schedules[currentIndex]);
+                    updateNavigation();
+                }
+            }
+            
+            async function loadScheduleByIndex(index) {
+                if (!currentSessionId || index < 0) return;
+                
+                showLoading(true);
+                
+                try {
+                    const url = getBaseUrl();
+                    const response = await fetch(`${url}/schedules/${currentSessionId}/index/${index}`, {
+                        method: 'GET'
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        displaySchedule(result.schedule);
+                        currentIndex = index;
+                        updateNavigation();
+                    } else {
+                        showStatus('config-status', 
+                            `[ERROR] Failed to load schedule: ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    showStatus('config-status', 
+                        `[ERROR] Error: ${error.message}`, 'error');
+                } finally {
+                    showLoading(false);
+                }
+            }
+            
+            async function deleteSession() {
+                if (!currentSessionId) return;
+                
+                showLoading(true);
+                
+                try {
+                    const url = getBaseUrl();
+                    const response = await fetch(`${url}/schedules/${currentSessionId}/delete`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                        showStatus('config-status', 
+                            '[OK] Session deleted successfully', 'success');
+                        
+                        // Reset state
+                        currentSessionId = null;
+                        currentIndex = -1;
+                        totalGenerated = 0;
+                        schedules = [];
+                        
+                        document.getElementById('nav-controls').style.display = 'none';
+                        document.getElementById('schedule').innerHTML = '';
+                    } else {
+                        showStatus('config-status', 
+                            `[ERROR] Failed to delete session: ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    showStatus('config-status', 
+                        `[ERROR] Error: ${error.message}`, 'error');
+                } finally {
+                    showLoading(false);
+                }
+            }
+            
+            function updateNavigation() {
+                const prevBtn = document.getElementById('prev');
+                const nextBtn = document.getElementById('next');
+                const currSpan = document.getElementById('curr');
+                const countSpan = document.getElementById('schedule-count');
+                
+                // Update current position display
+                currSpan.textContent = `${currentIndex + 1} of ${Math.max(schedules.length, totalGenerated)}`;
+                
+                // Update schedule count
+                countSpan.textContent = `Generated: ${totalGenerated}/${scheduleLimit}`;
+                
+                // Update button states
+                prevBtn.disabled = currentIndex <= 0;
+                nextBtn.disabled = totalGenerated >= scheduleLimit && currentIndex >= schedules.length - 1;
+            }
+            
+            // Schedule display functions (adapted from original)
+            const getHashCode = (str) => {
+                let h1 = 0x10293847;
+                let h2 = 0xfeedf00d;
+                for (let i = 0, ch; i < str.length; i++) {
+                    ch = str.charCodeAt(i);
+                    h1 = Math.imul(h1 ^ ch, 2654435761);
+                    h2 = Math.imul(h2 ^ ch, 1597334677);
+                }
+                h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+                h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+                h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+                h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+                
+                return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+            };
+            
+            const intToHSL = (val) => {
+                const shortened = Math.imul(val, Math.imul(val, val)) % 360;
+                return "hsla(" + shortened + ",100%,30%,20%)";
+            };
+            
+            function map_course(c) {
+                const result = [];
+                const {course, faculty, room, times, lab, lab_index} = c;
+                
+                for (const t in times) {
+                    const entry = {...times[t]};
+                    entry['name'] = course;
+                    entry['room'] = room;
+                    entry['faculty'] = faculty;
+                    result.push(entry);
+                }
+                
+                if (lab) {
+                    const entry = {...times[lab_index]};
+                    entry['name'] = course;
+                    entry['room'] = lab;
+                    entry['faculty'] = faculty;
+                    result.push(entry);
+                }
+                
+                return result;
+            }
+            
+            function displaySchedule(scheduleData) {
+                const scheduleContainer = document.getElementById('schedule');
+                scheduleContainer.innerHTML = '';
+                
+                const the_data = scheduleData.flatMap(map_course);
+                
+                console.log("Schedule data for D3:", scheduleData);
+                console.log("Mapped data:", the_data);
+                
+                // Extract unique locations
+                const rooms = new Set();
+                const labs = new Set();
+                
+                for (const c of scheduleData) {
+                    if (c.room) {
+                        rooms.add(c.room);
+                    }
+                    if (c.lab) {
+                        labs.add(c.lab);
+                    }
+                }
+                
+                const locations = Array.from(rooms).sort().concat(Array.from(labs).sort());
+                
+                for (const room of locations) {
+                    const div = d3.select("#schedule")
+                        .append("div")
+                        .style("border", "1px solid #ddd")
+                        .style("padding", "15px")
+                        .style("border-radius", "6px")
+                        .style("background", "white");
+                    
+                    div.append("h2")
+                        .text(room)
+                        .style("margin-top", "0")
+                        .style("color", "#495057");
+                    
+                    const days = div.append("div");
+                    
+                    days.append('div')
+                        .style('width', '40px')
+                        .style("display", "inline-block");
+                    
+                    const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+                    for (const i in DAYS) {
+                        days.append('span')
+                            .text(DAYS[i])
+                            .style("font-size", "10px")
+                            .style("width", "150px")
+                            .style("display", "inline-block")
+                            .style("text-align", "center");
+                    }
+                    
+                    const svg = div.append("svg")
+                        .attr("width", 800)
+                        .attr("height", 720);
+                    
+                    div.append("p")
+                        .style("page-break-after", "always");
+                    
+                    const TIMES = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+                    
+                    svg.selectAll('line')
+                        .data(TIMES)
+                        .enter()
+                        .append('line')
+                        .style("stroke", "lightgrey")
+                        .style("stroke-width", 1)
+                        .attr('x1', 0).attr('y1', d => (d - 8) * 60)
+                        .attr('x2', 800).attr('y2', d => (d - 8) * 60);
+                    
+                    svg.selectAll('text')
+                        .data(TIMES)
+                        .enter()
+                        .append('text')
+                        .attr('x', 0).attr('y', d => (d - 8) * 60)
+                        .attr('dy', 12)
+                        .text(d => {
+                            const h = (d > 12) ? d - 12 : d;
+                            const ap = (d >= 12) ? "PM" : "AM";
+                            return h + ":00 " + ap;
+                        })
+                        .style("font-size", "10px");
+                    
+                    const filtered = the_data.filter(x => x.room == room);
+                    svg.selectAll('rect')
+                        .data(filtered)
+                        .enter()
+                        .append('rect')
+                        .attr('x', d => (d.day - 1) * 150 + 45 + 5)
+                        .attr('y', d => d.start - 8 * 60)
+                        .attr('width', 140)
+                        .attr('height', d => d.duration)
+                        .style('fill', d => intToHSL(getHashCode(d.faculty)))
+                        .style('stroke', 'black');
+                    
+                    const group = svg.selectAll('g')
+                        .data(filtered)
+                        .enter()
+                        .append('g');
+                    
+                    group.append('text')
+                        .attr('dy', 12)
+                        .attr('x', d => (d.day - 1) * 150 + 50 + 5)
+                        .attr('y', d => d.start - 8 * 60)
+                        .text(d => d.name)
+                        .style('font-weight', 700)
+                        .style("font-size", "12px");
+                    
+                    group.append('text')
+                        .attr('dy', 12)
+                        .attr('x', d => (d.day - 1) * 150 + 50 + 5)
+                        .attr('y', d => d.start - 8 * 60 + 15)
+                        .text(d => d.faculty)
+                        .style("font-size", "10px");
+                    
+                    group.append('text')
+                        .attr('dy', 12)
+                        .attr('x', d => (d.day - 1) * 150 + 50 + 5)
+                        .attr('y', d => d.start - 8 * 60 + 30)
+                        .text(d => {
+                            const fn = (t) => {
+                                const hh = Math.floor(t / 60);
+                                const mm = t % 60;
+                                const h = (hh > 12) ? hh - 12 : hh;
+                                const ap = (hh >= 12) ? "PM" : "AM";
+                                return h + ":" + String(mm).padStart(2, '0') + " " + ap;
+                            };
+                            return fn(d.start) + " - " + fn(d.start + d.duration);
+                        })
+                        .style("font-size", "10px");
+                }
+            }
+            
+            // Initialize
+            document.addEventListener('DOMContentLoaded', function() {
+                // Set default values
+                document.getElementById('server-url').value = 'http://localhost:8000';
+            });
+        </script>
+    </body>
+</html> 
