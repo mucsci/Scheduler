@@ -29,7 +29,7 @@ class Course(Identifiable):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.section = Course._next_section(self.course_id)
+        self.section = kwargs.get("section", Course._next_section(self.course_id))
         ctx = kwargs.get("ctx")
         self._lab = z3.Int(f"{str(self)}_lab", ctx=ctx)
         self._room = z3.Int(f"{str(self)}_room", ctx=ctx)
@@ -91,7 +91,7 @@ class CourseInstance(BaseModel):
     room: Optional[Room] = Field(default=None)
     lab: Optional[Lab] = Field(default=None)
 
-    def __json__(self):
+    def as_json(self):
         object = {}
         object["course"] = str(self.course)
         object["faculty"] = self.faculty.name
@@ -100,7 +100,7 @@ class CourseInstance(BaseModel):
         if self.lab:
             object["lab"] = self.lab.name
         if self.time:
-            object["times"] = [t.__json__() for t in self.time.times]
+            object["times"] = [t.as_json() for t in self.time.times]
             if self.lab and self.time.lab_index is not None:
                 object["lab_index"] = self.time.lab_index
         return object

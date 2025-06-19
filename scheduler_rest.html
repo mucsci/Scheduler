@@ -1,222 +1,142 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <title>Scheduler REST API</title>
+        <title>Course Scheduler</title>
         <style>
             html, body {
                 font-family: 'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;
                 margin: 0;
-                padding: 20px;
+                padding: 10px;
                 background-color: #f5f5f5;
             }
             
-            .container {
-                max-width: 1200px;
-                margin: 0 auto;
-                background: white;
-                padding: 20px;
-                border-radius: 8px;
-                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            h1 {
+                font-size: 1.5em;
+                text-align: center;
             }
             
-            .form-section {
-                background: #f8f9fa;
-                padding: 20px;
-                border-radius: 6px;
-                margin-bottom: 20px;
-                border: 1px solid #dee2e6;
-            }
-            
-            .form-group {
-                margin-bottom: 15px;
-            }
-            
-            .form-group label {
-                display: block;
-                margin-bottom: 5px;
-                font-weight: bold;
-                color: #495057;
-            }
-            
-            .form-group input, .form-group select {
-                width: 100%;
-                padding: 8px 12px;
-                border: 1px solid #ced4da;
-                border-radius: 4px;
-                font-size: 14px;
-                box-sizing: border-box;
-            }
-            
-            .form-row {
+            #main-form {
                 display: flex;
-                gap: 15px;
-                align-items: end;
+                flex-wrap: wrap;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 1em;
+                padding: 0;
+                justify-content: center;
             }
             
-            .form-row .form-group {
-                flex: 1;
+            #status-dot {
+                display: inline-block;
+                width: 14px;
+                height: 14px;
+                border-radius: 50%;
+                background: #bbb;
+                margin-left: 2px;
             }
             
-            .btn {
-                background: #007bff;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 4px;
-                cursor: pointer;
-                font-size: 14px;
-                transition: background-color 0.2s;
+            #nav-controls {
+                display: none;
+                width: 100%;
+                text-align: center;
             }
             
-            .btn:hover {
-                background: #0056b3;
+            #nav-controls.visible {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                gap: 10px;
             }
             
-            .btn:disabled {
-                background: #6c757d;
+            button:disabled {
+                opacity: 0.5;
                 cursor: not-allowed;
             }
             
-            .btn-secondary {
-                background: #6c757d;
-            }
-            
-            .btn-secondary:hover {
-                background: #545b62;
-            }
-            
-            .status {
-                padding: 10px;
-                border-radius: 4px;
-                margin: 10px 0;
-                font-weight: bold;
-            }
-            
-            .status.success {
-                background: #d4edda;
-                color: #155724;
-                border: 1px solid #c3e6cb;
-            }
-            
-            .status.error {
-                background: #f8d7da;
-                color: #721c24;
-                border: 1px solid #f5c6cb;
-            }
-            
-            .status.info {
-                background: #d1ecf1;
-                color: #0c5460;
-                border: 1px solid #bee5eb;
-            }
-            
-            .nav-controls {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                margin: 20px 0 10px 0;
-                padding: 10px 0;
-                background: none;
-                border-radius: 0;
-            }
-            
-            .nav-controls button {
-                min-width: 60px;
-            }
-            
-            .schedule-info {
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                margin: 0;
-            }
-            
-            .schedule-count {
-                font-size: 16px;
-                font-weight: bold;
-                color: #495057;
-            }
-            
-            .loading {
-                display: none;
-                text-align: center;
-                padding: 20px;
-                color: #6c757d;
-            }
-            
-            .loading.show {
-                display: block;
-            }
-            
             @media not print {
-                #schedule > div {
-                    display: inline-block;
-                    margin-right: 20px;
+                .gap {
+                    margin-top: 20px;
                     margin-bottom: 20px;
-                    vertical-align: top;
+                }
+
+                .grid {
+                    display: flex;
+                    flex-wrap: wrap;
+                    row-gap: 20px;
+                    column-gap: 20px;
+                    justify-content: space-around;
+                    flex: 0 0 600px;
+                }
+                
+                .grid > div {
+                    flex: 0 0 600px;
+                    margin: 0;
+                    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                    border: 1px solid #ddd;
+                    border-radius: 8px;
                 }
             }
             
             @media print {
-                .form-section, .nav-controls {
-                    display: none;
+                .container {
+                    display: none !important;
                 }
+                
+                .grid > div {
+                    page-break-after: always;
+                    break-after: page;
+                }
+            }
+            
+            #content {
+                display: none;
             }
         </style>
     </head>
     <body>
         <div class="container">
-            <h1 style="font-size:1.5em;margin-bottom:0.5em;">Course Scheduler REST API</h1>
-            <form id="main-form" style="display:flex;align-items:center;gap:8px;margin-bottom:1em;padding:0;">
-                <input type="text" id="server-url" value="http://localhost:8000" placeholder="Server URL" style="width:200px;padding:4px 6px;font-size:1em;">
-                <button type="button" id="check-btn" class="btn" style="padding:4px 12px;font-size:1em;">Check</button>
-                <span id="status-dot" style="display:inline-block;width:14px;height:14px;border-radius:50%;background:#bbb;margin-left:2px;"></span>
-                <input type="file" id="config-file" accept=".json" style="font-size:1em;">
-                <button type="button" class="btn" style="padding:4px 12px;font-size:1em;" onclick="submitConfiguration()">Submit</button>
+            <h1>Course Scheduler</h1>
+            <form id="main-form">
+                <input type="text" id="server-url" value="http://localhost:8000" placeholder="Server URL">
+                <span id="status-dot"></span>
+                <input type="file" id="config-file" accept=".json">
+                <button type="button" onclick="submitConfiguration()">Submit</button>
+                <div id="nav-controls">
+                    <button type="button" id="prev" onclick="previousSchedule()">Previous</button>
+                    <span id="curr">0 of 0</span>
+                    <button type="button" id="next" onclick="nextSchedule()">Next</button>
+                </div>
             </form>
-            <div id="config-status"></div>
-            <div class="nav-controls" id="nav-controls" style="display: none;">
-                <button class="btn btn-secondary" id="prev" onclick="previousSchedule()">Previous</button>
-                <span id="curr">0 of 0</span>
-                <button class="btn" id="next" onclick="nextSchedule()">Next</button>
-                <span class="schedule-count" id="schedule-count"></span>
-                <button class="btn btn-secondary" onclick="deleteSession()">Delete Session</button>
-                <span id="status-message" style="margin-left:16px;min-width:180px;display:inline-block;"></span>
+        </div>
+        <div id="content">
+            <div class="gap"></div>
+            <div class="container">
+                <h1>Rooms</h1>
             </div>
-            <div class="loading" id="loading">
-                <p>Loading...</p>
+            <div id="schedule" class="gap grid"></div>
+            <div class="container">
+                <h1>Faculty</h1>
             </div>
-            <div id="schedule"></div>
+            <div id="faculty" class="gap grid"></div>
         </div>
         
         <script src="https://d3js.org/d3.v7.min.js"></script>
         <script type="text/javascript">
+            // Layout constants
+            const DAY_WIDTH = 110;
+            const DAY_PADDING = 2;
+            const LEFT_MARGIN = 45;
+            const TEXT_OFFSET = 50;
+            const SVG_PADDING = 2;
+            
             let currentSessionId = null;
             let currentIndex = -1;
             let totalGenerated = 0;
             let scheduleLimit = 10;
-            let schedules = [];
+            let cleanupTriggered = false;
             
             // Utility functions
-            function showStatus(elementId, message, type = 'info') {
-                const element = document.getElementById('status-message');
-                let color = '#444';
-                if (type === 'success') color = '#2ecc40';
-                if (type === 'error') color = '#e74c3c';
-                if (type === 'info') color = '#2980b9';
-                element.innerHTML = `<span style="color:${color};font-weight:500;">${message}</span>`;
-                if (type !== 'loading') {
-                    setTimeout(() => { element.innerHTML = ''; }, 5000);
-                }
-            }
-            
-            function showLoading(show) {
-                const element = document.getElementById('status-message');
-                if (show) {
-                    element.innerHTML = '<span style="color:#888;">Loading...</span>';
-                } else {
-                    // Do not clear here, let showStatus handle it
-                }
+            function showError(message) {
+                alert(`Error: ${message}`);
             }
             
             function getBaseUrl() {
@@ -224,7 +144,22 @@
             }
             
             // API functions
-            document.getElementById('check-btn').onclick = async function() {
+            async function cancelExistingSession() {
+                if (currentSessionId && !cleanupTriggered) {
+                    try {
+                        const url = getBaseUrl();
+                        await fetch(`${url}/schedules/${currentSessionId}/cleanup`, {
+                            method: 'POST'
+                        });
+                        cleanupTriggered = true;
+                        hideContent();
+                    } catch (error) {
+                        console.error('Failed to cancel existing session:', error);
+                    }
+                }
+            }
+            
+            async function checkServerStatus() {
                 const dot = document.getElementById('status-dot');
                 dot.style.background = '#bbb'; // gray (checking)
                 try {
@@ -238,17 +173,18 @@
                 } catch {
                     dot.style.background = '#e74c3c'; // red
                 }
-            };
+            }
             
             async function submitConfiguration() {
                 const fileInput = document.getElementById('config-file');
                 
                 if (!fileInput.files[0]) {
-                    showStatus('config-status', 'Please select a configuration file', 'error');
+                    showError('Please select a configuration file');
                     return;
                 }
                 
-                showLoading(true);
+                // Cancel existing session before submitting new configuration
+                await cancelExistingSession();
                 
                 try {
                     const fileContent = await fileInput.files[0].text();
@@ -267,78 +203,53 @@
                         const result = await response.json();
                         currentSessionId = result.schedule_id;
                         scheduleLimit = configData.limit;
-                        schedules = [];
                         currentIndex = -1;
                         totalGenerated = 0;
+                        cleanupTriggered = false;
                         
-                        showStatus('config-status', 
-                            `[OK] Configuration submitted successfully! Session ID: ${currentSessionId}`, 'success');
-                        
-                        document.getElementById('nav-controls').style.display = 'flex';
+                        document.getElementById('nav-controls').classList.add('visible');
                         updateNavigation();
+                        startCountPolling();
+                        
+                        // Automatically trigger generate all after session creation
+                        await generateAllSchedules();
                     } else {
                         const errorText = await response.text();
-                        showStatus('config-status', 
-                            `[ERROR] Failed to submit configuration: ${response.status} - ${errorText}`, 'error');
+                        showError(`[ERROR] Failed to submit configuration: ${response.status} - ${errorText}`);
+                        hideContent();
                     }
                 } catch (error) {
-                    showStatus('config-status', 
-                        `[ERROR] Error: ${error.message}`, 'error');
-                } finally {
-                    showLoading(false);
+                    showError(`[ERROR] Error: ${error.message}`);
+                    hideContent();
                 }
             }
             
-            async function nextSchedule() {
+            async function navigateSchedule(direction) {
                 if (!currentSessionId) return;
-                // If not at the end, just advance to the next already-generated schedule
-                if (currentIndex < schedules.length - 1) {
-                    currentIndex++;
-                    displaySchedule(schedules[currentIndex]);
-                    updateNavigation();
+                
+                // Get current count from server
+                const countData = await getScheduleCount();
+                if (!countData) {
+                    showError('Failed to get schedule count from server');
                     return;
                 }
-                // Otherwise, generate a new schedule
-                showLoading(true);
-                try {
-                    const url = getBaseUrl();
-                    const response = await fetch(`${url}/schedules/${currentSessionId}/next`, {
-                        method: 'POST'
-                    });
-                    if (response.ok) {
-                        const result = await response.json();
-                        schedules.push(result.schedule);
-                        currentIndex = schedules.length - 1;
-                        totalGenerated = result.index + 1;
-                        displaySchedule(result.schedule);
-                        updateNavigation();
-                        showStatus('config-status', `[OK] Generated schedule ${totalGenerated}`, 'success');
-                    } else if (response.status === 400) {
-                        const errorData = await response.json();
-                        showStatus('config-status', `[INFO] ${errorData.detail}`, 'info');
-                    } else {
-                        const errorText = await response.text();
-                        showStatus('config-status', `[ERROR] Failed to generate schedule: ${response.status} - ${errorText}`, 'error');
-                    }
-                } catch (error) {
-                    showStatus('config-status', `[ERROR] Error: ${error.message}`, 'error');
-                } finally {
-                    showLoading(false);
+                
+                const newIndex = currentIndex + direction;
+                
+                // Check bounds
+                if (newIndex < 0 || newIndex >= countData.current_count) {
+                    return;
                 }
+                
+                await loadScheduleByIndex(newIndex);
             }
             
-            async function previousSchedule() {
-                if (currentIndex > 0) {
-                    currentIndex--;
-                    displaySchedule(schedules[currentIndex]);
-                    updateNavigation();
-                }
-            }
+            // Replace the separate navigation functions with calls to the generic one
+            const nextSchedule = () => navigateSchedule(1);
+            const previousSchedule = () => navigateSchedule(-1);
             
             async function loadScheduleByIndex(index) {
                 if (!currentSessionId || index < 0) return;
-                
-                showLoading(true);
                 
                 try {
                     const url = getBaseUrl();
@@ -352,67 +263,89 @@
                         currentIndex = index;
                         updateNavigation();
                     } else {
-                        showStatus('config-status', 
-                            `[ERROR] Failed to load schedule: ${response.status}`, 'error');
+                        showError(`[ERROR] Failed to load schedule: ${response.status}`);
                     }
                 } catch (error) {
-                    showStatus('config-status', 
-                        `[ERROR] Error: ${error.message}`, 'error');
-                } finally {
-                    showLoading(false);
+                    showError(`[ERROR] Error: ${error.message}`);
                 }
             }
             
-            async function deleteSession() {
+            async function generateAllSchedules() {
                 if (!currentSessionId) return;
-                
-                showLoading(true);
                 
                 try {
                     const url = getBaseUrl();
-                    const response = await fetch(`${url}/schedules/${currentSessionId}/delete`, {
-                        method: 'DELETE'
+                    const response = await fetch(`${url}/schedules/${currentSessionId}/generate_all`, {
+                        method: 'POST'
                     });
                     
                     if (response.ok) {
-                        showStatus('config-status', 
-                            '[OK] Session deleted successfully', 'success');
-                        
-                        // Reset state
-                        currentSessionId = null;
-                        currentIndex = -1;
-                        totalGenerated = 0;
-                        schedules = [];
-                        
-                        document.getElementById('nav-controls').style.display = 'none';
-                        document.getElementById('schedule').innerHTML = '';
+                        const result = await response.json();
+                        // Start polling for count updates
+                        startCountPolling();
                     } else {
-                        showStatus('config-status', 
-                            `[ERROR] Failed to delete session: ${response.status}`, 'error');
+                        const errorText = await response.text();
+                        showError(`[ERROR] Failed to start generation: ${response.status} - ${errorText}`);
                     }
                 } catch (error) {
-                    showStatus('config-status', 
-                        `[ERROR] Error: ${error.message}`, 'error');
-                } finally {
-                    showLoading(false);
+                    showError(`[ERROR] Error: ${error.message}`);
                 }
             }
             
+            async function getScheduleCount() {
+                if (!currentSessionId) return null;
+                
+                try {
+                    const url = getBaseUrl();
+                    const response = await fetch(`${url}/schedules/${currentSessionId}/count`, {
+                        method: 'GET'
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        return result;
+                    }
+                } catch (error) {
+                    console.error('Failed to get schedule count:', error);
+                }
+                return null;
+            }
+            
+            let countPollingInterval = null;
+            
+            function startCountPolling() {
+                // Clear any existing polling
+                if (countPollingInterval) {
+                    clearInterval(countPollingInterval);
+                }
+                
+                // Poll every 2 seconds
+                countPollingInterval = setInterval(async () => {
+                    const countData = await getScheduleCount();
+                    if (countData) {
+                        totalGenerated = countData.current_count;
+                        updateNavigation();
+                        
+                        // Stop polsling if generation is complete
+                        if (countData.is_complete) {
+                            clearInterval(countPollingInterval);
+                            countPollingInterval = null;
+                        }
+                    }
+                }, 1000);
+            }
+            
             function updateNavigation() {
-                const prevBtn = document.getElementById('prev');
-                const nextBtn = document.getElementById('next');
-                const currSpan = document.getElementById('curr');
-                const countSpan = document.getElementById('schedule-count');
-                
-                // Update current position display
-                currSpan.textContent = `${currentIndex + 1} of ${Math.max(schedules.length, totalGenerated)}`;
-                
-                // Update schedule count
-                countSpan.textContent = `Generated: ${totalGenerated}/${scheduleLimit}`;
-                
-                // Update button states
-                prevBtn.disabled = currentIndex <= 0;
-                nextBtn.disabled = totalGenerated >= scheduleLimit && currentIndex >= schedules.length - 1;
+                getScheduleCount().then(countData => {
+                    const prevBtn = document.getElementById('prev');
+                    const nextBtn = document.getElementById('next');
+                    const currSpan = document.getElementById('curr');
+
+                    totalGenerated = countData.current_count;
+                    currSpan.textContent = `${currentIndex + 1} of ${Math.max(currentIndex + 1, totalGenerated)}`;
+                    prevBtn.disabled = currentIndex <= 0;
+                    nextBtn.disabled = currentIndex + 1 >= totalGenerated;
+                });
             }
             
             // Schedule display functions (adapted from original)
@@ -461,13 +394,27 @@
             }
             
             function displaySchedule(scheduleData) {
+                // Show the content div when displaying schedules
+                document.getElementById('content').style.display = 'block';
+                displayRoomSchedule(scheduleData);
+                displayFacultySchedule(scheduleData);
+            }
+            
+            function hideContent() {
+                document.getElementById('content').style.display = 'none';
+            }
+            
+            function displayRoomSchedule(scheduleData) {
                 const scheduleContainer = document.getElementById('schedule');
                 scheduleContainer.innerHTML = '';
                 
-                const the_data = scheduleData.flatMap(map_course);
+                // Hide content if no schedule data
+                if (!scheduleData || scheduleData.length === 0) {
+                    hideContent();
+                    return;
+                }
                 
-                console.log("Schedule data for D3:", scheduleData);
-                console.log("Mapped data:", the_data);
+                const the_data = scheduleData.flatMap(map_course);
                 
                 // Extract unique locations
                 const rooms = new Set();
@@ -487,15 +434,16 @@
                 for (const room of locations) {
                     const div = d3.select("#schedule")
                         .append("div")
-                        .style("border", "1px solid #ddd")
-                        .style("padding", "15px")
-                        .style("border-radius", "6px")
-                        .style("background", "white");
+                        .style("padding", "5px")
+                        .style("background", "white")
+                        .style("width", (LEFT_MARGIN + (5 * DAY_WIDTH)) + "px");
                     
                     div.append("h2")
                         .text(room)
                         .style("margin-top", "0")
-                        .style("color", "#495057");
+                        .style("margin-bottom", "8px")
+                        .style("margin-left", "5px")
+                        .style("text-align", "center");
                     
                     const days = div.append("div");
                     
@@ -508,19 +456,39 @@
                         days.append('span')
                             .text(DAYS[i])
                             .style("font-size", "10px")
-                            .style("width", "150px")
+                            .style("width", DAY_WIDTH + "px")
                             .style("display", "inline-block")
                             .style("text-align", "center");
                     }
                     
+                    // Compute time range for this room
+                    const filtered = the_data.filter(x => x.room == room);
+                    let minHour = 24;
+                    let maxHour = 0;
+                    
+                    for (const classData of filtered) {
+                        const startHour = Math.floor(classData.start / 60);
+                        const endHour = Math.ceil((classData.start + classData.duration) / 60);
+                        
+                        minHour = Math.min(minHour, startHour);
+                        maxHour = Math.max(maxHour, endHour);
+                    }
+                    
+                    if (minHour === 24 || maxHour === 0) {
+                        minHour = 8;
+                        maxHour = 17;
+                    }
+                    
+                    const TIMES = [];
+                    for (let hour = minHour; hour <= maxHour; hour++) {
+                        TIMES.push(hour);
+                    }
+                    
+                    const svgHeight = (maxHour - minHour) * 60 + (2 * SVG_PADDING);
+                    
                     const svg = div.append("svg")
-                        .attr("width", 800)
-                        .attr("height", 720);
-                    
-                    div.append("p")
-                        .style("page-break-after", "always");
-                    
-                    const TIMES = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
+                        .attr("width", LEFT_MARGIN + (5 * DAY_WIDTH))
+                        .attr("height", svgHeight);
                     
                     svg.selectAll('line')
                         .data(TIMES)
@@ -528,30 +496,29 @@
                         .append('line')
                         .style("stroke", "lightgrey")
                         .style("stroke-width", 1)
-                        .attr('x1', 0).attr('y1', d => (d - 8) * 60)
-                        .attr('x2', 800).attr('y2', d => (d - 8) * 60);
+                        .attr('x1', 0).attr('y1', d => (d - minHour) * 60 + SVG_PADDING)
+                        .attr('x2', LEFT_MARGIN + (5 * DAY_WIDTH)).attr('y2', d => (d - minHour) * 60 + SVG_PADDING);
                     
                     svg.selectAll('text')
                         .data(TIMES)
                         .enter()
                         .append('text')
-                        .attr('x', 0).attr('y', d => (d - 8) * 60)
+                        .attr('x', 0).attr('y', d => (d - minHour) * 60 + SVG_PADDING)
                         .attr('dy', 12)
                         .text(d => {
                             const h = (d > 12) ? d - 12 : d;
                             const ap = (d >= 12) ? "PM" : "AM";
-                            return h + ":00 " + ap;
+                            return h + ":00" + ap;
                         })
                         .style("font-size", "10px");
                     
-                    const filtered = the_data.filter(x => x.room == room);
                     svg.selectAll('rect')
                         .data(filtered)
                         .enter()
                         .append('rect')
-                        .attr('x', d => (d.day - 1) * 150 + 45 + 5)
-                        .attr('y', d => d.start - 8 * 60)
-                        .attr('width', 140)
+                        .attr('x', d => (d.day - 1) * DAY_WIDTH + LEFT_MARGIN + DAY_PADDING)
+                        .attr('y', d => d.start - minHour * 60 + SVG_PADDING)
+                        .attr('width', DAY_WIDTH - 2 * DAY_PADDING)
                         .attr('height', d => d.duration)
                         .style('fill', d => intToHSL(getHashCode(d.faculty)))
                         .style('stroke', 'black');
@@ -563,32 +530,211 @@
                     
                     group.append('text')
                         .attr('dy', 12)
-                        .attr('x', d => (d.day - 1) * 150 + 50 + 5)
-                        .attr('y', d => d.start - 8 * 60)
+                        .attr('x', d => (d.day - 1) * DAY_WIDTH + TEXT_OFFSET + DAY_PADDING)
+                        .attr('y', d => d.start - minHour * 60 + SVG_PADDING)
                         .text(d => d.name)
                         .style('font-weight', 700)
                         .style("font-size", "12px");
                     
                     group.append('text')
                         .attr('dy', 12)
-                        .attr('x', d => (d.day - 1) * 150 + 50 + 5)
-                        .attr('y', d => d.start - 8 * 60 + 15)
+                        .attr('x', d => (d.day - 1) * DAY_WIDTH + TEXT_OFFSET + DAY_PADDING)
+                        .attr('y', d => d.start - minHour * 60 + SVG_PADDING + 15)
                         .text(d => d.faculty)
                         .style("font-size", "10px");
                     
                     group.append('text')
                         .attr('dy', 12)
-                        .attr('x', d => (d.day - 1) * 150 + 50 + 5)
-                        .attr('y', d => d.start - 8 * 60 + 30)
+                        .attr('x', d => (d.day - 1) * DAY_WIDTH + TEXT_OFFSET + DAY_PADDING)
+                        .attr('y', d => d.start - minHour * 60 + SVG_PADDING + 30)
                         .text(d => {
                             const fn = (t) => {
                                 const hh = Math.floor(t / 60);
                                 const mm = t % 60;
                                 const h = (hh > 12) ? hh - 12 : hh;
                                 const ap = (hh >= 12) ? "PM" : "AM";
-                                return h + ":" + String(mm).padStart(2, '0') + " " + ap;
+                                return h + ":" + String(mm).padStart(2, '0') + ap;
                             };
-                            return fn(d.start) + " - " + fn(d.start + d.duration);
+                            return fn(d.start) + "-" + fn(d.start + d.duration);
+                        })
+                        .style("font-size", "10px");
+                }
+            }
+            
+            function displayFacultySchedule(scheduleData) {
+                const facultyContainer = document.getElementById('faculty');
+                facultyContainer.innerHTML = '';
+                
+                // Extract unique faculty members
+                const facultyMembers = new Set();
+                for (const c of scheduleData) {
+                    if (c.faculty) {
+                        facultyMembers.add(c.faculty);
+                    }
+                }
+                
+                const facultyList = Array.from(facultyMembers).sort();
+                
+                for (const faculty of facultyList) {
+                    const div = d3.select("#faculty")
+                        .append("div")
+                        .style("padding", "5px")
+                        .style("background", "white")
+                        .style("width", (LEFT_MARGIN + (5 * DAY_WIDTH)) + "px");
+                    
+                    div.append("h2")
+                        .text(faculty)
+                        .style("margin-top", "0")
+                        .style("margin-bottom", "8px")
+                        .style("margin-left", "5px")
+                        .style("text-align", "center");
+                    
+                    const days = div.append("div");
+                    
+                    days.append('div')
+                        .style('width', '40px')
+                        .style("display", "inline-block");
+                    
+                    const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+                    for (const i in DAYS) {
+                        days.append('span')
+                            .text(DAYS[i])
+                            .style("font-size", "10px")
+                            .style("width", DAY_WIDTH + "px")
+                            .style("display", "inline-block")
+                            .style("text-align", "center");
+                    }
+                    
+                    // Compute time range for this faculty member
+                    let minHour = 24;
+                    let maxHour = 0;
+                    
+                    for (const c of scheduleData) {
+                        if (c.faculty === faculty) {
+                            for (const t in c.times) {
+                                const classData = c.times[t];
+                                const startHour = Math.floor(classData.start / 60);
+                                const endHour = Math.ceil((classData.start + classData.duration) / 60);
+                                
+                                minHour = Math.min(minHour, startHour);
+                                maxHour = Math.max(maxHour, endHour);
+                            }
+                            
+                            // Check lab time if it exists
+                            if (c.lab && c.lab_index !== undefined) {
+                                const labData = c.times[c.lab_index];
+                                const startHour = Math.floor(labData.start / 60);
+                                const endHour = Math.ceil((labData.start + labData.duration) / 60);
+                                
+                                minHour = Math.min(minHour, startHour);
+                                maxHour = Math.max(maxHour, endHour);
+                            }
+                        }
+                    }
+                    
+                    if (minHour === 24 || maxHour === 0) {
+                        minHour = 8;
+                        maxHour = 17;
+                    }
+                    
+                    const TIMES = [];
+                    for (let hour = minHour; hour <= maxHour; hour++) {
+                        TIMES.push(hour);
+                    }
+                    
+                    const svgHeight = (maxHour - minHour) * 60 + (2 * SVG_PADDING);
+                    
+                    const svg = div.append("svg")
+                        .attr("width", LEFT_MARGIN + (5 * DAY_WIDTH))
+                        .attr("height", svgHeight);
+                    
+                    svg.selectAll('line')
+                        .data(TIMES)
+                        .enter()
+                        .append('line')
+                        .style("stroke", "lightgrey")
+                        .style("stroke-width", 1)
+                        .attr('x1', 0).attr('y1', d => (d - minHour) * 60 + SVG_PADDING)
+                        .attr('x2', LEFT_MARGIN + (5 * DAY_WIDTH)).attr('y2', d => (d - minHour) * 60 + SVG_PADDING);
+                    
+                    svg.selectAll('text')
+                        .data(TIMES)
+                        .enter()
+                        .append('text')
+                        .attr('x', 0).attr('y', d => (d - minHour) * 60 + SVG_PADDING)
+                        .attr('dy', 12)
+                        .text(d => {
+                            const h = (d > 12) ? d - 12 : d;
+                            const ap = (d >= 12) ? "PM" : "AM";
+                            return h + ":00" + ap;
+                        })
+                        .style("font-size", "10px");
+                    
+                    // Create data for this faculty member's classes
+                    const facultyData = [];
+                    for (const c of scheduleData) {
+                        if (c.faculty === faculty) {
+                            for (const t in c.times) {
+                                const entry = {...c.times[t]};
+                                entry['name'] = c.course;
+                                entry['faculty'] = c.faculty;
+                                
+                                // Consolidate room and lab information
+                                if (c.lab && t == c.lab_index) {
+                                    entry['room'] = `${c.room} (${c.lab})`;
+                                } else {
+                                    entry['room'] = c.room;
+                                }
+                                
+                                facultyData.push(entry);
+                            }
+                        }
+                    }
+                    
+                    svg.selectAll('rect')
+                        .data(facultyData)
+                        .enter()
+                        .append('rect')
+                        .attr('x', d => (d.day - 1) * DAY_WIDTH + LEFT_MARGIN + DAY_PADDING)
+                        .attr('y', d => d.start - minHour * 60 + SVG_PADDING)
+                        .attr('width', DAY_WIDTH - 2 * DAY_PADDING)
+                        .attr('height', d => d.duration)
+                        .style('fill', d => intToHSL(getHashCode(d.faculty)))
+                        .style('stroke', 'black');
+                    
+                    const group = svg.selectAll('g')
+                        .data(facultyData)
+                        .enter()
+                        .append('g');
+                    
+                    group.append('text')
+                        .attr('dy', 12)
+                        .attr('x', d => (d.day - 1) * DAY_WIDTH + TEXT_OFFSET + DAY_PADDING)
+                        .attr('y', d => d.start - minHour * 60 + SVG_PADDING)
+                        .text(d => d.name)
+                        .style('font-weight', 700)
+                        .style("font-size", "12px");
+                    
+                    group.append('text')
+                        .attr('dy', 12)
+                        .attr('x', d => (d.day - 1) * DAY_WIDTH + TEXT_OFFSET + DAY_PADDING)
+                        .attr('y', d => d.start - minHour * 60 + SVG_PADDING + 15)
+                        .text(d => d.room)
+                        .style("font-size", "10px");
+                    
+                    group.append('text')
+                        .attr('dy', 12)
+                        .attr('x', d => (d.day - 1) * DAY_WIDTH + TEXT_OFFSET + DAY_PADDING)
+                        .attr('y', d => d.start - minHour * 60 + SVG_PADDING + 30)
+                        .text(d => {
+                            const fn = (t) => {
+                                const hh = Math.floor(t / 60);
+                                const mm = t % 60;
+                                const h = (hh > 12) ? hh - 12 : hh;
+                                const ap = (hh >= 12) ? "PM" : "AM";
+                                return h + ":" + String(mm).padStart(2, '0') + ap;
+                            };
+                            return fn(d.start) + "-" + fn(d.start + d.duration);
                         })
                         .style("font-size", "10px");
                 }
@@ -598,6 +744,27 @@
             document.addEventListener('DOMContentLoaded', function() {
                 // Set default values
                 document.getElementById('server-url').value = 'http://localhost:8000';
+                
+                // Add event listener to delete session when page is closed
+                window.addEventListener('beforeunload', function() {
+                    if (currentSessionId && !cleanupTriggered) {
+                        cleanupTriggered = true;
+                        const url = getBaseUrl();
+                        navigator.sendBeacon(`${url}/schedules/${currentSessionId}/cleanup`);
+                    }
+                });
+                
+                // Add event listener to automatically check server status when URL changes
+                let statusCheckTimeout;
+                document.getElementById('server-url').addEventListener('input', function() {
+                    // Clear previous timeout
+                    clearTimeout(statusCheckTimeout);
+                    // Set new timeout to check status after user stops typing
+                    statusCheckTimeout = setTimeout(checkServerStatus, 500);
+                });
+                
+                // Check initial status
+                checkServerStatus();
             });
         </script>
     </body>

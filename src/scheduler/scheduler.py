@@ -1,3 +1,4 @@
+from collections import defaultdict
 from dataclasses import dataclass
 import itertools
 import json
@@ -92,7 +93,9 @@ class Scheduler:
             self.courses: list[Course] = []
 
             required_credits = set()
+            course_counts = defaultdict(int)
             for c in config.courses:
+                course_counts[c.course_id] += 1
                 required_credits.add(c.credits)
                 course_faculty = c.faculty
                 if not course_faculty:
@@ -104,6 +107,7 @@ class Scheduler:
                     Course(
                         credits=c.credits,
                         course_id=c.course_id,
+                        section=course_counts[c.course_id],
                         labs=c.lab,
                         rooms=c.room,
                         conflicts=c.conflicts,

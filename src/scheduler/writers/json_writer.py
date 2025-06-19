@@ -17,7 +17,7 @@ class JSONWriter:
     def add_schedule(self, courses: list[Course], model: z3.ModelRef) -> None:
         """Add a schedule to be written."""
 
-        schedule_data = [c.instance(model).__json__() for c in courses]
+        schedule_data = [c.instance(model).as_json() for c in courses]
         if self.filename:
             self.schedules.append(schedule_data)
         else:

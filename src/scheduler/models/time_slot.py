@@ -41,7 +41,7 @@ class Duration(BaseModel):
     def __str__(self) -> str:
         return str(self.value)
 
-    def __json__(self):
+    def as_json(self):
         return self.value
 
     def __repr__(self):
@@ -104,7 +104,7 @@ class TimePoint(BaseModel):
     def __repr__(self) -> str:
         return f"TimePoint(timepoint={self.value})"
 
-    def __json__(self):
+    def as_json(self):
         return self.value
 
 
@@ -120,7 +120,7 @@ class TimeInstance(BaseModel):
     def __str__(self) -> str:
         return f"{self.day.name} {str(self.start)}-{str(self.stop)}"
 
-    def __json__(self):
+    def as_json(self):
         return {"day": self.day, "start": self.start.timepoint, "duration": self.duration.duration}
 
 
@@ -277,8 +277,8 @@ class TimeSlot(Identifiable):
             for i, t in enumerate(self.times)
         )
 
-    def __json__(self):
-        object = {"times": [t.__json__() for t in self.times]}
+    def as_json(self):
+        object = {"times": [t.as_json() for t in self.times]}
         if self.lab_index is not None:
             object["lab_index"] = self.lab_index
         return object

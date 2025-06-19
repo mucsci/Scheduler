@@ -23,7 +23,7 @@ def main():
     print("\nGenerating schedule...")
     for model in scheduler.get_models(limit=1, optimize=True):
         # Convert model to schedule using Course.instance()
-        schedule = [course.instance(model).__json__() for course in scheduler.courses]
+        schedule = [course.instance(model).as_json() for course in scheduler.courses]
 
         # Print schedule
         print("\nGenerated Schedule:")

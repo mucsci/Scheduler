@@ -251,14 +251,14 @@ To extract a human-readable schedule from a Z3 model:
 from scheduler.models import Course
 
 for model in scheduler.get_models(limit=1):
-    schedule = [course.instance(model).__json__() for course in scheduler.courses]
+    schedule = [course.instance(model).as_json() for course in scheduler.courses]
     print(schedule)
 ```
 
 ### Internal Type Summaries
 
 - **Course**: Represents a course in the scheduling system. Use `course.instance(model)` to get a `CourseInstance` from a Z3 model.
-- **CourseInstance**: Represents a scheduled course with assigned time, faculty, room, and lab. Has `.__json__()` and `.csv()` methods for output.
+- **CourseInstance**: Represents a scheduled course with assigned time, faculty, room, and lab. Has `.as_json()` and `.as_csv()` methods for output.
 - **TimeSlot**: Represents a time slot in the schedule. Has methods for overlap and adjacency checks.
 - **TimeInstance, TimePoint, Duration**: Used for time calculations and representation.
 - **Faculty, Room, Lab, Day**: Represent faculty, rooms, labs, and days of the week.

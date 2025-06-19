@@ -16,5 +16,5 @@ class Day(IntEnum):
         """
         return next(val.name for val in Day if self.value == val)
 
-    def __json__(self):
+    def as_json(self):
         return self.value 

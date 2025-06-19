@@ -16,7 +16,7 @@ class CSVWriter:
 
     def add_schedule(self, courses: list[Course], model: z3.ModelRef) -> None:
         """Add a schedule to be written."""
-        schedule_data = "\n".join(c.instance(model).csv() for c in courses)
+        schedule_data = "\n".join(c.instance(model).as_csv() for c in courses)
         if self.filename:
             self.schedules.append(schedule_data)
         else:
