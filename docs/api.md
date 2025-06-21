@@ -23,14 +23,15 @@ time_slot_config = load_config_from_file(TimeSlotConfig, "time_slots.json")
 scheduler = Scheduler(config, time_slot_config)
 
 # Generate schedules
-for model in scheduler.get_models(limit=5, optimize=True):
-    # See Internal Types section for how to interpret models
-    ...
+for schedule in scheduler.get_models(limit=5, optimize=True):
+    # schedule is a list of CourseInstance objects
+    for course_instance in schedule:
+        print(f"{course_instance.course.course_id}: {course_instance.faculty}")
 ```
 
 #### Methods
 - `__init__(config: SchedulerConfig, time_slot_config: TimeSlotConfig)`: Initialize the scheduler with configuration and time slots configuration
-- `get_models(limit: int = 10, optimize: bool = True)`: Generate schedule models (returns Z3 models)
+- `get_models(limit: int = 10, optimize: bool = True)`: Generate schedule models (returns lists of CourseInstance objects)
 
 ### load_config_from_file
 
@@ -51,12 +52,12 @@ time_slot_config = load_config_from_file(TimeSlotConfig, "time_slots.json")
 from scheduler import JSONWriter
 
 with JSONWriter() as writer:
-    for model in scheduler.get_models(limit=1):
-        writer.add_schedule(scheduler.courses, model)
+    for schedule in scheduler.get_models(limit=1):
+        writer.add_schedule(schedule)
 
 with JSONWriter("schedules.json") as writer:
-    for model in scheduler.get_models(limit=1):
-        writer.add_schedule(scheduler.courses, model)
+    for schedule in scheduler.get_models(limit=1):
+        writer.add_schedule(schedule)
 ```
 
 #### CSVWriter
@@ -65,12 +66,12 @@ with JSONWriter("schedules.json") as writer:
 from scheduler import CSVWriter
 
 with CSVWriter() as writer:
-    for model in scheduler.get_models(limit=1):
-        writer.add_schedule(scheduler.courses, model)
+    for schedule in scheduler.get_models(limit=1):
+        writer.add_schedule(schedule)
 
 with CSVWriter("schedules.csv") as writer:
-    for model in scheduler.get_models(limit=1):
-        writer.add_schedule(scheduler.courses, model)
+    for schedule in scheduler.get_models(limit=1):
+        writer.add_schedule(schedule)
 ```
 
 ### Configuration Types
@@ -197,6 +198,23 @@ meeting = Meeting(day="MON", duration=60, lab=False)
 pattern = ClassPattern(credits=3, meetings=[meeting])
 ```
 
+### Example: Working with CourseInstance Objects
+
+Each `CourseInstance` represents a scheduled course with all its assignments:
+
+```python
+for schedule in scheduler.get_models(limit=1):
+    for course_instance in schedule:
+        print(f"Course: {course_instance.course.course_id}")
+        print(f"Faculty: {course_instance.faculty}")
+        print(f"Room: {course_instance.room if course_instance.room else 'None'}")
+        print(f"Lab: {course_instance.lab if course_instance.lab else 'None'}")
+        print(f"Time: {course_instance.time}")
+        print(f"JSON: {course_instance.as_json()}")
+        print(f"CSV: {course_instance.as_csv()}")
+```
+
+
 ## Error Handling
 
 The scheduler uses standard Python exceptions for error handling:
@@ -218,9 +236,10 @@ config = load_config_from_file(SchedulerConfig, "config.json")
 time_slot_config = load_config_from_file(TimeSlotConfig, "time_slots.json")
 scheduler = Scheduler(config, time_slot_config)
 
-for model in scheduler.get_models(limit=1, optimize=True):
-    # See Internal Types section for how to interpret models
-    ...
+for schedule in scheduler.get_models(limit=1, optimize=True):
+    # schedule is a list of CourseInstance objects
+    for course_instance in schedule:
+        print(f"{course_instance.course.course_id}: {course_instance.faculty}")
 ```
 
 ## Best Practices
@@ -230,39 +249,3 @@ for model in scheduler.get_models(limit=1, optimize=True):
 3. Enable optimization only when needed, as it can significantly increase solving time
 4. Use appropriate error handling for file operations and configuration loading
 5. Use the provided writers (`JSONWriter`, `CSVWriter`) for consistent output formatting
-6. When analyzing schedules, use the Z3 model output with the internal types (see below)
-
----
-
-# Internal Types (Advanced)
-
-The following types are used internally by the scheduler and are not part of the public API, but may be useful for advanced users or contributors. They are available via submodules (e.g., `scheduler.models`).
-
-- `Course`
-- `CourseInstance`
-- `TimeSlot`, `TimeInstance`, `TimePoint`, `Duration`
-- `Faculty`, `Room`, `Lab`, `Day`
-
-### Example: Interpreting Z3 Models
-
-To extract a human-readable schedule from a Z3 model:
-
-```python
-from scheduler.models import Course
-
-for model in scheduler.get_models(limit=1):
-    schedule = [course.instance(model).as_json() for course in scheduler.courses]
-    print(schedule)
-```
-
-### Internal Type Summaries
-
-- **Course**: Represents a course in the scheduling system. Use `course.instance(model)` to get a `CourseInstance` from a Z3 model.
-- **CourseInstance**: Represents a scheduled course with assigned time, faculty, room, and lab. Has `.as_json()` and `.as_csv()` methods for output.
-- **TimeSlot**: Represents a time slot in the schedule. Has methods for overlap and adjacency checks.
-- **TimeInstance, TimePoint, Duration**: Used for time calculations and representation.
-- **Faculty, Room, Lab, Day**: Represent faculty, rooms, labs, and days of the week.
-
----
-
-For most users, only the types and functions in the Public API section are needed. Use the Internal Types section only if you need to work directly with Z3 models or extend the scheduler's functionality.

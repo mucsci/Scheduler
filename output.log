@@ -1,0 +1,120 @@
+2025-06-21 10:37:29 - Scheduler - INFO - Configured conservative global Z3 options for EnumSort optimization
+2025-06-21 10:37:30 - Scheduler - INFO - Created all optimization goals
+2025-06-21 10:37:32 - Scheduler - INFO - Schedule 1 generation took 2.85s
+2025-06-21 10:37:35 - Scheduler - INFO - Schedule 2 generation took 2.52s
+2025-06-21 10:37:38 - Scheduler - INFO - Schedule 3 generation took 2.82s
+2025-06-21 10:37:38 - Scheduler - INFO - Skipping optimization goals
+2025-06-21 10:37:38 - Scheduler - INFO - Schedule 1 generation took 0.33s
+2025-06-21 10:37:39 - Scheduler - INFO - Schedule 2 generation took 0.29s
+2025-06-21 10:37:39 - Scheduler - INFO - Schedule 3 generation took 0.27s
+2025-06-21 10:37:39 - Scheduler - INFO - Configured conservative global Z3 options for EnumSort optimization
+2025-06-21 10:37:39 - Scheduler - INFO - Created all optimization goals
+2025-06-21 10:37:42 - Scheduler - INFO - Schedule 1 generation took 2.87s
+2025-06-21 10:37:45 - Scheduler - INFO - Schedule 2 generation took 2.61s
+2025-06-21 10:37:48 - Scheduler - INFO - Schedule 3 generation took 2.78s
+2025-06-21 10:37:48 - Scheduler - INFO - Skipping optimization goals
+2025-06-21 10:37:48 - Scheduler - INFO - Schedule 1 generation took 0.34s
+2025-06-21 10:37:48 - Scheduler - INFO - Schedule 2 generation took 0.29s
+2025-06-21 10:37:49 - Scheduler - INFO - Schedule 3 generation took 0.28s
+EnumSort Solver Performance Benchmark
+Using Real Datasets
+============================================================
+Found datasets: sample, example_rest
+
+============================================================
+Benchmarking Dataset: sample
+============================================================
+Loading dataset: sample
+Initializing scheduler...
+
+Problem Characteristics:
+  - Courses: 17
+  - Faculty: 9
+  - Rooms: 3
+  - Labs: 2
+  - Time slots: 53
+  - Faculty preferences: 14
+  - Course pairs: 136
+
+Testing with optimization enabled (limit=3)...
+  Generated schedule 1 with 17 course instances
+    Sample assignments:
+      CMSC 140.01: Hardy -> MON 13:00-13:50,WED 13:00-14:50^,FRI 13:00-13:50
+      CMSC 140.02: Hardy -> MON 14:00-14:50,TUE 13:10-15:00^,FRI 14:00-14:50
+      CMSC 152.01: Hardy -> MON 10:00-10:50,TUE 10:00-11:50^,FRI 10:00-10:50
+      ... and 14 more courses
+  Generated schedule 2 with 17 course instances
+  Generated schedule 3 with 17 course instances
+  Optimization completed in 8.27 seconds
+
+Testing without optimization (limit=3)...
+  Generated schedule 1 with 17 course instances
+  Generated schedule 2 with 17 course instances
+  Generated schedule 3 with 17 course instances
+  No optimization completed in 0.92 seconds
+
+Performance Summary:
+  With optimization: 8.27s
+  Without optimization: 0.92s
+  Optimization overhead: 8.94x
+  ⚠️  High optimization overhead detected!
+
+============================================================
+Benchmarking Dataset: example_rest
+============================================================
+Loading dataset: example_rest
+Initializing scheduler...
+
+Problem Characteristics:
+  - Courses: 17
+  - Faculty: 9
+  - Rooms: 3
+  - Labs: 2
+  - Time slots: 53
+  - Faculty preferences: 14
+  - Course pairs: 136
+
+Testing with optimization enabled (limit=3)...
+  Generated schedule 1 with 17 course instances
+    Sample assignments:
+      CMSC 140.01: Hardy -> MON 13:00-13:50,WED 13:00-14:50^,FRI 13:00-13:50
+      CMSC 140.02: Hardy -> MON 14:00-14:50,TUE 13:10-15:00^,FRI 14:00-14:50
+      CMSC 152.01: Hardy -> MON 10:00-10:50,TUE 10:00-11:50^,FRI 10:00-10:50
+      ... and 14 more courses
+  Generated schedule 2 with 17 course instances
+  Generated schedule 3 with 17 course instances
+  Optimization completed in 8.33 seconds
+
+Testing without optimization (limit=3)...
+  Generated schedule 1 with 17 course instances
+  Generated schedule 2 with 17 course instances
+  Generated schedule 3 with 17 course instances
+  No optimization completed in 0.94 seconds
+
+Performance Summary:
+  With optimization: 8.33s
+  Without optimization: 0.94s
+  Optimization overhead: 8.89x
+  ⚠️  High optimization overhead detected!
+
+============================================================
+COMPREHENSIVE BENCHMARK SUMMARY
+============================================================
+Successfully benchmarked 2 datasets:
+
+📊 SAMPLE:
+   Problem size: 17 courses, 9 faculty
+   Optimization time: 8.27s
+   No-opt time: 0.92s
+   ⚠️  Overhead: 8.94x (HIGH)
+
+📊 EXAMPLE_REST:
+   Problem size: 17 courses, 9 faculty
+   Optimization time: 8.33s
+   No-opt time: 0.94s
+   ⚠️  Overhead: 8.89x (HIGH)
+
+📈 Average optimization overhead: 8.92x
+🔴 Overall: High optimization overhead - consider further tuning
+
+Benchmark completed at 2025-06-21 10:37:49

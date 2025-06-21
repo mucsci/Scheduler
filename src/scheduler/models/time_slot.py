@@ -48,6 +48,8 @@ class Duration(BaseModel):
         return self.value
 
 
+MAX_TIME_DIFF_BETWEEN_SLOTS = Duration(duration=50)
+
 class TimePoint(BaseModel):
     timepoint: int
 
@@ -124,9 +126,16 @@ class TimeInstance(BaseModel):
         return {"day": self.day, "start": self.start.timepoint, "duration": self.duration.duration}
 
 
+def  _diff_between_slots(t1: TimeInstance, t2: TimeInstance) -> Duration:
+    return min(abs(t1.start - t2.stop), abs(t2.start - t1.stop))
+
+
 class TimeSlot(Identifiable):
     times: List[TimeInstance]
     lab_index: Optional[int] = Field(default=None)
+
+    def __hash__(self) -> int:
+        return hash(self.id)
 
     def lab_time(self) -> Optional[TimeInstance]:
         """
@@ -147,36 +156,14 @@ class TimeSlot(Identifiable):
         """
         Ensure that a time slot has padding between all possibly adjacent times
         """
-        MAX_TIME_DIFF = Duration(duration=50)
-
-        def diff(t1: TimeInstance, t2: TimeInstance) -> Duration:
-            return min(abs(t1.start - t2.stop), abs(t2.start - t1.stop))
 
         for t1 in self.times:
             for t2 in other.times:
                 if t1.day == t2.day:
-                    if diff(t1, t2) <= MAX_TIME_DIFF:
+                    if _diff_between_slots(t1, t2) <= MAX_TIME_DIFF_BETWEEN_SLOTS:
                         return False
 
         return True
-
-    def next_to_tues_wed(self, other: "TimeSlot") -> bool:
-        if self.has_lab() and other.has_lab():
-            t1: Optional[TimeInstance] = self.lab_time()
-            t2: Optional[TimeInstance] = other.lab_time()
-            if t1 is None or t2 is None:
-                return False
-            # forcefully disallow T/W split labs -- messes up fall schedules otherwise!
-            if {t1.day, t2.day} == {Day.TUE, Day.WED}:
-                return False
-        return True
-
-    def lab_starts_with_lecture(self) -> bool:
-        if not self.has_lab():
-            return True
-        lab_start = self.lab_time().start
-        lecture_start = self.times[0].start
-        return abs(lecture_start - lab_start) <= Duration(duration=10)
 
     def next_to(self, other: "TimeSlot") -> bool:
         """

@@ -289,9 +289,7 @@ async def get_next_schedule(schedule_id: str):
             )
 
         # Convert model to JSON format with transformation
-        schedule_data = [
-            c.instance(model).as_json() for c in session.scheduler.courses
-        ]
+        schedule_data = [course_instance.as_json() for course_instance in model]
 
         # Store the generated schedule
         session.generated_schedules.append(schedule_data)
@@ -351,9 +349,7 @@ async def generate_all_schedules(schedule_id: str):
                     )
                     
                     # Convert model to JSON format with transformation
-                    schedule_data = [
-                        c.instance(model).as_json() for c in session.scheduler.courses
-                    ]
+                    schedule_data = [course_instance.as_json() for course_instance in model]
                     
                     # Store the generated schedule immediately
                     session.generated_schedules.append(schedule_data)

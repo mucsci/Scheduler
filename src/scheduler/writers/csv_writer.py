@@ -1,7 +1,6 @@
 import json
-import z3
 
-from ..models import Course
+from ..models import CourseInstance
 
 
 class CSVWriter:
@@ -14,9 +13,11 @@ class CSVWriter:
     def __enter__(self):
         return self
 
-    def add_schedule(self, courses: list[Course], model: z3.ModelRef) -> None:
+    def add_schedule(self, schedule: list[CourseInstance]) -> None:
         """Add a schedule to be written."""
-        schedule_data = "\n".join(c.instance(model).as_csv() for c in courses)
+        schedule_data = "\n".join(
+            course_instance.as_csv() for course_instance in schedule
+        )
         if self.filename:
             self.schedules.append(schedule_data)
         else:

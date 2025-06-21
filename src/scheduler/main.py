@@ -60,8 +60,7 @@ def main(
     # Create appropriate writer
     with _get_writer(format, output_file) as writer:
         for i, m in enumerate(sched.get_models(limit, optimize)):
-            writer.add_schedule(sched.courses, m)
-
+            writer.add_schedule(m)
             # For interactive mode (no output file), prompt user
             if not output and i + 1 < limit:
                 if not click.confirm("Generate next model?", default=True):

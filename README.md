@@ -39,6 +39,27 @@ scheduler --config config.json --time-slots time_slots.json --limit 10
 python -m scheduler.main --config config.json --time-slots time_slots.json --limit 10
 ```
 
+### Python API
+
+```python
+from scheduler import Scheduler, load_config_from_file, SchedulerConfig, TimeSlotConfig
+
+# Load configurations
+config = load_config_from_file(SchedulerConfig, "config.json")
+time_slot_config = load_config_from_file(TimeSlotConfig, "time_slots.json")
+
+# Create scheduler and generate schedules
+scheduler = Scheduler(config, time_slot_config)
+
+for schedule in scheduler.get_models(limit=5, optimize=True):
+    # schedule is a list of CourseInstance objects
+    for course_instance in schedule:
+        print(f"{course_instance.course.course_id}: {course_instance.faculty}")
+        print(f"  Room: {course_instance.room if course_instance.room else 'None'}")
+        print(f"  Lab: {course_instance.lab if course_instance.lab else 'None'}")
+        print(f"  Time: {course_instance.time}")
+```
+
 ### HTTP API Server
 
 Start the HTTP API server:

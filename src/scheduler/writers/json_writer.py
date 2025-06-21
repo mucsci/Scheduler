@@ -1,8 +1,6 @@
 import json
-import z3
 
-from ..models import Course
-
+from ..models import CourseInstance
 
 class JSONWriter:
     """Writer class for JSON output with consistent interface."""
@@ -14,10 +12,10 @@ class JSONWriter:
     def __enter__(self):
         return self
 
-    def add_schedule(self, courses: list[Course], model: z3.ModelRef) -> None:
+    def add_schedule(self, schedule: list[CourseInstance]) -> None:
         """Add a schedule to be written."""
-
-        schedule_data = [c.instance(model).as_json() for c in courses]
+        
+        schedule_data = [course_instance.as_json() for course_instance in schedule]
         if self.filename:
             self.schedules.append(schedule_data)
         else:

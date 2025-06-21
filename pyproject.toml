@@ -8,7 +8,6 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "click>=8.1.0",
-    "json-fix>=1.0.0",
     "mypy>=1.16.0",
     "pydantic>=2.11.5",
     "z3-solver>=4.15.1.0",

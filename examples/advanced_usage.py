@@ -29,24 +29,22 @@ def main():
     with JSONWriter() as writer:
         for i, model in enumerate(scheduler.get_models(limit=2, optimize=True)):
             print(f"\nGenerated Schedule {i+1}:")
-            writer.add_schedule(scheduler.courses, model)
+            writer.add_schedule(model)
 
     # Then, generate CSV output
     print("\nCSV Output:")
     with CSVWriter() as writer:
         for i, model in enumerate(scheduler.get_models(limit=2, optimize=True)):
             print(f"\nGenerated Schedule {i+1}:")
-            writer.add_schedule(scheduler.courses, model)
+            writer.add_schedule(model)
 
     # Finally, demonstrate how to analyze the schedules
     print("\nSchedule Analysis:")
     for i, model in enumerate(scheduler.get_models(limit=1, optimize=True)):
-        schedule = [course.instance(model) for course in scheduler.courses]
-
         # Analyze faculty workload
         faculty_workload = {}
-        for course in schedule:
-            faculty = course.faculty.name
+        for course in model:
+            faculty = course.faculty
             if faculty not in faculty_workload:
                 faculty_workload[faculty] = []
             faculty_workload[faculty].append(course.course.course_id)
@@ -57,9 +55,9 @@ def main():
 
         # Analyze room usage
         room_usage = {}
-        for course in schedule:
+        for course in model:
             if course.room:
-                room = course.room.name
+                room = course.room
                 if room not in room_usage:
                     room_usage[room] = []
                 room_usage[room].append(f"{course.course.course_id} ({course.time})")
