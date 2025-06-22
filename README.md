@@ -5,8 +5,8 @@ A constraint satisfaction solver for generating course schedules using Z3 theore
 ## Features
 
 - **Constraint Satisfaction**: Uses Z3 theorem prover for optimal schedule generation
-- **Faculty Preferences**: Supports faculty course preferences and availability
-- **Room & Lab Assignment**: Intelligent assignment of rooms and labs
+- **Faculty Preferences**: Supports faculty course, room, and lab preferences with granular optimization
+- **Room & Lab Assignment**: Intelligent assignment of rooms and labs with packing optimization
 - **Conflict Resolution**: Handles course conflicts and scheduling constraints
 - **HTTP API**: RESTful API for schedule generation with session management
 - **Concurrent Processing**: Thread pool for handling multiple Z3 operations simultaneously
@@ -42,7 +42,7 @@ python -m scheduler.main --config config.json --time-slots time_slots.json --lim
 ### Python API
 
 ```python
-from scheduler import Scheduler, load_config_from_file, SchedulerConfig, TimeSlotConfig
+from scheduler import Scheduler, load_config_from_file, SchedulerConfig, TimeSlotConfig, OptimizerFlags
 
 # Load configurations
 config = load_config_from_file(SchedulerConfig, "config.json")
@@ -51,7 +51,18 @@ time_slot_config = load_config_from_file(TimeSlotConfig, "time_slots.json")
 # Create scheduler and generate schedules
 scheduler = Scheduler(config, time_slot_config)
 
-for schedule in scheduler.get_models(limit=5, optimize=True):
+# Use specific optimizer options
+optimizer_options = [
+    OptimizerFlags.FACULTY_COURSE,
+    OptimizerFlags.FACULTY_ROOM,
+    OptimizerFlags.FACULTY_LAB,
+    OptimizerFlags.SAME_ROOM,
+    OptimizerFlags.SAME_LAB,
+    OptimizerFlags.PACK_ROOMS,
+    OptimizerFlags.PACK_LABS
+]
+
+for schedule in scheduler.get_models(limit=5, optimizer_options=optimizer_options):
     # schedule is a list of CourseInstance objects
     for course_instance in schedule:
         print(f"{course_instance.course.course_id}: {course_instance.faculty}")
@@ -116,7 +127,15 @@ Content-Type: application/json
     "break_duration": 15
   },
   "limit": 10,
-  "optimize": true
+  "optimizer_options": [
+    "faculty_course",
+    "faculty_room",
+    "faculty_lab",
+    "same_room",
+    "same_lab",
+    "pack_rooms",
+    "pack_labs"
+  ]
 }
 ```
 
@@ -167,7 +186,9 @@ GET /health
       "maximum_credits": 12,
       "minimum_credits": 6,
       "unique_course_limit": 2,
-      "preferences": {"CS101": 5},
+      "course_preferences": {"CS101": 5},
+      "room_preferences": {"Room A": 5},
+      "lab_preferences": {"Lab 1": 5},
       "times": {
         "MON": ["09:00-12:00", "14:00-17:00"],
         "TUE": ["09:00-12:00", "14:00-17:00"]
@@ -257,3 +278,23 @@ src/scheduler/
 ├── models/              # Data models
 └── writers/             # Output writers
 ```
+
+## Optimizer Options
+
+The scheduler supports various optimization strategies that can be enabled individually:
+
+- **`faculty_course`**: Optimize for faculty course preferences (1-5 scale)
+- **`faculty_room`**: Optimize for faculty room preferences (1-5 scale)
+- **`faculty_lab`**: Optimize for faculty lab preferences (1-5 scale)
+- **`same_room`**: Prefer same faculty to use same rooms
+- **`same_lab`**: Prefer same faculty to use same labs
+- **`pack_rooms`**: Pack courses into fewer rooms when possible
+- **`pack_labs`**: Pack courses into fewer labs when possible
+
+### Faculty Preferences
+
+Faculty can now specify preferences for courses, rooms, and labs separately:
+
+- **`course_preferences`**: Map of course IDs to preference values (1-5, where 5 is strongly preferred)
+- **`room_preferences`**: Map of room names to preference values (1-5, where 5 is strongly preferred)
+- **`lab_preferences`**: Map of lab names to preference values (1-5, where 5 is strongly preferred)

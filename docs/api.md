@@ -13,7 +13,7 @@ The following types and functions are available directly from the top-level `sch
 The main class for generating course schedules.
 
 ```python
-from scheduler import Scheduler, load_config_from_file, SchedulerConfig, TimeSlotConfig
+from scheduler import Scheduler, load_config_from_file, SchedulerConfig, TimeSlotConfig, OptimizerFlags
 
 # Load configurations
 config = load_config_from_file(SchedulerConfig, "config.json")
@@ -22,8 +22,18 @@ time_slot_config = load_config_from_file(TimeSlotConfig, "time_slots.json")
 # Create scheduler instance
 scheduler = Scheduler(config, time_slot_config)
 
-# Generate schedules
-for schedule in scheduler.get_models(limit=5, optimize=True):
+# Generate schedules with specific optimizer options
+optimizer_options = [
+    OptimizerFlags.FACULTY_COURSE,
+    OptimizerFlags.FACULTY_ROOM,
+    OptimizerFlags.FACULTY_LAB,
+    OptimizerFlags.SAME_ROOM,
+    OptimizerFlags.SAME_LAB,
+    OptimizerFlags.PACK_ROOMS,
+    OptimizerFlags.PACK_LABS
+]
+
+for schedule in scheduler.get_models(limit=5, optimizer_options=optimizer_options):
     # schedule is a list of CourseInstance objects
     for course_instance in schedule:
         print(f"{course_instance.course.course_id}: {course_instance.faculty}")
@@ -31,7 +41,7 @@ for schedule in scheduler.get_models(limit=5, optimize=True):
 
 #### Methods
 - `__init__(config: SchedulerConfig, time_slot_config: TimeSlotConfig)`: Initialize the scheduler with configuration and time slots configuration
-- `get_models(limit: int = 10, optimize: bool = True)`: Generate schedule models (returns lists of CourseInstance objects)
+- `get_models(limit: int = 10, optimizer_options: list[OptimizerFlags] | None = None)`: Generate schedule models (returns lists of CourseInstance objects)
 
 ### load_config_from_file
 
@@ -106,7 +116,9 @@ config = SchedulerConfig(
                 "MON": ["09:00-17:00"],
                 "TUE": ["09:00-17:00"]
             },
-            preferences={"CS101": 5}
+            course_preferences={"CS101": 5},
+            room_preferences={"Room1": 5},
+            lab_preferences={"Lab1": 5}
         )
     ]
 )
@@ -182,7 +194,9 @@ faculty = FacultyConfig(
         "MON": ["09:00-17:00"],
         "TUE": ["09:00-17:00"]
     },
-    preferences={"CS101": 5}
+    course_preferences={"CS101": 5},
+    room_preferences={"Room1": 5},
+    lab_preferences={"Lab1": 5}
 )
 ```
 
@@ -214,6 +228,32 @@ for schedule in scheduler.get_models(limit=1):
         print(f"CSV: {course_instance.as_csv()}")
 ```
 
+## Optimizer Options
+
+The scheduler supports various optimization strategies that can be enabled individually:
+
+### OptimizerFlags
+
+```python
+from scheduler import OptimizerFlags
+
+# Available optimizer options
+OptimizerFlags.FACULTY_COURSE    # Optimize for faculty course preferences
+OptimizerFlags.FACULTY_ROOM      # Optimize for faculty room preferences  
+OptimizerFlags.FACULTY_LAB       # Optimize for faculty lab preferences
+OptimizerFlags.SAME_ROOM         # Prefer same faculty to use same rooms
+OptimizerFlags.SAME_LAB          # Prefer same faculty to use same labs
+OptimizerFlags.PACK_ROOMS        # Pack courses into fewer rooms when possible
+OptimizerFlags.PACK_LABS         # Pack courses into fewer labs when possible
+```
+
+### Faculty Preferences
+
+Faculty can now specify preferences for courses, rooms, and labs separately:
+
+- **`course_preferences`**: Map of course IDs to preference values (1-5, where 5 is strongly preferred)
+- **`room_preferences`**: Map of room names to preference values (1-5, where 5 is strongly preferred)  
+- **`lab_preferences`**: Map of lab names to preference values (1-5, where 5 is strongly preferred)
 
 ## Error Handling
 
@@ -230,13 +270,24 @@ except Exception as e:
 ## Example Usage
 
 ```python
-from scheduler import Scheduler, load_config_from_file, SchedulerConfig, TimeSlotConfig
+from scheduler import Scheduler, load_config_from_file, SchedulerConfig, TimeSlotConfig, OptimizerFlags
 
 config = load_config_from_file(SchedulerConfig, "config.json")
 time_slot_config = load_config_from_file(TimeSlotConfig, "time_slots.json")
 scheduler = Scheduler(config, time_slot_config)
 
-for schedule in scheduler.get_models(limit=1, optimize=True):
+# Use all optimizer options
+optimizer_options = [
+    OptimizerFlags.FACULTY_COURSE,
+    OptimizerFlags.FACULTY_ROOM,
+    OptimizerFlags.FACULTY_LAB,
+    OptimizerFlags.SAME_ROOM,
+    OptimizerFlags.SAME_LAB,
+    OptimizerFlags.PACK_ROOMS,
+    OptimizerFlags.PACK_LABS
+]
+
+for schedule in scheduler.get_models(limit=1, optimizer_options=optimizer_options):
     # schedule is a list of CourseInstance objects
     for course_instance in schedule:
         print(f"{course_instance.course.course_id}: {course_instance.faculty}")
@@ -246,6 +297,7 @@ for schedule in scheduler.get_models(limit=1, optimize=True):
 
 1. Always use the configuration classes (`SchedulerConfig`, `CourseConfig`, `FacultyConfig`, `TimeSlotConfig`) to create valid configurations
 2. Use the `load_config_from_file` function to load configurations from JSON files
-3. Enable optimization only when needed, as it can significantly increase solving time
+3. Enable only the optimizer options you need, as each option can increase solving time
 4. Use appropriate error handling for file operations and configuration loading
 5. Use the provided writers (`JSONWriter`, `CSVWriter`) for consistent output formatting
+6. Consider the trade-off between optimization quality and solving time when choosing optimizer options

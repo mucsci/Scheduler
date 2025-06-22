@@ -9,7 +9,7 @@ from typing import Callable
 
 import z3
 
-from .config import SchedulerConfig, FacultyConfig, TimeSlotConfig
+from .config import SchedulerConfig, FacultyConfig, TimeSlotConfig, OptimizerFlags
 from .logging import logger
 from .models import (
     Course,
@@ -78,7 +78,9 @@ class Scheduler:
         self._faculty_maximum_credits: dict[str, int] = dict()
         self._faculty_minimum_credits: dict[str, int] = dict()
         self._faculty_unique_course_limits: dict[str, int] = dict()
-        self._faculty_preferences: dict[str, dict[str, int]] = dict()
+        self._faculty_course_preferences: dict[str, dict[str, int]] = dict()
+        self._faculty_room_preferences: dict[str, dict[str, int]] = dict()
+        self._faculty_lab_preferences: dict[str, dict[str, int]] = dict()
         self._faculty_availability: dict[str, list[TimeInstance]] = dict()
 
         for faculty_data in config.faculty:
@@ -89,7 +91,11 @@ class Scheduler:
             self._faculty_unique_course_limits[faculty_name] = (
                 faculty_data.unique_course_limit
             )
-            self._faculty_preferences[faculty_name] = faculty_data.preferences
+            self._faculty_course_preferences[faculty_name] = (
+                faculty_data.course_preferences
+            )
+            self._faculty_room_preferences[faculty_name] = faculty_data.room_preferences
+            self._faculty_lab_preferences[faculty_name] = faculty_data.lab_preferences
             self._faculty_availability[faculty_name] = get_faculty_availability(
                 faculty_data
             )
@@ -109,7 +115,7 @@ class Scheduler:
             course_faculty = c.faculty
             if not course_faculty:
                 for faculty_data in config.faculty:
-                    if c.course_id in faculty_data.preferences:
+                    if c.course_id in faculty_data.course_preferences:
                         course_faculty.append(faculty_data.name)
 
             course = Course(
@@ -217,6 +223,8 @@ class Scheduler:
             return slot_i.labs_on_same_day(slot_j)
         elif fn_name == "next_to":
             return slot_i.next_to(slot_j)
+        elif fn_name == "labs_next_to":
+            return slot_i.labs_next_to(slot_j)
         else:
             raise ValueError(f"Unknown relationship function: {fn_name}")
 
@@ -341,11 +349,18 @@ class Scheduler:
         faculty_available, faculty_available_C = self._z3ify_faculty_time_constraint(
             "faculty_available", ctx=self._ctx
         )
+        labs_next_to, labs_next_to_C = self._z3ify_time_constraint(
+            "labs_next_to", ctx=self._ctx
+        )
+
+        self._next_to = next_to
+        self._labs_next_to = labs_next_to
 
         all_constraints = []
         all_constraints.extend(overlaps_C)
         all_constraints.extend(lab_overlaps_C)
         all_constraints.extend(next_to_C)
+        all_constraints.extend(labs_next_to_C)
         all_constraints.extend(faculty_available_C)
 
         logger.debug(f"Added {len(all_constraints)} function constraints")
@@ -504,7 +519,9 @@ class Scheduler:
 
             if resource:
                 resource_constraints.append(z3.And(resource))
-            resource_constraints.append(z3.Implies(i.faculty() == j.faculty(), z3.And(constraint_parts)))
+            resource_constraints.append(
+                z3.Implies(i.faculty() == j.faculty(), z3.And(constraint_parts))
+            )
 
         for c in faculty_constraints:
             all_constraints.append(self._simplify(c))
@@ -590,13 +607,15 @@ class Scheduler:
             )
             s.add(z3.Or(per_course))
 
-    def get_models(self, limit=10, optimize=True):
+    def get_models(
+        self, limit=10, optimizer_options: list[OptimizerFlags] | None = None
+    ):
         """
         Generate schedule models.
 
         Args:
             limit: Maximum number of schedules to generate (default: 10)
-            optimize: Whether to apply faculty preferences and optimization goals (default: True)
+            optimizer_config: Configuration for the optimizer (default: None)
 
         Yields:
             List of CourseInstance objects representing a complete schedule
@@ -619,16 +638,14 @@ class Scheduler:
             s.add(c)
 
         # Add faculty preferences as optimization goals with improved caching - only if requested
-        if optimize:
-            preference_terms = []
-            faculty_id_cache = {faculty: faculty for faculty in self._faculty}
+        if OptimizerFlags.FACULTY_COURSE in optimizer_options:
 
-            for faculty_name, preferences in self._faculty_preferences.items():
+            course_preference_terms = []
+            for faculty_name, preferences in self._faculty_course_preferences.items():
                 if not preferences:  # Skip faculty with no preferences
                     continue
 
-                faculty_name_key = faculty_id_cache[faculty_name]
-                faculty_constant = self._faculty_constants[faculty_name_key]
+                faculty_constant = self._faculty_constants[faculty_name]
                 for course in self._courses:
                     if course.course_id in preferences:
                         # Use preference value directly (1-5 scale where 5 is strongly prefer, 1 is weakest)
@@ -636,15 +653,72 @@ class Scheduler:
                         term = z3.If(
                             course.faculty() == faculty_constant, preference_value, 0
                         )
-                        preference_terms.append(term)
+                        course_preference_terms.append(term)
 
-            if preference_terms:
+            if course_preference_terms:
                 logger.debug(
-                    f"Adding {len(preference_terms)} faculty preference optimization goals",
+                    f"Adding {len(course_preference_terms)} faculty course preference optimization goals",
                 )
-                s.maximize(z3.Sum(preference_terms))
+                s.maximize(z3.Sum(course_preference_terms))
+
+        if OptimizerFlags.FACULTY_ROOM in optimizer_options:
+            room_preference_terms = []
+            for faculty_name, preferences in self._faculty_room_preferences.items():
+                if not preferences:  # Skip faculty with no preferences
+                    continue
+
+                faculty_constant = self._faculty_constants[faculty_name]
+                for course in self._courses:
+                    for room in course.rooms:
+                        if room in preferences:
+                            preference_value = preferences[room]
+                            term = z3.If(
+                                z3.And(
+                                    course.faculty() == faculty_constant,
+                                    course.room() == self._room_constants[room],
+                                ),
+                                preference_value,
+                                0,
+                            )
+                            room_preference_terms.append(term)
+
+            if room_preference_terms:
+                logger.debug(
+                    f"Adding {len(room_preference_terms)} faculty room preference optimization goals",
+                )
+                s.maximize(z3.Sum(room_preference_terms))
+
+        if OptimizerFlags.FACULTY_LAB in optimizer_options:
+            lab_preference_terms = []
+            for faculty_name, preferences in self._faculty_lab_preferences.items():
+                if not preferences:  # Skip faculty with no preferences
+                    continue
+
+                faculty_constant = self._faculty_constants[faculty_name]
+                for course in self._courses:
+                    for lab in course.labs:
+                        if lab in preferences:
+                            preference_value = preferences[lab]
+                            term = z3.If(
+                                z3.And(
+                                    course.faculty() == faculty_constant,
+                                    course.lab() == self._lab_constants[lab],
+                                ),
+                                preference_value,
+                                0,
+                            )
+                            lab_preference_terms.append(term)
+
+            if lab_preference_terms:
+                logger.debug(
+                    f"Adding {len(lab_preference_terms)} faculty lab preference optimization goals",
+                )
+                s.maximize(z3.Sum(lab_preference_terms))
 
             same_rooms = []
+            same_labs = []
+            packing_rooms = []
+            packing_labs = []
             for i, j in itertools.combinations(self._courses, 2):
                 if set(i.rooms) & set(j.rooms):
                     same_rooms.append(
@@ -654,21 +728,48 @@ class Scheduler:
                             0,
                         )
                     )
-            if same_rooms:
-                logger.debug(f"Adding {len(same_rooms)} same room optimization goals")
-                s.maximize(z3.Sum(same_rooms))
-
-            same_labs = []
-            for i, j in itertools.combinations(self._courses, 2):
+                    packing_rooms.append(
+                        z3.If(
+                            z3.And(
+                                i.room() == j.room(), self._next_to(i.time(), j.time())
+                            ),
+                            1,
+                            0,
+                        )
+                    )
                 if set(i.labs) & set(j.labs):
                     same_labs.append(
                         z3.If(
                             z3.And(i.faculty() == j.faculty(), i.lab() == j.lab()), 1, 0
                         )
                     )
-            if same_labs:
+                    packing_labs.append(
+                        z3.If(
+                            z3.And(
+                                i.lab() == j.lab(),
+                                self._labs_next_to(i.time(), j.time()),
+                            ),
+                            1,
+                            0,
+                        )
+                    )
+
+            if same_rooms and OptimizerFlags.SAME_ROOM in optimizer_options:
+                logger.debug(f"Adding {len(same_rooms)} same room optimization goals")
+                s.maximize(z3.Sum(same_rooms))
+            if same_labs and OptimizerFlags.SAME_LAB in optimizer_options:
                 logger.debug(f"Adding {len(same_labs)} same lab optimization goals")
                 s.maximize(z3.Sum(same_labs))
+            if packing_rooms and OptimizerFlags.PACK_ROOMS in optimizer_options:
+                logger.debug(
+                    f"Adding {len(packing_rooms)} room packing optimization goals"
+                )
+                s.maximize(z3.Sum(packing_rooms))
+            if packing_labs and OptimizerFlags.PACK_LABS in optimizer_options:
+                logger.debug(
+                    f"Adding {len(packing_labs)} lab packing optimization goals"
+                )
+                s.maximize(z3.Sum(packing_labs))
 
             logger.info("Created all optimization goals")
         else:

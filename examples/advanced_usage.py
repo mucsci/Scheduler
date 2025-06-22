@@ -6,11 +6,20 @@ This example demonstrates how to:
 2. Generate and display multiple schedules
 3. Use different output formats
 4. Analyze generated schedules
+5. Use different optimizer options
 """
 
 import json
 import click
-from scheduler import Scheduler, load_config_from_file, SchedulerConfig, TimeSlotConfig, JSONWriter, CSVWriter
+from scheduler import (
+    Scheduler,
+    load_config_from_file,
+    SchedulerConfig,
+    TimeSlotConfig,
+    JSONWriter,
+    CSVWriter,
+    OptimizerFlags,
+)
 
 
 def main():
@@ -21,26 +30,43 @@ def main():
     # Create scheduler instance
     scheduler = Scheduler(config, time_slot_config)
 
+    # Define optimizer options
+    optimizer_options = [
+        OptimizerFlags.FACULTY_COURSE,
+        OptimizerFlags.FACULTY_ROOM,
+        OptimizerFlags.FACULTY_LAB,
+        OptimizerFlags.SAME_ROOM,
+        OptimizerFlags.SAME_LAB,
+        OptimizerFlags.PACK_ROOMS,
+        OptimizerFlags.PACK_LABS,
+    ]
+
     # Generate multiple schedules with different output formats
     print("\nGenerating schedules...")
 
     # First, generate JSON output
     print("\nJSON Output:")
     with JSONWriter() as writer:
-        for i, model in enumerate(scheduler.get_models(limit=2, optimize=True)):
+        for i, model in enumerate(
+            scheduler.get_models(limit=2, optimizer_options=optimizer_options)
+        ):
             print(f"\nGenerated Schedule {i+1}:")
             writer.add_schedule(model)
 
     # Then, generate CSV output
     print("\nCSV Output:")
     with CSVWriter() as writer:
-        for i, model in enumerate(scheduler.get_models(limit=2, optimize=True)):
+        for i, model in enumerate(
+            scheduler.get_models(limit=2, optimizer_options=optimizer_options)
+        ):
             print(f"\nGenerated Schedule {i+1}:")
             writer.add_schedule(model)
 
     # Finally, demonstrate how to analyze the schedules
     print("\nSchedule Analysis:")
-    for i, model in enumerate(scheduler.get_models(limit=1, optimize=True)):
+    for i, model in enumerate(
+        scheduler.get_models(limit=1, optimizer_options=optimizer_options)
+    ):
         # Analyze faculty workload
         faculty_workload = {}
         for course in model:

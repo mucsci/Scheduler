@@ -27,7 +27,9 @@ TOTAL_OPERATIONS = MAX_WORKERS * OPERATIONS_PER_WORKER
 # Load configuration from example_rest_config.json
 def load_example_config() -> Dict[str, Any]:
     """Load the example configuration from example_rest_config.json."""
-    config_path = os.path.join(os.path.dirname(__file__), "..", "example_rest_config.json")
+    config_path = os.path.join(
+        os.path.dirname(__file__), "..", "example_rest_config.json"
+    )
     try:
         with open(config_path, "r") as f:
             full_config = json.load(f)
@@ -37,7 +39,6 @@ def load_example_config() -> Dict[str, Any]:
             "config": full_config["config"],
             "time_slot_config": full_config["time_slot_config"],
             "limit": full_config.get("limit", 5),
-            "optimize": full_config.get("optimize", True),
         }
         return config
     except FileNotFoundError:

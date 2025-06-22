@@ -2,6 +2,7 @@ from typing import Optional
 
 import json
 from pydantic import BaseModel, Field
+from enum import StrEnum
 
 
 class TimeBlock(BaseModel):
@@ -43,7 +44,9 @@ class FacultyConfig(BaseModel):
     minimum_credits: int
     unique_course_limit: int
     times: dict[str, list[str]]  # {day_name: ["HH:MM-HH:MM", ...]}
-    preferences: dict[str, int] = Field(default_factory=dict)
+    course_preferences: dict[str, int] = Field(default_factory=dict)
+    room_preferences: dict[str, int] = Field(default_factory=dict)
+    lab_preferences: dict[str, int] = Field(default_factory=dict)
 
 
 class SchedulerConfig(BaseModel):
@@ -51,3 +54,13 @@ class SchedulerConfig(BaseModel):
     labs: list[str]
     courses: list[CourseConfig]
     faculty: list[FacultyConfig]
+
+
+class OptimizerFlags(StrEnum):
+    FACULTY_COURSE = "faculty_course"
+    FACULTY_ROOM = "faculty_room"
+    FACULTY_LAB = "faculty_lab"
+    SAME_ROOM = "same_room"
+    SAME_LAB = "same_lab"
+    PACK_ROOMS = "pack_rooms"
+    PACK_LABS = "pack_labs"

@@ -2,23 +2,23 @@
     "rooms": ["Roddy 136", "Roddy 140", "Roddy 147"],
     "labs": ["Linux", "Mac"],
     "courses": [
-        { "course_id": "CMSC 140", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": [], "conflicts": ["CMSC 161", "CMSC 162"], "faculty": []},
-        { "course_id": "CMSC 140", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": [], "conflicts": ["CMSC 161", "CMSC 162"], "faculty": []},
-        { "course_id": "CMSC 152", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac","Linux"], "conflicts": [], "faculty": []},
-        { "course_id": "CMSC 161", "credits": 4, "room": ["Roddy 136"], "lab": ["Linux"], "conflicts": ["CMSC 140"], "faculty": ["Zoppetti"]},
-        { "course_id": "CMSC 161", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": [], "faculty": []},
-        { "course_id": "CMSC 161", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": ["CMSC 140"], "faculty": []},
-        { "course_id": "CMSC 162", "credits": 4, "room": ["Roddy 140"], "lab": ["Linux","Mac"], "conflicts": ["CMSC 140"], "faculty": []},
-        { "course_id": "CMSC 330", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux","Mac"], "conflicts": ["CMSC 362", "CMSC 366"], "faculty": []},
-        { "course_id": "CMSC 340", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac","Linux"], "conflicts": ["CMSC 380", "CMSC 420", "CMSC 453", "CMSC 476"], "faculty": []},
-        { "course_id": "CMSC 340", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac","Linux"], "conflicts": ["CMSC 362", "CMSC 366", "CMSC 330"], "faculty": []},
-        { "course_id": "CMSC 362", "credits": 4, "room": ["Roddy 136"], "lab": ["Linux"], "conflicts": ["CMSC 330", "CMSC 366"] , "faculty": []},
-        { "course_id": "CMSC 366", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux","Mac"], "conflicts": ["CMSC 340", "CMSC 362", "CMSC 330"], "faculty": []},
-        { "course_id": "CMSC 366", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux","Mac"], "conflicts": ["CMSC 362", "CMSC 330"], "faculty": []},
-        { "course_id": "CMSC 380", "credits": 4, "room": ["Roddy 140"], "lab": ["Linux","Mac"], "conflicts": ["CMSC 420", "CMSC 453", "CMSC 476"], "faculty": []},
-        { "course_id": "CMSC 420", "credits": 4, "room": ["Roddy 140"], "lab": ["Mac"], "conflicts": ["CMSC 380", "CMSC 453", "CMSC 476"], "faculty": []},
-        { "course_id": "CMSC 453", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac","Linux"], "conflicts": ["CMSC 380", "CMSC 420", "CMSC 476"], "faculty": []},
-        { "course_id": "CMSC 476", "credits": 4, "room": ["Roddy 136"], "lab": ["Linux"], "conflicts": ["CMSC 380", "CMSC 420", "CMSC 453"], "faculty": []}
+        {"course_id": "CMSC 140", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": [], "conflicts": ["CMSC 161", "CMSC 162"], "faculty": []},
+        {"course_id": "CMSC 140", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": [], "conflicts": ["CMSC 161", "CMSC 162"], "faculty": []},
+        {"course_id": "CMSC 152", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": [], "faculty": []},
+        {"course_id": "CMSC 161", "credits": 4, "room": ["Roddy 136"], "lab": ["Linux"], "conflicts": ["CMSC 140"], "faculty": ["Zoppetti"]},
+        {"course_id": "CMSC 161", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": [], "faculty": []},
+        {"course_id": "CMSC 161", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": ["CMSC 140"], "faculty": []},
+        {"course_id": "CMSC 162", "credits": 4, "room": ["Roddy 140"], "lab": ["Linux", "Mac"], "conflicts": ["CMSC 140"], "faculty": []},
+        {"course_id": "CMSC 330", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux", "Mac"], "conflicts": ["CMSC 362", "CMSC 366"], "faculty": []},
+        {"course_id": "CMSC 340", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": ["CMSC 380", "CMSC 420", "CMSC 453", "CMSC 476"], "faculty": []},
+        {"course_id": "CMSC 340", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": ["CMSC 362", "CMSC 366", "CMSC 330"], "faculty": []},
+        {"course_id": "CMSC 362", "credits": 4, "room": ["Roddy 136"], "lab": ["Linux"], "conflicts": ["CMSC 330", "CMSC 366"], "faculty": []},
+        {"course_id": "CMSC 366", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux", "Mac"], "conflicts": ["CMSC 340", "CMSC 362", "CMSC 330"], "faculty": []},
+        {"course_id": "CMSC 366", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux", "Mac"], "conflicts": ["CMSC 362", "CMSC 330"], "faculty": []},
+        {"course_id": "CMSC 380", "credits": 4, "room": ["Roddy 140"], "lab": ["Linux", "Mac"], "conflicts": ["CMSC 420", "CMSC 453", "CMSC 476"], "faculty": []},
+        {"course_id": "CMSC 420", "credits": 4, "room": ["Roddy 140"], "lab": ["Mac"], "conflicts": ["CMSC 380", "CMSC 453", "CMSC 476"], "faculty": []},
+        {"course_id": "CMSC 453", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": ["CMSC 380", "CMSC 420", "CMSC 476"], "faculty": []},
+        {"course_id": "CMSC 476", "credits": 4, "room": ["Roddy 136"], "lab": ["Linux"], "conflicts": ["CMSC 380", "CMSC 420", "CMSC 453"], "faculty": []}
     ],
     "faculty": [
         {
@@ -33,10 +33,16 @@
                 "THU": ["10:00-17:00"],
                 "FRI": ["11:00-16:00"]
             },
-            "preferences": {
+            "course_preferences": {
                 "CMSC 362": 5,
                 "CMSC 476": 5,
                 "CMSC 161": 4
+            },
+            "room_preferences": {
+                "Roddy 136": 5
+            },
+            "lab_preferences": {
+                "Linux": 5
             }
         },
         {
@@ -51,7 +57,7 @@
                 "THU": [],
                 "FRI": ["09:00-15:00"]
             },
-            "preferences": {
+            "course_preferences": {
                 "CMSC 140": 5,
                 "CMSC 152": 4
             }
@@ -68,9 +74,16 @@
                 "THU": ["09:00-15:00"],
                 "FRI": ["09:00-15:00"]
             },
-            "preferences": {
+            "course_preferences": {
                 "CMSC 162": 5,
                 "CMSC 380": 5
+            },
+            "room_preferences": {
+                "Roddy 140": 5
+            },
+            "lab_preferences": {
+                "Linux": 5,
+                "Mac": 1
             }
         },
         {
@@ -85,7 +98,7 @@
                 "THU": [],
                 "FRI": ["09:00-15:00"]
             },
-            "preferences": {
+            "course_preferences": {
                 "CMSC 366": 5,
                 "CMSC 330": 4
             }
@@ -102,8 +115,15 @@
                 "THU": ["17:00-21:00"],
                 "FRI": []
             },
-            "preferences": {
+            "course_preferences": {
                 "CMSC 161": 5
+            },
+            "room_preferences": {
+                "Roddy 136": 5
+            },
+            "lab_preferences": {
+                "Linux": 5,
+                "Mac": 1
             }
         },
         {
@@ -118,8 +138,15 @@
                 "THU": ["08:00-12:00"],
                 "FRI": []
             },
-            "preferences": {
+            "course_preferences": {
                 "CMSC 161": 5
+            },
+            "room_preferences": {
+                "Roddy 147": 5
+            },
+            "lab_preferences": {
+                "Linux": 5,
+                "Mac": 1
             }
         },
         {
@@ -134,14 +161,21 @@
                 "THU": ["16:00-19:00"],
                 "FRI": []
             },
-            "preferences": {
+            "course_preferences": {
                 "CMSC 420": 5
+            },
+            "room_preferences": {
+                "Roddy 140": 5
+            },
+            "lab_preferences": {
+                "Mac": 5,
+                "Linux": 1
             }
         },
         {
             "name": "Yang",
             "maximum_credits": 12,
-            "minimum_credits": 0,
+            "minimum_credits": 12,
             "unique_course_limit": 2,
             "times": {
                 "MON": ["09:00-16:00"],
@@ -150,7 +184,7 @@
                 "THU": ["09:00-16:00"],
                 "FRI": ["09:00-16:00"]
             },
-            "preferences": {
+            "course_preferences": {
                 "CMSC 340": 5,
                 "CMSC 453": 4
             }
@@ -167,7 +201,10 @@
                 "THU": [],
                 "FRI": []
             },
-            "preferences": {}
+            "course_preferences": {},
+            "room_preferences": {
+                "Roddy 140": 5
+            }
         }
     ]
 }

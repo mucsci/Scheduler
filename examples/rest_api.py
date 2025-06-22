@@ -77,7 +77,7 @@ def main():
             details = response.json()
             print(f"✓ Schedule details retrieved:")
             print(f"  - Limit: {details['limit']}")
-            print(f"  - Optimize: {details['optimize']}")
+            print(f"  - Optimizer options: {details['optimizer_options']}")
             print(f"  - Total generated: {details['total_generated']}")
         else:
             print(f"✗ Failed to get details: {response.status_code}")

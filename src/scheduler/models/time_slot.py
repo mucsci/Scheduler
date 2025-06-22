@@ -50,6 +50,7 @@ class Duration(BaseModel):
 
 MAX_TIME_DIFF_BETWEEN_SLOTS = Duration(duration=50)
 
+
 class TimePoint(BaseModel):
     timepoint: int
 
@@ -60,7 +61,7 @@ class TimePoint(BaseModel):
     @property
     def hour(self):
         return self.timepoint // 60
-    
+
     @property
     def minute(self):
         return self.timepoint % 60
@@ -123,10 +124,14 @@ class TimeInstance(BaseModel):
         return f"{self.day.name} {str(self.start)}-{str(self.stop)}"
 
     def as_json(self):
-        return {"day": self.day, "start": self.start.timepoint, "duration": self.duration.duration}
+        return {
+            "day": self.day,
+            "start": self.start.timepoint,
+            "duration": self.duration.duration,
+        }
 
 
-def  _diff_between_slots(t1: TimeInstance, t2: TimeInstance) -> Duration:
+def _diff_between_slots(t1: TimeInstance, t2: TimeInstance) -> Duration:
     return min(abs(t1.start - t2.stop), abs(t2.start - t1.stop))
 
 
@@ -164,6 +169,19 @@ class TimeSlot(Identifiable):
                         return False
 
         return True
+
+    def labs_next_to(self, other: "TimeSlot") -> bool:
+        if self.lab_index is None or other.lab_index is None:
+            return False
+        if self.times[self.lab_index].day != other.times[other.lab_index].day:
+            return False
+
+        return (
+            _diff_between_slots(
+                self.times[self.lab_index], other.times[other.lab_index]
+            )
+            <= MAX_TIME_DIFF_BETWEEN_SLOTS
+        )
 
     def next_to(self, other: "TimeSlot") -> bool:
         """
@@ -211,9 +229,7 @@ class TimeSlot(Identifiable):
         """
         Returns true IFF this timeslot has any overlap with the passed time slot
         """
-        return any(
-            TimeSlot._overlaps(a, b) for a in self.times for b in other.times
-        )
+        return any(TimeSlot._overlaps(a, b) for a in self.times for b in other.times)
 
     def lab_overlaps(self, other: "TimeSlot") -> bool:
         """

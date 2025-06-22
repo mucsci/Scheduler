@@ -133,6 +133,7 @@
             let totalGenerated = 0;
             let scheduleLimit = 10;
             let cleanupTriggered = false;
+            let cachedCountData = null; // Cache for count data
             
             // Utility functions
             function showError(message) {
@@ -206,6 +207,7 @@
                         currentIndex = -1;
                         totalGenerated = 0;
                         cleanupTriggered = false;
+                        cachedCountData = null; // Reset cached data
                         
                         document.getElementById('nav-controls').classList.add('visible');
                         updateNavigation();
@@ -227,11 +229,14 @@
             async function navigateSchedule(direction) {
                 if (!currentSessionId) return;
                 
-                // Get current count from server
-                const countData = await getScheduleCount();
+                // Use cached count data if available, otherwise fetch it
+                let countData = cachedCountData;
                 if (!countData) {
-                    showError('Failed to get schedule count from server');
-                    return;
+                    countData = await getScheduleCount();
+                    if (!countData) {
+                        showError('Failed to get schedule count from server');
+                        return;
+                    }
                 }
                 
                 const newIndex = currentIndex + direction;
@@ -261,7 +266,7 @@
                         const result = await response.json();
                         displaySchedule(result.schedule);
                         currentIndex = index;
-                        updateNavigation();
+                        updateNavigation(cachedCountData); // Pass cached data
                     } else {
                         showError(`[ERROR] Failed to load schedule: ${response.status}`);
                     }
@@ -303,6 +308,7 @@
                     
                     if (response.ok) {
                         const result = await response.json();
+                        cachedCountData = result; // Cache the result
                         return result;
                     }
                 } catch (error) {
@@ -324,7 +330,7 @@
                     const countData = await getScheduleCount();
                     if (countData) {
                         totalGenerated = countData.current_count;
-                        updateNavigation();
+                        updateNavigation(countData); // Pass the fresh data
                         
                         // Stop polsling if generation is complete
                         if (countData.is_complete) {
@@ -335,17 +341,19 @@
                 }, 1000);
             }
             
-            function updateNavigation() {
-                getScheduleCount().then(countData => {
-                    const prevBtn = document.getElementById('prev');
-                    const nextBtn = document.getElementById('next');
-                    const currSpan = document.getElementById('curr');
+            function updateNavigation(countData = null) {
+                // If countData is provided, use it; otherwise use cached data
+                const data = countData || cachedCountData;
+                if (!data) return;
+                
+                const prevBtn = document.getElementById('prev');
+                const nextBtn = document.getElementById('next');
+                const currSpan = document.getElementById('curr');
 
-                    totalGenerated = countData.current_count;
-                    currSpan.textContent = `${currentIndex + 1} of ${Math.max(currentIndex + 1, totalGenerated)}`;
-                    prevBtn.disabled = currentIndex <= 0;
-                    nextBtn.disabled = currentIndex + 1 >= totalGenerated;
-                });
+                totalGenerated = data.current_count;
+                currSpan.textContent = `${currentIndex + 1} of ${Math.max(currentIndex + 1, totalGenerated)}`;
+                prevBtn.disabled = currentIndex <= 0;
+                nextBtn.disabled = currentIndex + 1 >= totalGenerated;
             }
             
             // Schedule display functions (adapted from original)

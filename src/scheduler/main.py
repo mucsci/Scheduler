@@ -1,6 +1,6 @@
 import click
 
-from .config import SchedulerConfig, TimeSlotConfig
+from .config import SchedulerConfig, TimeSlotConfig, OptimizerFlags
 from .logging import logger
 from .scheduler import load_config_from_file, Scheduler
 from .writers import JSONWriter, CSVWriter
@@ -32,10 +32,11 @@ def _get_writer(format: str, output_file: str) -> JSONWriter | CSVWriter:
 )
 @click.option("--output", "-o", help="Output basename (extension added automatically)")
 @click.option(
-    "--optimize",
+    "--optimizer-options",
     "-O",
-    is_flag=True,
-    help="Enable optimization of preferences (slower)",
+    type=click.Choice([flag.value for flag in OptimizerFlags]),
+    multiple=True,
+    help="Optimizer options",
 )
 def main(
     config: str,
@@ -43,11 +44,11 @@ def main(
     limit: int,
     format: str,
     output: str,
-    optimize: bool,
+    optimizer_options: list[OptimizerFlags],
 ):
     """Generate course schedules using constraint satisfaction solving."""
 
-    logger.info(f"Using limit={limit}, optimize={optimize}")
+    logger.info(f"Using limit={limit}")
     config = load_config_from_file(SchedulerConfig, config)
     time_slot_config = load_config_from_file(TimeSlotConfig, timeslot_config)
 
@@ -59,13 +60,18 @@ def main(
 
     # Create appropriate writer
     with _get_writer(format, output_file) as writer:
-        for i, m in enumerate(sched.get_models(limit, optimize)):
+        for i, m in enumerate(
+            sched.get_models(
+                limit,
+                optimizer_options=optimizer_options,
+            )
+        ):
             writer.add_schedule(m)
             # For interactive mode (no output file), prompt user
             if not output and i + 1 < limit:
                 if not click.confirm("Generate next model?", default=True):
                     break
-        
+
     if output_file:
         logger.info(f"Output written to {output_file}")
 
