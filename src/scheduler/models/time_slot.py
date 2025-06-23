@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -157,19 +157,6 @@ class TimeSlot(Identifiable):
         """
         return self.lab_index is not None
 
-    def not_next_to(self, other: "TimeSlot") -> bool:
-        """
-        Ensure that a time slot has padding between all possibly adjacent times
-        """
-
-        for t1 in self.times:
-            for t2 in other.times:
-                if t1.day == t2.day:
-                    if _diff_between_slots(t1, t2) <= MAX_TIME_DIFF_BETWEEN_SLOTS:
-                        return False
-
-        return True
-
     def labs_next_to(self, other: "TimeSlot") -> bool:
         if self.lab_index is None or other.lab_index is None:
             return False
@@ -187,43 +174,20 @@ class TimeSlot(Identifiable):
         """
         Check if a time slot is logically next to another (same day + adjacent or next day + same time)
         """
-        MAX_TIME_DELTA = Duration(duration=70)
-        MAX_TIME_DELTA_NO_LAB = Duration(duration=60)
+        MAX_TIME_DELTA = Duration(duration=50)
 
         def diff(t1: TimeInstance, t2: TimeInstance) -> Duration:
-            if t1.day == t2.day:
-                return min(abs(t1.start - t2.stop), abs(t2.start - t1.stop))
-            else:
-                return abs(t1.start - t2.start)
+            return min(abs(t1.start - t2.stop), abs(t2.start - t1.stop))
 
-        if self.has_lab() and other.has_lab():
-            t1: Optional[TimeInstance] = self.lab_time()
-            t2: Optional[TimeInstance] = other.lab_time()
-            if t1 is None or t2 is None:
-                return False
-            # forcefully disallow T/W split labs -- messes up fall schedules otherwise!
-            # keep uncommented unless you really want this
-            # if {t1.day, t2.day} == {Day.TUE, Day.WED}:
-            #     return False
-            if diff(t1, t2) > MAX_TIME_DELTA:
-                return False
-            for t1 in self.times:
-                if self.lab_time() != t1:
-                    for t2 in other.times:
-                        if other.lab_time() != t2:
-                            if t1.day == t2.day:
-                                if diff(t1, t2) > MAX_TIME_DELTA_NO_LAB:
-                                    return False
-            return True
-        else:
-            if len(self.times) != len(other.times):
-                return False
-            for t1 in self.times:
-                for t2 in other.times:
-                    if t1.day == t2.day:
-                        if diff(t1, t2) > MAX_TIME_DELTA_NO_LAB:
-                            return False
-            return True
+        for t1 in self.times:
+            for t2 in other.times:
+                if t1.day == t2.day:
+                    if diff(t1, t2) > MAX_TIME_DELTA:
+                        return False
+                else:
+                    if diff(t1, t2) > MAX_TIME_DELTA:
+                        return False
+        return True
 
     def overlaps(self, other: "TimeSlot") -> bool:
         """
@@ -281,7 +245,7 @@ class TimeSlot(Identifiable):
         )
 
     def as_json(self):
-        object = {"times": [t.as_json() for t in self.times]}
+        object: dict[str, Any] = {"times": [t.as_json() for t in self.times]}
         if self.lab_index is not None:
             object["lab_index"] = self.lab_index
         return object

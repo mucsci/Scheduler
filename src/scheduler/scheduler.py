@@ -5,7 +5,7 @@ import itertools
 import json
 import threading
 import time
-from typing import Callable
+from typing import Callable, cast
 
 import z3
 
@@ -230,7 +230,7 @@ class Scheduler:
 
     def _z3ify_time_constraint(
         self, name: str, *, ctx: z3.Context | None = None
-    ) -> tuple[z3.Function, list[z3.BoolRef]]:
+    ) -> tuple[z3.FuncDeclRef, list[z3.BoolRef]]:
         z3fn = z3.Function(
             name,
             self._time_slot_sort,
@@ -272,8 +272,10 @@ class Scheduler:
                 )
 
         constraints = [
-            z3.And([z3fn(ts_i, ts_j) for ts_i, ts_j in true]),
-            z3.And([z3.Not(z3fn(ts_i, ts_j)) for ts_i, ts_j in false]),
+            cast(z3.BoolRef, z3.And([z3fn(ts_i, ts_j) for ts_i, ts_j in true])),
+            cast(
+                z3.BoolRef, z3.And([z3.Not(z3fn(ts_i, ts_j)) for ts_i, ts_j in false])
+            ),
         ]
 
         return z3fn, constraints
@@ -284,7 +286,7 @@ class Scheduler:
         fn: Callable[[TimeSlot], bool],
         *,
         ctx: z3.Context | None = None,
-    ) -> tuple[z3.Function, list[z3.BoolRef]]:
+    ) -> tuple[z3.FuncDeclRef, list[z3.BoolRef]]:
         z3fn = z3.Function(name, self._time_slot_sort, z3.BoolSort(ctx=ctx))
 
         true = []
@@ -296,14 +298,14 @@ class Scheduler:
                 false.append(self._time_slot_constants[slot.id])
 
         constraints = [
-            z3.And([z3fn(ts) for ts in true]),
-            z3.And([z3.Not(z3fn(ts)) for ts in false]),
+            cast(z3.BoolRef, z3.And([z3fn(ts) for ts in true])),
+            cast(z3.BoolRef, z3.And([z3.Not(z3fn(ts)) for ts in false])),
         ]
         return z3fn, constraints
 
     def _z3ify_faculty_time_constraint(
         self, name: str, *, ctx: z3.Context | None = None
-    ) -> tuple[z3.Function, list[z3.BoolRef]]:
+    ) -> tuple[z3.FuncDeclRef, list[z3.BoolRef]]:
         z3fn = z3.Function(
             name,
             self._faculty_sort,
@@ -330,11 +332,19 @@ class Scheduler:
                     false.append((faculty_constant, slot_constant))
             if true:
                 constraints.append(
-                    z3.And([z3fn(faculty, slot) for faculty, slot in true])
+                    cast(
+                        z3.BoolRef,
+                        z3.And([z3fn(faculty, slot) for faculty, slot in true]),
+                    )
                 )
             if false:
                 constraints.append(
-                    z3.And([z3.Not(z3fn(faculty, slot)) for faculty, slot in false])
+                    cast(
+                        z3.BoolRef,
+                        z3.And(
+                            [z3.Not(z3fn(faculty, slot)) for faculty, slot in false]
+                        ),
+                    )
                 )
 
         return z3fn, constraints
@@ -385,7 +395,12 @@ class Scheduler:
                     for c in faculty_courses
                 ]
                 faculty_constraints.append(
-                    z3.And(z3.PbGe(mapping, min_credits), z3.PbLe(mapping, max_credits))
+                    cast(
+                        z3.BoolRef,
+                        z3.And(
+                            z3.PbGe(mapping, min_credits), z3.PbLe(mapping, max_credits)
+                        ),
+                    )
                 )
 
                 # Unique course limit constraint - only generate if needed
@@ -403,11 +418,14 @@ class Scheduler:
                     teaches_course = []
                     for course_group in unique_courses.values():
                         teaches_course.append(
-                            z3.Or(
-                                [
-                                    c.faculty() == self._faculty_constants[faculty]
-                                    for c in course_group
-                                ]
+                            cast(
+                                z3.BoolRef,
+                                z3.Or(
+                                    [
+                                        c.faculty() == self._faculty_constants[faculty]
+                                        for c in course_group
+                                    ]
+                                ),
                             )
                         )
                     limit = self._simplify(
@@ -418,61 +436,82 @@ class Scheduler:
         # Course constraints with optimized conflict checking - batch generation
         course_constraints = []
         for c in self._courses:
-            conflict_constraints = []
+            conflict_constraints: list[z3.BoolRef] = []
             for d in self._courses:
                 if d != c and d.course_id in c.conflicts:
-                    conflict_constraints.append(z3.Not(overlaps(c.time(), d.time())))
+                    conflict_constraints.append(
+                        cast(z3.BoolRef, z3.Not(overlaps(c.time(), d.time())))
+                    )
 
             # faculty availability constraint
-            course_constraint_list = [
-                faculty_available(c.faculty(), c.time()),
+            course_constraint_list: list[z3.BoolRef] = [
+                cast(z3.BoolRef, faculty_available(c.faculty(), c.time())),
             ]
 
             # Get valid time slots for this credit level
             start, stop = self._ranges[c.credits]
             valid_time_slots = [
-                slot for slot in self._slots if start <= slot.id <= stop
+                slot for slot in self._slots if start <= cast(int, slot.id) <= stop
             ]
             if valid_time_slots:
                 # Constrain time to valid slots for this credit level
                 course_constraint_list.append(
-                    z3.Or(
-                        [
-                            c.time() == self._time_slot_constants[slot.id]
-                            for slot in valid_time_slots
-                        ]
+                    cast(
+                        z3.BoolRef,
+                        z3.Or(
+                            [
+                                c.time() == self._time_slot_constants[slot.id]
+                                for slot in valid_time_slots
+                            ]
+                        ),
                     )
                 )
 
             if c.labs:
                 # we must assign to a lab when we have options
-                valid_labs = [lab for lab in self._labs if lab in c.labs]
                 course_constraint_list.append(
-                    z3.Or([c.lab() == self._lab_constants[lab] for lab in valid_labs])
+                    cast(
+                        z3.BoolRef,
+                        z3.Or(
+                            [
+                                c.lab() == self._lab_constants[lab]
+                                for lab in self._labs
+                                if lab in c.labs
+                            ]
+                        ),
+                    )
                 )
             if c.rooms:
                 # we must assign to a room when we have options
-                valid_rooms = [room for room in self._rooms if room in c.rooms]
                 course_constraint_list.append(
-                    z3.Or(
-                        [c.room() == self._room_constants[room] for room in valid_rooms]
+                    cast(
+                        z3.BoolRef,
+                        z3.Or(
+                            [
+                                c.room() == self._room_constants[room]
+                                for room in self._rooms
+                                if room in c.rooms
+                            ]
+                        ),
                     )
                 )
             if c.faculties:
                 # we must assign to a faculty from the candidates
-                valid_faculties = [faculty for faculty in c.faculties]
                 course_constraint_list.append(
-                    z3.Or(
-                        [
-                            c.faculty() == self._faculty_constants[faculty]
-                            for faculty in valid_faculties
-                        ]
+                    cast(
+                        z3.BoolRef,
+                        z3.Or(
+                            [
+                                c.faculty() == self._faculty_constants[faculty]
+                                for faculty in c.faculties
+                            ]
+                        ),
                     )
                 )
             if conflict_constraints:
-                course_constraint_list.append(z3.And(conflict_constraints))
+                course_constraint_list.append(cast(z3.BoolRef, z3.And(conflict_constraints)))  # type: ignore
 
-            course_constraints.append(z3.And(course_constraint_list))
+            course_constraints.append(cast(z3.BoolRef, z3.And(course_constraint_list)))  # type: ignore
 
         # Faculty-specific constraints - ALL course pairs must be checked for faculty overlap
         course_pairs = list(itertools.combinations(self._courses, 2))
@@ -486,9 +525,12 @@ class Scheduler:
             # Enforce same room usage when both courses can use the same rooms
             if set(i.rooms) & set(j.rooms):
                 resource.append(
-                    z3.Implies(
-                        i.room() == j.room(),
-                        z3.Not(overlaps(i.time(), j.time())),
+                    cast(
+                        z3.BoolRef,
+                        z3.Implies(
+                            i.room() == j.room(),
+                            z3.Not(overlaps(i.time(), j.time())),
+                        ),
                     )
                 )
                 if i.course_id == j.course_id:
@@ -497,9 +539,12 @@ class Scheduler:
             # Enforce same lab usage when both courses have labs and can use the same labs
             if set(i.labs) & set(j.labs):
                 resource.append(
-                    z3.Implies(
-                        i.lab() == j.lab(),
-                        z3.Not(lab_overlaps(i.time(), j.time())),
+                    cast(
+                        z3.BoolRef,
+                        z3.Implies(
+                            i.lab() == j.lab(),
+                            z3.Not(lab_overlaps(i.time(), j.time())),
+                        ),
                     )
                 )
                 if i.course_id == j.course_id:
@@ -507,8 +552,11 @@ class Scheduler:
 
             # Prevent time overlap for courses taught by same faculty
             constraint_parts.append(
-                z3.And(
-                    z3.Not(overlaps(i.time(), j.time())),
+                cast(z3.BoolRef, z3.Not(overlaps(i.time(), j.time())))
+            )
+            constraint_parts.append(
+                cast(
+                    z3.BoolRef,
                     z3.If(
                         i.course_id == j.course_id,
                         next_to(i.time(), j.time()),
@@ -518,9 +566,12 @@ class Scheduler:
             )
 
             if resource:
-                resource_constraints.append(z3.And(resource))
+                resource_constraints.append(cast(z3.BoolRef, z3.And(resource)))
             resource_constraints.append(
-                z3.Implies(i.faculty() == j.faculty(), z3.And(constraint_parts))
+                cast(
+                    z3.BoolRef,
+                    z3.Implies(i.faculty() == j.faculty(), z3.And(constraint_parts)),
+                )
             )
 
         for c in faculty_constraints:
@@ -554,6 +605,9 @@ class Scheduler:
             )
             room = self._room_constant_to_name.get(model.eval(course.room()), None)
             lab = self._lab_constant_to_name.get(model.eval(course.lab()), None)
+
+            if time is None or faculty is None or room is None:
+                raise ValueError(f"Invalid model: {model}")
 
             # Create CourseInstance
             course_instance = CourseInstance(
@@ -638,7 +692,10 @@ class Scheduler:
             s.add(c)
 
         # Add faculty preferences as optimization goals with improved caching - only if requested
-        if OptimizerFlags.FACULTY_COURSE in optimizer_options:
+        if (
+            optimizer_options is not None
+            and OptimizerFlags.FACULTY_COURSE in optimizer_options
+        ):
 
             course_preference_terms = []
             for faculty_name, preferences in self._faculty_course_preferences.items():
@@ -661,7 +718,10 @@ class Scheduler:
                 )
                 s.maximize(z3.Sum(course_preference_terms))
 
-        if OptimizerFlags.FACULTY_ROOM in optimizer_options:
+        if (
+            optimizer_options is not None
+            and OptimizerFlags.FACULTY_ROOM in optimizer_options
+        ):
             room_preference_terms = []
             for faculty_name, preferences in self._faculty_room_preferences.items():
                 if not preferences:  # Skip faculty with no preferences
@@ -688,7 +748,10 @@ class Scheduler:
                 )
                 s.maximize(z3.Sum(room_preference_terms))
 
-        if OptimizerFlags.FACULTY_LAB in optimizer_options:
+        if (
+            optimizer_options is not None
+            and OptimizerFlags.FACULTY_LAB in optimizer_options
+        ):
             lab_preference_terms = []
             for faculty_name, preferences in self._faculty_lab_preferences.items():
                 if not preferences:  # Skip faculty with no preferences
@@ -728,44 +791,63 @@ class Scheduler:
                             0,
                         )
                     )
-                    packing_rooms.append(
-                        z3.If(
-                            z3.And(
-                                i.room() == j.room(), self._next_to(i.time(), j.time())
-                            ),
-                            1,
-                            0,
+                    if i.course_id != j.course_id:
+                        packing_rooms.append(
+                            z3.If(
+                                z3.And(
+                                    i.room() == j.room(),
+                                    self._next_to(i.time(), j.time()),
+                                ),
+                                1,
+                                0,
+                            )
                         )
-                    )
                 if set(i.labs) & set(j.labs):
                     same_labs.append(
                         z3.If(
                             z3.And(i.faculty() == j.faculty(), i.lab() == j.lab()), 1, 0
                         )
                     )
-                    packing_labs.append(
-                        z3.If(
-                            z3.And(
-                                i.lab() == j.lab(),
-                                self._labs_next_to(i.time(), j.time()),
-                            ),
-                            1,
-                            0,
+                    if i.course_id != j.course_id:
+                        packing_labs.append(
+                            z3.If(
+                                z3.And(
+                                    i.lab() == j.lab(),
+                                    self._labs_next_to(i.time(), j.time()),
+                                ),
+                                1,
+                                0,
+                            )
                         )
-                    )
 
-            if same_rooms and OptimizerFlags.SAME_ROOM in optimizer_options:
+            if (
+                optimizer_options is not None
+                and same_rooms
+                and OptimizerFlags.SAME_ROOM in optimizer_options
+            ):
                 logger.debug(f"Adding {len(same_rooms)} same room optimization goals")
                 s.maximize(z3.Sum(same_rooms))
-            if same_labs and OptimizerFlags.SAME_LAB in optimizer_options:
+            if (
+                optimizer_options is not None
+                and same_labs
+                and OptimizerFlags.SAME_LAB in optimizer_options
+            ):
                 logger.debug(f"Adding {len(same_labs)} same lab optimization goals")
                 s.maximize(z3.Sum(same_labs))
-            if packing_rooms and OptimizerFlags.PACK_ROOMS in optimizer_options:
+            if (
+                optimizer_options is not None
+                and packing_rooms
+                and OptimizerFlags.PACK_ROOMS in optimizer_options
+            ):
                 logger.debug(
                     f"Adding {len(packing_rooms)} room packing optimization goals"
                 )
                 s.maximize(z3.Sum(packing_rooms))
-            if packing_labs and OptimizerFlags.PACK_LABS in optimizer_options:
+            if (
+                optimizer_options is not None
+                and packing_labs
+                and OptimizerFlags.PACK_LABS in optimizer_options
+            ):
                 logger.debug(
                     f"Adding {len(packing_labs)} lab packing optimization goals"
                 )

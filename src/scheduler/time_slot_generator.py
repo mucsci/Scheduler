@@ -103,7 +103,7 @@ class TimeSlotGenerator:
         result = []
         for pattern in matching_patterns:
             # Generate all possible time slots for each meeting in the pattern
-            meeting_slots = []
+            meeting_slots: list[list[TimeInstance]] = []
             for meeting in pattern.meetings:
                 day_slots = self._generate_day_slots(
                     day=meeting.day,
@@ -115,6 +115,7 @@ class TimeSlotGenerator:
 
             # Generate and validate all possible combinations
             for time_combination in product(*meeting_slots):
+                time_combination = list(time_combination)
                 # Skip if there are same-day overlaps or insufficient overlap between days
                 if not self._validate_time_combination(time_combination, min_overlap):
                     continue

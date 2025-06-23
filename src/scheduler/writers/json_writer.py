@@ -2,10 +2,11 @@ import json
 
 from ..models import CourseInstance
 
+
 class JSONWriter:
     """Writer class for JSON output with consistent interface."""
 
-    def __init__(self, filename: str = None):
+    def __init__(self, filename: str | None = None):
         self.filename = filename
         self.schedules = []
 
@@ -14,7 +15,7 @@ class JSONWriter:
 
     def add_schedule(self, schedule: list[CourseInstance]) -> None:
         """Add a schedule to be written."""
-        
+
         schedule_data = [course_instance.as_json() for course_instance in schedule]
         if self.filename:
             self.schedules.append(schedule_data)

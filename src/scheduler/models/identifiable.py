@@ -1,13 +1,14 @@
 from typing import ClassVar, Any
 from pydantic import BaseModel, Field
 
+
 class Identifiable(BaseModel):
 
     _default_id: ClassVar[int]
     _id: ClassVar[int]
     _all: ClassVar[dict]
 
-    id: int = Field(default=None)
+    id: int | None = Field(default=None)
 
     def __init_subclass__(cls, /, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -17,7 +18,7 @@ class Identifiable(BaseModel):
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        if not hasattr(self, 'id') or self.id is None:
+        if not hasattr(self, "id") or self.id is None:
             self.id = self.__class__._id
             self.__class__._all[self.id] = self
             self.__class__._id += 1
@@ -47,4 +48,4 @@ class Identifiable(BaseModel):
             return None
 
     def __repr__(self):
-        return str(self.id) 
+        return str(self.id)

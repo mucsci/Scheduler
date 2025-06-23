@@ -6,7 +6,7 @@ from .scheduler import load_config_from_file, Scheduler
 from .writers import JSONWriter, CSVWriter
 
 
-def _get_writer(format: str, output_file: str) -> JSONWriter | CSVWriter:
+def _get_writer(format: str, output_file: str | None) -> JSONWriter | CSVWriter:
     if format == "json":
         return JSONWriter(output_file)
     else:
@@ -49,10 +49,10 @@ def main(
     """Generate course schedules using constraint satisfaction solving."""
 
     logger.info(f"Using limit={limit}")
-    config = load_config_from_file(SchedulerConfig, config)
+    configuration = load_config_from_file(SchedulerConfig, config)
     time_slot_config = load_config_from_file(TimeSlotConfig, timeslot_config)
 
-    sched = Scheduler(config, time_slot_config)
+    sched = Scheduler(configuration, time_slot_config)
     logger.info("Created all constraints")
 
     # Determine output filename

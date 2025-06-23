@@ -1,5 +1,6 @@
 from enum import IntEnum, auto
 
+
 class Day(IntEnum):
     MON = auto()
     TUE = auto()
@@ -8,13 +9,13 @@ class Day(IntEnum):
     FRI = auto()
 
     def __str__(self) -> str:
-        return next(val.name for val in Day if self.value == val)
+        return self.name
 
     def __repr__(self) -> str:
         """
         Pretty Print representation of a day
         """
-        return next(val.name for val in Day if self.value == val)
+        return self.name
 
     def as_json(self):
-        return self.value 
+        return self.value

@@ -1,7 +1,7 @@
 import uuid
 import asyncio
-from typing import Dict, Any
-from dataclasses import dataclass
+from typing import Dict, Any, Generator
+from dataclasses import dataclass, field
 from contextlib import asynccontextmanager
 from concurrent.futures import ThreadPoolExecutor, Future
 
@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .config import SchedulerConfig, TimeSlotConfig, OptimizerFlags
-from .scheduler import Scheduler
+from .scheduler import Scheduler, CourseInstance
 from .logging import logger
 
 # Lock for generator initialization
@@ -58,18 +58,14 @@ class ScheduleSession:
 
     scheduler: None | Scheduler
     scheduler_future: None | Future[Scheduler]
-    generator: None | Any
+    generator: None | Generator[list[CourseInstance], None, None]
     config: Dict[str, Any]
     time_slot_config: Dict[str, Any]
     limit: int
     optimizer_options: list[OptimizerFlags]
     generated_schedules: list[list[Dict[str, Any]]]
     current_index: int = 0
-    background_tasks: list[asyncio.Task] = None
-
-    def __post_init__(self):
-        if self.background_tasks is None:
-            self.background_tasks = []
+    background_tasks: list[asyncio.Task] = field(default_factory=list)
 
 
 # Global storage for active sessions
@@ -83,6 +79,8 @@ def cleanup_session(schedule_id: str):
 
     if schedule_id in schedule_sessions:
         session = schedule_sessions[schedule_id]
+
+        assert session.background_tasks is not None
 
         # Cancel all background tasks
         for task in session.background_tasks:
@@ -110,7 +108,7 @@ async def ensure_scheduler_initialized(session_id: str, session: ScheduleSession
     """Ensure the scheduler is initialized for a session."""
     if session.scheduler is not None:
         return
-
+    assert session.scheduler_future is not None
     # Wrap the Future in an asyncio.Future so it can be awaited
     session.scheduler = await asyncio.wrap_future(session.scheduler_future)
 
@@ -118,6 +116,8 @@ async def ensure_scheduler_initialized(session_id: str, session: ScheduleSession
 async def ensure_generator_initialized(session_id: str, session: ScheduleSession):
     """Ensure the generator is initialized for a session."""
     if session.generator is not None:
+        return
+    if session.scheduler is None:
         return
 
     # Create lock for this session if it doesn't exist
@@ -266,8 +266,10 @@ async def get_next_schedule(schedule_id: str):
     try:
         # Get the next model from the scheduler in thread pool
         try:
+            assert session.generator is not None
+            generator = session.generator
             model = await asyncio.wrap_future(
-                z3_executor.submit(lambda: next(session.generator))
+                z3_executor.submit(lambda: next(generator))
             )
         except asyncio.CancelledError:
             logger.warning(
@@ -345,15 +347,18 @@ async def generate_all_schedules(schedule_id: str):
 
             for i in range(remaining):
                 try:
+                    current_task = asyncio.current_task()
                     # Check if we've been cancelled
-                    if asyncio.current_task().cancelled():
+                    if current_task is not None and current_task.cancelled():
                         logger.debug(
                             f"Background generation cancelled for session {schedule_id}"
                         )
                         return
 
+                    assert session.generator is not None
+                    generator = session.generator
                     model = await asyncio.wrap_future(
-                        z3_executor.submit(lambda: next(session.generator))
+                        z3_executor.submit(lambda: next(generator))
                     )
 
                     # Convert model to JSON format with transformation
@@ -372,6 +377,7 @@ async def generate_all_schedules(schedule_id: str):
                     logger.info(
                         f"No more schedules available for session {schedule_id}"
                     )
+                    session.limit = len(session.generated_schedules)
                     break
                 except asyncio.CancelledError:
                     logger.debug(

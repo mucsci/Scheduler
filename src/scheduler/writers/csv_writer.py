@@ -6,7 +6,7 @@ from ..models import CourseInstance
 class CSVWriter:
     """Writer class for CSV output with consistent interface."""
 
-    def __init__(self, filename: str = None):
+    def __init__(self, filename: str | None = None):
         self.filename = filename
         self.schedules = []
 
