@@ -1,4 +1,4 @@
-from typing import Any, List, Optional
+from typing import Any, ClassVar, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -46,9 +46,6 @@ class Duration(BaseModel):
 
     def __repr__(self):
         return self.value
-
-
-MAX_TIME_DIFF_BETWEEN_SLOTS = Duration(duration=50)
 
 
 class TimePoint(BaseModel):
@@ -131,13 +128,11 @@ class TimeInstance(BaseModel):
         }
 
 
-def _diff_between_slots(t1: TimeInstance, t2: TimeInstance) -> Duration:
-    return min(abs(t1.start - t2.stop), abs(t2.start - t1.stop))
-
-
 class TimeSlot(Identifiable):
     times: List[TimeInstance]
     lab_index: Optional[int] = Field(default=None)
+
+    _MAX_TIME_DIFF_BETWEEN_SLOTS : ClassVar[Duration] = Duration(duration=30)
 
     def __hash__(self) -> int:
         return hash(self.id)
@@ -157,37 +152,39 @@ class TimeSlot(Identifiable):
         """
         return self.lab_index is not None
 
-    def labs_next_to(self, other: "TimeSlot") -> bool:
-        if self.lab_index is None or other.lab_index is None:
-            return False
-        if self.times[self.lab_index].day != other.times[other.lab_index].day:
-            return False
+    @staticmethod
+    def _diff_between_slots(t1: TimeInstance, t2: TimeInstance) -> Duration:
+        if t1.day == t2.day:
+            return min(abs(t1.start - t2.stop), abs(t2.start - t1.stop))
+        else:
+            return min(abs(t1.start - t2.start), abs(t1.stop - t2.stop))
 
+    def lab_next_to(self, other: "TimeSlot") -> bool:
+        a = self.lab_time()
+        b = other.lab_time()
+        if a is None or b is None:
+            return False
+        if a.day != b.day:
+            # different days -- check if the times logically overlap
+            return (a.start < b.stop) and (b.start < a.stop) and abs(a.start - b.start) <= TimeSlot._MAX_TIME_DIFF_BETWEEN_SLOTS
         return (
-            _diff_between_slots(
-                self.times[self.lab_index], other.times[other.lab_index]
-            )
-            <= MAX_TIME_DIFF_BETWEEN_SLOTS
+            # same day -- check if the times are within the max time diff
+            TimeSlot._diff_between_slots(a, b) <= TimeSlot._MAX_TIME_DIFF_BETWEEN_SLOTS
         )
 
-    def next_to(self, other: "TimeSlot") -> bool:
+    def lecture_next_to(self, other: "TimeSlot") -> bool:
         """
         Check if a time slot is logically next to another (same day + adjacent or next day + same time)
         """
-        MAX_TIME_DELTA = Duration(duration=50)
-
-        def diff(t1: TimeInstance, t2: TimeInstance) -> Duration:
-            return min(abs(t1.start - t2.stop), abs(t2.start - t1.stop))
-
-        for t1 in self.times:
-            for t2 in other.times:
-                if t1.day == t2.day:
-                    if diff(t1, t2) > MAX_TIME_DELTA:
-                        return False
-                else:
-                    if diff(t1, t2) > MAX_TIME_DELTA:
-                        return False
-        return True
+        for i1, t1 in enumerate(self.times):
+            for i2, t2 in enumerate(other.times):
+                if self.lab_index is None or other.lab_index is None:
+                    continue
+                if i1 == self.lab_index or i2 == other.lab_index:
+                    continue
+                if TimeSlot._diff_between_slots(t1, t2) <= TimeSlot._MAX_TIME_DIFF_BETWEEN_SLOTS:
+                    return True
+        return False
 
     def overlaps(self, other: "TimeSlot") -> bool:
         """
@@ -204,16 +201,6 @@ class TimeSlot(Identifiable):
         if a is None or b is None:
             return False
         return TimeSlot._overlaps(a, b)
-
-    def labs_on_same_day(self, other: "TimeSlot") -> bool:
-        """
-        Returns true IFF the labs of this timeslot and the passed are on the same day
-        """
-        a: Optional[TimeInstance] = self.lab_time()
-        b: Optional[TimeInstance] = other.lab_time()
-        if a is None or b is None:
-            return False
-        return a.day == b.day
 
     @staticmethod
     def _overlaps(a: TimeInstance, b: TimeInstance) -> bool:
