@@ -1,5 +1,4 @@
 from collections import defaultdict
-from dataclasses import dataclass
 from functools import lru_cache
 import itertools
 import json
@@ -362,14 +361,12 @@ class Scheduler:
         self._lab_next_to = lab_next_to
         self._lecture_next_to = lecture_next_to
 
-        all_constraints: list[z3.BoolRef] = []
-        all_constraints.extend(overlaps_C)
-        all_constraints.extend(lab_overlaps_C)
-        all_constraints.extend(lecture_next_to_C)
-        all_constraints.extend(lab_next_to_C)
-        all_constraints.extend(faculty_available_C)
-
-        logger.debug(f"Added {len(all_constraints)} function constraints")
+        function_constraints: list[z3.BoolRef] = []
+        function_constraints.extend(overlaps_C)
+        function_constraints.extend(lab_overlaps_C)
+        function_constraints.extend(lecture_next_to_C)
+        function_constraints.extend(lab_next_to_C)
+        function_constraints.extend(faculty_available_C)
 
         # Pre-compute course groupings to reduce repeated calculations
         faculty_course_map: defaultdict[str, list[Course]] = defaultdict(list)
@@ -391,6 +388,7 @@ class Scheduler:
                         for c in faculty_courses
                     ]
                 )
+                # ensure that each faculty is assigned between min and max credits
                 faculty_constraints.append(
                     cast(
                         z3.BoolRef,
@@ -421,6 +419,7 @@ class Scheduler:
                                 ),
                             )
                         )
+                    # ensure that each faculty is assigned less than or equal to the unique course limit
                     limit = cast(
                         z3.BoolRef,
                         self._simplify(
@@ -433,6 +432,7 @@ class Scheduler:
         # Course constraints with optimized conflict checking - batch generation
         course_constraints: list[z3.BoolRef] = []
         for c in self._courses:
+            # conflict constraints
             conflict_constraints: list[z3.BoolRef] = [
                 cast(z3.BoolRef, z3.Not(overlaps(c.time(), d.time())))
                 for d in self._courses
@@ -532,6 +532,7 @@ class Scheduler:
                     )
                 )
                 if i.course_id == j.course_id:
+                    # when a faculty teaches two sections of the same course, they must use the same room
                     constraint_parts.append(cast(z3.BoolRef, i.room() == j.room()))
 
             # Enforce same lab usage when both courses have labs and can use the same labs
@@ -546,31 +547,34 @@ class Scheduler:
                     )
                 )
                 if i.course_id == j.course_id:
+                    # when a faculty teaches two sections of the same course, they must use the same lab
                     constraint_parts.append(cast(z3.BoolRef, i.lab() == j.lab()))
 
             # Prevent time overlap for courses taught by same faculty
             constraint_parts.append(
                 cast(z3.BoolRef, z3.Not(overlaps(i.time(), j.time())))
             )
-            constraint_parts.append(
-                cast(
-                    z3.BoolRef,
-                    z3.If(
-                        i.course_id == j.course_id,
-                        z3.And(
-                            lecture_next_to(i.time(), j.time()),
-                            lab_next_to(i.time(), j.time()),
-                        ),
-                        z3.And(
-                            z3.Not(lecture_next_to(i.time(), j.time())),
-                            z3.Not(lab_next_to(i.time(), j.time())),
-                        ),
-                    ),
+            if i.course_id == j.course_id:
+                # when a faculty teaches two sections of the same course, they must be next to each other
+                constraint_parts.append(
+                    cast(z3.BoolRef, z3.And(
+                        lecture_next_to(i.time(), j.time()),
+                        lab_next_to(i.time(), j.time()),
+                    ))
                 )
-            )
-
+            else:
+                # when a faculty teaches two sections of different courses, they must not be next to each other
+                constraint_parts.append(
+                    cast(z3.BoolRef, z3.And(
+                        z3.Not(lecture_next_to(i.time(), j.time())),
+                        z3.Not(lab_next_to(i.time(), j.time())),
+                    ))
+                )
+            
             if resource:
+                # add all resource constraints (room, lab, etc.)
                 resource_constraints.append(cast(z3.BoolRef, z3.And(resource)))
+            # add all course constraints when faculty is the same
             resource_constraints.append(
                 cast(
                     z3.BoolRef,
@@ -578,14 +582,14 @@ class Scheduler:
                 )
             )
 
-        for c in faculty_constraints:
+        all_constraints: list[z3.BoolRef] = []
+
+        for c in itertools.chain(function_constraints, faculty_constraints, course_constraints, resource_constraints):
             all_constraints.append(self._simplify(c))
+        
+        logger.debug(f"Added {len(function_constraints)} function constraints")
         logger.debug(f"Added {len(faculty_constraints)} faculty constraints")
-        for c in course_constraints:
-            all_constraints.append(self._simplify(c))
         logger.debug(f"Added {len(course_constraints)} course constraints")
-        for c in resource_constraints:
-            all_constraints.append(self._simplify(c))
         logger.debug(f"Added {len(resource_constraints)} resource constraints")
 
         self._constraints = all_constraints

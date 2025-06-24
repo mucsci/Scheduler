@@ -122,9 +122,9 @@ class TimeInstance(BaseModel):
 
     def as_json(self):
         return {
-            "day": self.day,
-            "start": self.start.timepoint,
-            "duration": self.duration.duration,
+            "day": self.day.as_json(),
+            "start": self.start.as_json(),
+            "duration": self.duration.as_json(),
         }
 
 
