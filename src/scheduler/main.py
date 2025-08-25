@@ -1,6 +1,6 @@
 import click
 
-from .config import SchedulerConfig, TimeSlotConfig, OptimizerFlags
+from .config import CombinedConfig, OptimizerFlags
 from .logging import logger
 from .scheduler import load_config_from_file, Scheduler
 from .writers import JSONWriter, CSVWriter
@@ -15,14 +15,7 @@ def _get_writer(format: str, output_file: str | None) -> JSONWriter | CSVWriter:
 
 @click.command()
 @click.argument("config", type=click.Path(exists=True), required=True)
-@click.option(
-    "--timeslot-config",
-    "-t",
-    type=click.Path(exists=True),
-    default="time_slots.json",
-    help="Path to the time slot configuration file",
-)
-@click.option("--limit", "-l", default=10, help="Maximum number of models to generate")
+@click.option("--limit", "-l", type=int, help="Maximum number of models to generate")
 @click.option(
     "--format",
     "-f",
@@ -40,7 +33,6 @@ def _get_writer(format: str, output_file: str | None) -> JSONWriter | CSVWriter:
 )
 def main(
     config: str,
-    timeslot_config: str,
     limit: int,
     format: str,
     output: str,
@@ -48,11 +40,16 @@ def main(
 ):
     """Generate course schedules using constraint satisfaction solving."""
 
-    logger.info(f"Using limit={limit}")
-    configuration = load_config_from_file(SchedulerConfig, config)
-    time_slot_config = load_config_from_file(TimeSlotConfig, timeslot_config)
+    full_config = load_config_from_file(CombinedConfig, config)
+    if limit is not None:
+        full_config.limit = limit
+    limit = full_config.limit
+    if optimizer_options is not None:
+        full_config.optimizer_flags = optimizer_options
 
-    sched = Scheduler(configuration, time_slot_config)
+    logger.info(f"Using limit={limit}")
+
+    sched = Scheduler(full_config)
     logger.info("Created all constraints")
 
     # Determine output filename
@@ -60,12 +57,7 @@ def main(
 
     # Create appropriate writer
     with _get_writer(format, output_file) as writer:
-        for i, m in enumerate(
-            sched.get_models(
-                limit,
-                optimizer_options=optimizer_options,
-            )
-        ):
+        for i, m in enumerate(sched.get_models()):
             writer.add_schedule(m)
             # For interactive mode (no output file), prompt user
             if not output and i + 1 < limit:

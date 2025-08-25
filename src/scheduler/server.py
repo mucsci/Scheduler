@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from .config import SchedulerConfig, TimeSlotConfig, OptimizerFlags
+from .config import CombinedConfig, OptimizerFlags
 from .scheduler import Scheduler, CourseInstance
 from .logging import logger
 
@@ -24,11 +24,7 @@ z3_executor: ThreadPoolExecutor = ThreadPoolExecutor(
 
 
 # Data models for API requests/responses
-class SubmitRequest(BaseModel):
-    config: Dict[str, Any]
-    time_slot_config: Dict[str, Any]
-    limit: int = 10
-    optimizer_options: list[OptimizerFlags]
+SubmitRequest = CombinedConfig
 
 
 class ScheduleResponse(BaseModel):
@@ -132,11 +128,7 @@ async def ensure_generator_initialized(session_id: str, session: ScheduleSession
         # Initialize generator in thread pool
         try:
             session.generator = await asyncio.wrap_future(
-                z3_executor.submit(
-                    session.scheduler.get_models,
-                    limit=session.limit,
-                    optimizer_options=session.optimizer_options,
-                )
+                z3_executor.submit(session.scheduler.get_models)
             )
             logger.debug(f"Initialized generator for session {session_id}")
         except asyncio.CancelledError:
@@ -185,14 +177,9 @@ app.add_middleware(
 async def submit_schedule(request: SubmitRequest):
     """Submit a new schedule generation request."""
     try:
-        # Parse configurations
-        config = SchedulerConfig(**request.config)
-        time_slot_config = TimeSlotConfig(**request.time_slot_config)
-        optimizer_options = request.optimizer_options
-
         # Create scheduler in thread pool to avoid blocking
         try:
-            scheduler_future = z3_executor.submit(Scheduler, config, time_slot_config)
+            scheduler_future = z3_executor.submit(Scheduler, request)
         except Exception as e:
             logger.error(f"Failed to create scheduler: {e}")
             raise HTTPException(
@@ -211,7 +198,7 @@ async def submit_schedule(request: SubmitRequest):
             time_slot_config=request.time_slot_config,
             limit=request.limit,
             generated_schedules=[],
-            optimizer_options=optimizer_options,
+            optimizer_options=request.optimizer_options,
         )
 
         logger.debug(f"Created new schedule session {schedule_id}")

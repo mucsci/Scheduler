@@ -1,300 +1,233 @@
-# Course Scheduler
+# Course Constraint Scheduler
 
-A constraint satisfaction solver for generating course schedules using Z3 theorem prover.
+A powerful constraint satisfaction solver for generating academic course schedules using the Z3 theorem prover.
+
+## Overview
+
+The Course Constraint Scheduler is designed to solve complex academic scheduling problems by modeling them as constraint satisfaction problems. It can handle:
+
+- **Faculty Constraints**: Availability, credit limits, course preferences
+- **Room Constraints**: Room assignments, lab requirements, capacity limits
+- **Time Constraints**: Time slot conflicts, meeting patterns, duration requirements
+- **Course Constraints**: Prerequisites, conflicts, section limits
+- **Optimization**: Multiple optimization strategies for better schedules
 
 ## Features
 
-- **Constraint Satisfaction**: Uses Z3 theorem prover for optimal schedule generation
-- **Faculty Preferences**: Supports faculty course, room, and lab preferences with granular optimization
-- **Room & Lab Assignment**: Intelligent assignment of rooms and labs with packing optimization
-- **Conflict Resolution**: Handles course conflicts and scheduling constraints
-- **HTTP API**: RESTful API for schedule generation with session management
-- **Concurrent Processing**: Thread pool for handling multiple Z3 operations simultaneously
-- **Performance Optimized**: Aggressive Z3 settings for faster solving
+- **Z3 Integration**: Uses Microsoft's Z3 theorem prover for efficient constraint solving
+- **Flexible Configuration**: JSON-based configuration for easy customization
+- **Multiple Output Formats**: JSON and CSV output support
+- **REST API**: Full HTTP API for integration with web applications
+- **Asynchronous Processing**: Background schedule generation for large problems
+- **Session Management**: Persistent sessions for iterative schedule generation
+- **Optimization Flags**: Configurable optimization strategies
 
-## Installation
+## Quick Start
 
-1. Clone the repository:
+Requires a minimum version of Python 3.12
+
+### Installation
+
 ```bash
-git clone <repository-url>
-cd Sched
+pip install course-constraint-scheduler
 ```
 
-2. Install dependencies:
-```bash
-pip install -e .
-```
-
-## Usage
-
-### Command Line Interface
-
-Generate schedules using the CLI:
+### Command Line Usage
 
 ```bash
-# Using the installed script
-scheduler --config config.json --time-slots time_slots.json --limit 10
+# Generate schedules from configuration file
+scheduler config.json --limit 10 --format json --output schedules
 
-# Or directly with Python
-python -m scheduler.main --config config.json --time-slots time_slots.json --limit 10
+# Interactive mode
+scheduler config.json --limit 5
 ```
 
 ### Python API
 
 ```python
-from scheduler import Scheduler, load_config_from_file, SchedulerConfig, TimeSlotConfig, OptimizerFlags
+from scheduler import Scheduler, load_config_from_file
 
-# Load configurations
-config = load_config_from_file(SchedulerConfig, "config.json")
-time_slot_config = load_config_from_file(TimeSlotConfig, "time_slots.json")
+# Load configuration
+config = load_config_from_file("config.json")
 
-# Create scheduler and generate schedules
-scheduler = Scheduler(config, time_slot_config)
+# Create scheduler
+scheduler = Scheduler(config)
 
-# Use specific optimizer options
-optimizer_options = [
-    OptimizerFlags.FACULTY_COURSE,
-    OptimizerFlags.FACULTY_ROOM,
-    OptimizerFlags.FACULTY_LAB,
-    OptimizerFlags.SAME_ROOM,
-    OptimizerFlags.SAME_LAB,
-    OptimizerFlags.PACK_ROOMS,
-    OptimizerFlags.PACK_LABS
-]
-
-for schedule in scheduler.get_models(limit=5, optimizer_options=optimizer_options):
-    # schedule is a list of CourseInstance objects
-    for course_instance in schedule:
-        print(f"{course_instance.course.course_id}: {course_instance.faculty}")
-        print(f"  Room: {course_instance.room if course_instance.room else 'None'}")
-        print(f"  Lab: {course_instance.lab if course_instance.lab else 'None'}")
-        print(f"  Time: {course_instance.time}")
+# Generate schedules
+for schedule in scheduler.get_models():
+    print(f"Generated schedule: {schedule}")
 ```
 
-### HTTP API Server
-
-Start the HTTP API server:
+### REST API
 
 ```bash
-# Using the installed script with default settings
-scheduler-server
+# Start the server
+scheduler-server --port 8000
 
-# With custom configuration
-scheduler-server --port 8000 --host 0.0.0.0 --log-level info --workers 6
-
-# Or directly with Python
-python -m scheduler.server --port 8000 --workers 6
+# Submit a schedule request
+curl -X POST "http://localhost:8000/submit" \
+  -H "Content-Type: application/json" \
+  -d @example.json
 ```
 
-#### Server Options
+## Documentation
 
-- `--port, -p`: Port to run the server on (default: 8000)
-- `--host, -h`: Host to bind the server to (default: 0.0.0.0)
-- `--log-level, -l`: Log level (debug, info, warning, error, critical) (default: info)
-- `--workers, -w`: Number of Z3 worker threads for concurrent processing (default: 4)
-
-#### Performance Tuning
-
-The server uses a thread pool to handle Z3 operations concurrently. For optimal performance:
-
-- **CPU-bound workloads**: Set workers to number of CPU cores
-- **I/O-bound workloads**: Set workers to 2-4x number of CPU cores
-- **Memory-constrained**: Reduce workers to avoid memory pressure
-
-Example for high-performance server:
-```bash
-scheduler-server --workers 8 --log-level warning
-```
-
-### API Endpoints
-
-#### Submit Schedule Request
-```http
-POST /submit
-Content-Type: application/json
-
-{
-  "config": {
-    "courses": [...],
-    "faculty": [...],
-    "rooms": [...],
-    "labs": [...]
-  },
-  "time_slot_config": {
-    "start_time": "08:00",
-    "end_time": "18:00",
-    "slot_duration": 60,
-    "break_duration": 15
-  },
-  "limit": 10,
-  "optimizer_options": [
-    "faculty_course",
-    "faculty_room",
-    "faculty_lab",
-    "same_room",
-    "same_lab",
-    "pack_rooms",
-    "pack_labs"
-  ]
-}
-```
-
-#### Generate Next Schedule
-```http
-POST /schedules/{schedule_id}/next
-```
-
-#### Get Schedule by Index
-```http
-GET /schedules/{schedule_id}/index/{index}
-```
-
-#### Get Schedule Details
-```http
-GET /schedules/{schedule_id}/details
-```
-
-#### Delete Schedule Session
-```http
-DELETE /schedules/{schedule_id}/delete
-```
-
-#### Health Check
-```http
-GET /health
-```
+- **[Python API Documentation](docs/python_api.md)** - Complete Python API reference
+- **[REST API Documentation](docs/rest_api.md.md)** - Full REST API specification
+- **[Configuration Guide](docs/configuration.md)** - Configuration file format and examples
 
 ## Configuration
 
-### Course Configuration (`config.json`)
+The scheduler uses a JSON configuration file that defines:
+
+- **Rooms and Labs**: Available facilities and their constraints
+- **Courses**: Course requirements, conflicts, and faculty assignments
+- **Faculty**: Availability, preferences, and teaching constraints
+- **Time Slots**: Available time blocks and class patterns
+- **Optimization**: Flags for different optimization strategies
+
+Example configuration:
 
 ```json
 {
-  "courses": [
-    {
-      "course_id": "CS101",
-      "credits": 3,
-      "faculty": ["Dr. Smith"],
-      "room": ["Room A", "Room B"],
-      "lab": ["Lab 1"],
-      "conflicts": []
-    }
-  ],
-  "faculty": [
-    {
-      "name": "Dr. Smith",
-      "maximum_credits": 12,
-      "minimum_credits": 6,
-      "unique_course_limit": 2,
-      "course_preferences": {"CS101": 5},
-      "room_preferences": {"Room A": 5},
-      "lab_preferences": {"Lab 1": 5},
-      "times": {
-        "MON": ["09:00-12:00", "14:00-17:00"],
-        "TUE": ["09:00-12:00", "14:00-17:00"]
+  "config": {
+    "rooms": ["Room A", "Room B"],
+    "labs": ["Lab 1"],
+    "courses": [
+      {
+        "course_id": "CS101",
+        "credits": 3,
+        "room": ["Room A"],
+        "lab": ["Lab 1"],
+        "conflicts": [],
+        "faculty": ["Dr. Smith"]
       }
-    }
-  ],
-  "rooms": ["Room A", "Room B"],
-  "labs": ["Lab 1", "Lab 2"]
+    ],
+    "faculty": [
+      {
+        "name": "Dr. Smith",
+        "maximum_credits": 12,
+        "minimum_credits": 6,
+        "unique_course_limit": 3,
+        "times": {
+          "MON": ["09:00-17:00"],
+          "TUE": ["09:00-17:00"],
+          "WED": ["09:00-17:00"],
+          "THU": ["09:00-17:00"],
+          "FRI": ["09:00-17:00"]
+        }
+      }
+    ]
+  },
+  "time_slot_config": {
+    "times": {
+      "MON": [
+        {
+          "start": "09:00",
+          "spacing": 60,
+          "end": "17:00"
+        }
+      ]
+    },
+    "classes": [
+      {
+        "credits": 3,
+        "meetings": [
+          {
+            "day": "MON",
+            "duration": 150,
+            "lab": false
+          }
+        ]
+      }
+    ]
+  },
+  "limit": 10,
+  "optimizer_flags": ["faculty_course", "pack_rooms"]
 }
 ```
-
-### Time Slot Configuration (`time_slots.json`)
-
-```json
-{
-  "start_time": "08:00",
-  "end_time": "18:00",
-  "slot_duration": 60,
-  "break_duration": 15
-}
-```
-
-## Testing
-
-### Basic API Test
-```bash
-python examples/rest_api.py
-```
-
-### Concurrent Client Test
-```bash
-python examples/concurrent_clients.py
-```
-
-### Stress Test
-```bash
-python examples/stress_test.py
-```
-
-The stress test creates multiple concurrent sessions and generates schedules to test server performance under load.
-
-## Performance Optimizations
-
-### Z3 Configuration
-The scheduler uses aggressive Z3 settings for faster solving:
-
-- **Parallel solving**: Enabled with configurable thread count
-- **Timeouts**: 30-second timeout per solve operation
-- **Resource limits**: Optimized memory and CPU usage
-- **Caching**: Extensive caching of slot relationships and simplifications
-
-### Thread Pool
-- **Concurrent Z3 operations**: Multiple schedule generations can run simultaneously
-- **Configurable workers**: Adjust based on system resources
-- **Non-blocking API**: Async endpoints with thread pool execution
-
-### Memory Management
-- **Session cleanup**: Automatic cleanup of completed sessions
-- **Resource limits**: Z3 resource limits prevent memory exhaustion
-- **Garbage collection**: Aggressive GC settings for faster memory cleanup
 
 ## Architecture
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   HTTP Client   │───▶│  FastAPI Server │───▶│  Thread Pool    │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                │                       │
-                                ▼                       ▼
-                       ┌─────────────────┐    ┌─────────────────┐
-                       │ Session Manager │    │   Z3 Solver     │
-                       └─────────────────┘    └─────────────────┘
-```
+The scheduler is built with a modular architecture:
+
+- **Core Solver**: Z3-based constraint satisfaction engine
+- **Configuration Management**: Pydantic-based configuration validation
+- **Model Classes**: Data structures for courses, faculty, and time slots
+- **Output Writers**: JSON and CSV output formatters
+- **REST Server**: FastAPI-based HTTP API
+- **Session Management**: Persistent session handling for large problems
+
+## Performance
+
+- **Small Problems** (< 10 courses): Near-instantaneous solving
+- **Medium Problems** (10-50 courses): Seconds to minutes
+- **Large Problems** (50+ courses): May take several minutes
+- **Optimization**: Use appropriate optimizer flags to reduce solving time
 
 ## Development
 
+### Setup
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd course-constraint-scheduler
+
+# Install development dependencies
+pip install -e ".[dev]"
+
+# Run tests
+pytest
+
+# Run linting
+ruff check src/
+```
+
 ### Project Structure
+
 ```
 src/scheduler/
-├── __init__.py
-├── main.py              # CLI entry point
-├── server.py            # HTTP API server
-├── scheduler.py         # Core scheduler logic
+├── __init__.py          # Main package exports
 ├── config.py            # Configuration models
-├── time_slot_generator.py
-├── logging.py
+├── main.py              # Command-line interface
+├── scheduler.py         # Core scheduling logic
+├── server.py            # REST API server
 ├── models/              # Data models
-└── writers/             # Output writers
+│   ├── course.py        # Course and instance models
+│   ├── day.py           # Day enumeration
+│   ├── time_slot.py     # Time-related models
+│   └── identifiable.py  # Base identifiable class
+├── writers/             # Output formatters
+│   ├── json_writer.py   # JSON output
+│   └── csv_writer.py    # CSV output
+└── logging.py           # Logging configuration
 ```
 
-## Optimizer Options
+## Contributing
 
-The scheduler supports various optimization strategies that can be enabled individually:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Ensure all tests pass
+6. Submit a pull request
 
-- **`faculty_course`**: Optimize for faculty course preferences (1-5 scale)
-- **`faculty_room`**: Optimize for faculty room preferences (1-5 scale)
-- **`faculty_lab`**: Optimize for faculty lab preferences (1-5 scale)
-- **`same_room`**: Prefer same faculty to use same rooms
-- **`same_lab`**: Prefer same faculty to use same labs
-- **`pack_rooms`**: Pack courses into fewer rooms when possible
-- **`pack_labs`**: Pack courses into fewer labs when possible
+## License
 
-### Faculty Preferences
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-Faculty can now specify preferences for courses, rooms, and labs separately:
+## Support
 
-- **`course_preferences`**: Map of course IDs to preference values (1-5, where 5 is strongly preferred)
-- **`room_preferences`**: Map of room names to preference values (1-5, where 5 is strongly preferred)
-- **`lab_preferences`**: Map of lab names to preference values (1-5, where 5 is strongly preferred)
+For questions, issues, or feature requests:
+
+- Check the documentation
+- Review existing issues
+- Create a new issue with detailed information
+- Include configuration examples and error messages
+
+## Roadmap
+
+- [ ] Web-based configuration interface
+- [ ] Schedule visualization tools
+- [ ] Multi-objective optimization support

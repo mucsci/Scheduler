@@ -27,7 +27,6 @@ class Course(Identifiable):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.section = kwargs.get("section", Course._next_section(self.course_id))
-        ctx = kwargs.get("ctx")
 
         # These will be set by the scheduler after EnumSorts are created
         self._lab = None

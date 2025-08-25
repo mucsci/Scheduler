@@ -3,7 +3,6 @@ from pydantic import BaseModel, Field
 
 
 class Identifiable(BaseModel):
-
     _default_id: ClassVar[int]
     _id: ClassVar[int]
     _all: ClassVar[dict]

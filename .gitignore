@@ -4,10 +4,13 @@
 **/*.pyc
 **/*egg-info*
 
+dist/
+.ruff_cache/
+
 **/*~
 **/#*#
 
 **/*.json
-!time_slots.json
-!sample.json
-!example_rest_config.json
+!example.json
+
+**/.DS_Store

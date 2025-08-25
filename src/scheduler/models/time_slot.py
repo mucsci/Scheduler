@@ -132,7 +132,7 @@ class TimeSlot(Identifiable):
     times: List[TimeInstance]
     lab_index: Optional[int] = Field(default=None)
 
-    _MAX_TIME_DIFF_BETWEEN_SLOTS : ClassVar[Duration] = Duration(duration=30)
+    _MAX_TIME_DIFF_BETWEEN_SLOTS: ClassVar[Duration] = Duration(duration=30)
 
     def __hash__(self) -> int:
         return hash(self.id)
@@ -166,7 +166,11 @@ class TimeSlot(Identifiable):
             return False
         if a.day != b.day:
             # different days -- check if the times logically overlap
-            return (a.start < b.stop) and (b.start < a.stop) and abs(a.start - b.start) <= TimeSlot._MAX_TIME_DIFF_BETWEEN_SLOTS
+            return (
+                (a.start < b.stop)
+                and (b.start < a.stop)
+                and abs(a.start - b.start) <= TimeSlot._MAX_TIME_DIFF_BETWEEN_SLOTS
+            )
         return (
             # same day -- check if the times are within the max time diff
             TimeSlot._diff_between_slots(a, b) <= TimeSlot._MAX_TIME_DIFF_BETWEEN_SLOTS
@@ -182,7 +186,10 @@ class TimeSlot(Identifiable):
                     continue
                 if i1 == self.lab_index or i2 == other.lab_index:
                     continue
-                if TimeSlot._diff_between_slots(t1, t2) <= TimeSlot._MAX_TIME_DIFF_BETWEEN_SLOTS:
+                if (
+                    TimeSlot._diff_between_slots(t1, t2)
+                    <= TimeSlot._MAX_TIME_DIFF_BETWEEN_SLOTS
+                ):
                     return True
         return False
 
@@ -227,7 +234,7 @@ class TimeSlot(Identifiable):
 
     def __str__(self) -> str:
         return ",".join(
-            f'{str(t)}{"^" if i == self.lab_index else ""}'
+            f"{str(t)}{'^' if i == self.lab_index else ''}"
             for i, t in enumerate(self.times)
         )
 

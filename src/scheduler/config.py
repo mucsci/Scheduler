@@ -1,6 +1,5 @@
 from typing import Optional
 
-import json
 from pydantic import BaseModel, Field
 from enum import StrEnum
 
@@ -64,3 +63,10 @@ class OptimizerFlags(StrEnum):
     SAME_LAB = "same_lab"
     PACK_ROOMS = "pack_rooms"
     PACK_LABS = "pack_labs"
+
+
+class CombinedConfig(BaseModel):
+    config: SchedulerConfig
+    time_slot_config: TimeSlotConfig
+    limit: int = Field(default=10)
+    optimizer_flags: list[OptimizerFlags] = Field(default_factory=list)

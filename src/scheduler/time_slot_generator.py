@@ -92,7 +92,6 @@ class TimeSlotGenerator:
 
     @lru_cache(maxsize=1024)
     def time_slots(self, credits: int, *, min_overlap: int) -> list[TimeSlot]:
-
         # Find matching class patterns for the requested credits
         matching_patterns = [
             p for p in self.config.classes if p.credits == credits and not p.disabled

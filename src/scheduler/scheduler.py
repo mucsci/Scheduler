@@ -4,11 +4,12 @@ import itertools
 import json
 import threading
 import time
-from typing import Callable, cast
+from typing import Callable, TypeVar, cast
 
+from pydantic import BaseModel
 import z3
 
-from .config import SchedulerConfig, FacultyConfig, TimeSlotConfig, OptimizerFlags
+from .config import CombinedConfig, FacultyConfig, OptimizerFlags
 from .logging import logger
 from .models import (
     Course,
@@ -22,9 +23,12 @@ from .time_slot_generator import TimeSlotGenerator
 
 DEFAULT_MIN_OVERLAP = 45
 
+T = TypeVar("T", bound=BaseModel)
 
-def load_config_from_file[T: SchedulerConfig | TimeSlotConfig](
-    config_cls: type[T], filename: str
+
+def load_config_from_file(
+    config_cls: type[T],
+    filename: str,
 ) -> T:
     """Load scheduler configuration from a JSON file."""
     with open(filename, encoding="utf-8") as f:
@@ -61,7 +65,7 @@ def get_faculty_availability(
 class Scheduler:
     _init_lock = threading.Lock()
 
-    def __init__(self, config: SchedulerConfig, time_slot_config: TimeSlotConfig):
+    def __init__(self, full_config: CombinedConfig):
         """
         Initialize the scheduler.
 
@@ -69,6 +73,11 @@ class Scheduler:
             config: Configuration object containing courses, faculty, rooms, and labs
             time_slot_config: Time slot configuration object
         """
+
+        config = full_config.config
+        time_slot_config = full_config.time_slot_config
+        self._optimizer_flags = full_config.optimizer_flags
+        self._limit = full_config.limit
 
         self._ctx = z3.Context()
 
@@ -516,7 +525,6 @@ class Scheduler:
         resource_constraints: list[z3.BoolRef] = []
 
         for i, j in course_pairs:
-
             resource: list[z3.BoolRef] = []
             constraint_parts: list[z3.BoolRef] = []
 
@@ -557,20 +565,26 @@ class Scheduler:
             if i.course_id == j.course_id:
                 # when a faculty teaches two sections of the same course, they must be next to each other
                 constraint_parts.append(
-                    cast(z3.BoolRef, z3.And(
-                        lecture_next_to(i.time(), j.time()),
-                        lab_next_to(i.time(), j.time()),
-                    ))
+                    cast(
+                        z3.BoolRef,
+                        z3.And(
+                            lecture_next_to(i.time(), j.time()),
+                            lab_next_to(i.time(), j.time()),
+                        ),
+                    )
                 )
             else:
                 # when a faculty teaches two sections of different courses, they must not be next to each other
                 constraint_parts.append(
-                    cast(z3.BoolRef, z3.And(
-                        z3.Not(lecture_next_to(i.time(), j.time())),
-                        z3.Not(lab_next_to(i.time(), j.time())),
-                    ))
+                    cast(
+                        z3.BoolRef,
+                        z3.And(
+                            z3.Not(lecture_next_to(i.time(), j.time())),
+                            z3.Not(lab_next_to(i.time(), j.time())),
+                        ),
+                    )
                 )
-            
+
             if resource:
                 # add all resource constraints (room, lab, etc.)
                 resource_constraints.append(cast(z3.BoolRef, z3.And(resource)))
@@ -584,9 +598,14 @@ class Scheduler:
 
         all_constraints: list[z3.BoolRef] = []
 
-        for c in itertools.chain(function_constraints, faculty_constraints, course_constraints, resource_constraints):
+        for c in itertools.chain(
+            function_constraints,
+            faculty_constraints,
+            course_constraints,
+            resource_constraints,
+        ):
             all_constraints.append(self._simplify(c))
-        
+
         logger.debug(f"Added {len(function_constraints)} function constraints")
         logger.debug(f"Added {len(faculty_constraints)} faculty constraints")
         logger.debug(f"Added {len(course_constraints)} course constraints")
@@ -631,8 +650,6 @@ class Scheduler:
 
     def _update(self, s: z3.Optimize):
         m: z3.ModelRef = s.model()
-        constraints = []
-
         rearranged = []
         per_course = []
         # group courses by faculty first
@@ -669,9 +686,7 @@ class Scheduler:
             )
             s.add(z3.Or(per_course))
 
-    def get_models(
-        self, limit=10, optimizer_options: list[OptimizerFlags] | None = None
-    ):
+    def get_models(self):
         """
         Generate schedule models.
 
@@ -699,11 +714,7 @@ class Scheduler:
             s.add(c)
 
         # Add faculty preferences as optimization goals with improved caching - only if requested
-        if (
-            optimizer_options is not None
-            and OptimizerFlags.FACULTY_COURSE in optimizer_options
-        ):
-
+        if OptimizerFlags.FACULTY_COURSE in self._optimizer_flags:
             course_preference_terms = []
             for faculty_name, preferences in self._faculty_course_preferences.items():
                 if not preferences:  # Skip faculty with no preferences
@@ -725,10 +736,7 @@ class Scheduler:
                 )
                 s.maximize(z3.Sum(course_preference_terms))
 
-        if (
-            optimizer_options is not None
-            and OptimizerFlags.FACULTY_ROOM in optimizer_options
-        ):
+        if OptimizerFlags.FACULTY_ROOM in self._optimizer_flags:
             room_preference_terms = []
             for faculty_name, preferences in self._faculty_room_preferences.items():
                 if not preferences:  # Skip faculty with no preferences
@@ -756,10 +764,7 @@ class Scheduler:
                 )
                 s.maximize(z3.Sum(room_preference_terms))
 
-        if (
-            optimizer_options is not None
-            and OptimizerFlags.FACULTY_LAB in optimizer_options
-        ):
+        if OptimizerFlags.FACULTY_LAB in self._optimizer_flags:
             lab_preference_terms = []
             for faculty_name, preferences in self._faculty_lab_preferences.items():
                 if not preferences:  # Skip faculty with no preferences
@@ -828,34 +833,18 @@ class Scheduler:
                             )
                         )
 
-            if (
-                optimizer_options is not None
-                and same_rooms
-                and OptimizerFlags.SAME_ROOM in optimizer_options
-            ):
+            if same_rooms and OptimizerFlags.SAME_ROOM in self._optimizer_flags:
                 logger.debug(f"Adding {len(same_rooms)} same room optimization goals")
                 s.maximize(z3.Sum(same_rooms))
-            if (
-                optimizer_options is not None
-                and same_labs
-                and OptimizerFlags.SAME_LAB in optimizer_options
-            ):
+            if same_labs and OptimizerFlags.SAME_LAB in self._optimizer_flags:
                 logger.debug(f"Adding {len(same_labs)} same lab optimization goals")
                 s.maximize(z3.Sum(same_labs))
-            if (
-                optimizer_options is not None
-                and packing_rooms
-                and OptimizerFlags.PACK_ROOMS in optimizer_options
-            ):
+            if packing_rooms and OptimizerFlags.PACK_ROOMS in self._optimizer_flags:
                 logger.debug(
                     f"Adding {len(packing_rooms)} room packing optimization goals"
                 )
                 s.maximize(z3.Sum(packing_rooms))
-            if (
-                optimizer_options is not None
-                and packing_labs
-                and OptimizerFlags.PACK_LABS in optimizer_options
-            ):
+            if packing_labs and OptimizerFlags.PACK_LABS in self._optimizer_flags:
                 logger.debug(
                     f"Adding {len(packing_labs)} lab packing optimization goals"
                 )
@@ -867,13 +856,13 @@ class Scheduler:
                 "Skipping optimization goals",
             )
 
-        for i in range(limit):
+        for i in range(self._limit):
             start_time = time.time()
             if s.check() == z3.sat:
                 generation_time = time.time() - start_time
                 logger.info(f"Schedule {i + 1} generation took {generation_time:.2f}s")
                 yield self._get_schedule(s.model())
-                if i < limit - 1:
+                if i < self._limit - 1:
                     self._update(s)
                     i += 1
             else:
