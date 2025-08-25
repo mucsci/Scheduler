@@ -1,13 +1,14 @@
-from collections import defaultdict
-from functools import lru_cache
 import itertools
 import json
 import threading
 import time
-from typing import Callable, TypeVar, cast
+from collections import defaultdict
+from collections.abc import Callable
+from functools import cache
+from typing import cast
 
+import z3  # type: ignore
 from pydantic import BaseModel
-import z3
 
 from .config import CombinedConfig, FacultyConfig, OptimizerFlags
 from .logging import logger
@@ -23,10 +24,8 @@ from .time_slot_generator import TimeSlotGenerator
 
 DEFAULT_MIN_OVERLAP = 45
 
-T = TypeVar("T", bound=BaseModel)
 
-
-def load_config_from_file(
+def load_config_from_file[T: BaseModel](
     config_cls: type[T],
     filename: str,
 ) -> T:
@@ -96,17 +95,11 @@ class Scheduler:
             self._faculty.add(faculty_name)
             self._faculty_maximum_credits[faculty_name] = faculty_data.maximum_credits
             self._faculty_minimum_credits[faculty_name] = faculty_data.minimum_credits
-            self._faculty_unique_course_limits[faculty_name] = (
-                faculty_data.unique_course_limit
-            )
-            self._faculty_course_preferences[faculty_name] = (
-                faculty_data.course_preferences
-            )
+            self._faculty_unique_course_limits[faculty_name] = faculty_data.unique_course_limit
+            self._faculty_course_preferences[faculty_name] = faculty_data.course_preferences
             self._faculty_room_preferences[faculty_name] = faculty_data.room_preferences
             self._faculty_lab_preferences[faculty_name] = faculty_data.lab_preferences
-            self._faculty_availability[faculty_name] = get_faculty_availability(
-                faculty_data
-            )
+            self._faculty_availability[faculty_name] = get_faculty_availability(faculty_data)
 
         self._rooms: set[str] = set(config.rooms)
 
@@ -115,7 +108,7 @@ class Scheduler:
         self._courses: list[Course] = []
 
         required_credits = set()
-        course_counts = defaultdict(int)
+        course_counts: dict[str, int] = defaultdict(int)
 
         for c in config.courses:
             course_counts[c.course_id] += 1
@@ -138,9 +131,7 @@ class Scheduler:
             )
             self._courses.append(course)
 
-        self._time_slot_generator: TimeSlotGenerator = TimeSlotGenerator(
-            time_slot_config
-        )
+        self._time_slot_generator: TimeSlotGenerator = TimeSlotGenerator(time_slot_config)
 
         self._ranges: dict[int, tuple[int, int]] = dict()
         self._slots: list[TimeSlot] = list()
@@ -177,9 +168,7 @@ class Scheduler:
 
         # Create Faculty EnumSort using names
         faculty_names = [sanitize(faculty) for faculty in self._faculty]
-        self._faculty_sort, faculty_constants = z3.EnumSort(
-            "Faculty", faculty_names, ctx=self._ctx
-        )
+        self._faculty_sort, faculty_constants = z3.EnumSort("Faculty", faculty_names, ctx=self._ctx)
         self._faculty_constants = {
             faculty: faculty_constants[i] for i, faculty in enumerate(self._faculty)
         }
@@ -190,9 +179,7 @@ class Scheduler:
         # Create Room EnumSort using names
         room_names = [sanitize(room) for room in self._rooms]
         self._room_sort, room_constants = z3.EnumSort("Room", room_names, ctx=self._ctx)
-        self._room_constants = {
-            room: room_constants[i] for i, room in enumerate(self._rooms)
-        }
+        self._room_constants = {room: room_constants[i] for i, room in enumerate(self._rooms)}
         self._room_constant_to_name = {
             room_constants[i]: room for i, room in enumerate(self._rooms)
         }
@@ -200,12 +187,8 @@ class Scheduler:
         # Create Lab EnumSort using names
         lab_names = [sanitize(lab) for lab in self._labs]
         self._lab_sort, lab_constants = z3.EnumSort("Lab", lab_names, ctx=self._ctx)
-        self._lab_constants = {
-            lab: lab_constants[i] for i, lab in enumerate(self._labs)
-        }
-        self._lab_constant_to_name = {
-            lab_constants[i]: lab for i, lab in enumerate(self._labs)
-        }
+        self._lab_constants = {lab: lab_constants[i] for i, lab in enumerate(self._labs)}
+        self._lab_constant_to_name = {lab_constants[i]: lab for i, lab in enumerate(self._labs)}
 
         # Create course variables using EnumSorts
         for course in self._courses:
@@ -214,15 +197,13 @@ class Scheduler:
             course._room = z3.Const(f"{str(course)}_room", self._room_sort)
             course._lab = z3.Const(f"{str(course)}_lab", self._lab_sort)
 
-    @lru_cache(maxsize=None)
+    @cache
     def _simplify(self, x: z3.ExprRef) -> z3.BoolRef:
         """Cached simplification to avoid redundant computation"""
         return cast(z3.BoolRef, z3.simplify(x, cache_all=True, local_ctx=True))
 
-    @lru_cache(maxsize=None)
-    def _cached_slot_relationship(
-        self, fn_name: str, slot_i: TimeSlot, slot_j: TimeSlot
-    ) -> bool:
+    @cache
+    def _cached_slot_relationship(self, fn_name: str, slot_i: TimeSlot, slot_j: TimeSlot) -> bool:
         if fn_name == "overlaps":
             return slot_i.overlaps(slot_j)
         elif fn_name == "lab_overlaps":
@@ -265,9 +246,7 @@ class Scheduler:
 
         constraints: list[z3.BoolRef] = []
         if true:
-            constraints.append(
-                cast(z3.BoolRef, z3.And([z3fn(ts_i, ts_j) for ts_i, ts_j in true]))
-            )
+            constraints.append(cast(z3.BoolRef, z3.And([z3fn(ts_i, ts_j) for ts_i, ts_j in true])))
         if false:
             constraints.append(
                 cast(
@@ -299,9 +278,7 @@ class Scheduler:
         if true:
             constraints.append(cast(z3.BoolRef, z3.And([z3fn(ts) for ts in true])))
         if false:
-            constraints.append(
-                cast(z3.BoolRef, z3.And([z3.Not(z3fn(ts)) for ts in false]))
-            )
+            constraints.append(cast(z3.BoolRef, z3.And([z3.Not(z3fn(ts)) for ts in false])))
         return z3fn, constraints
 
     def _z3ify_faculty_time_constraint(
@@ -343,9 +320,7 @@ class Scheduler:
                 constraints.append(
                     cast(
                         z3.BoolRef,
-                        z3.And(
-                            [z3.Not(z3fn(faculty, slot)) for faculty, slot in false]
-                        ),
+                        z3.And([z3.Not(z3fn(faculty, slot)) for faculty, slot in false]),
                     )
                 )
 
@@ -354,18 +329,14 @@ class Scheduler:
     def _build_constraints(self):
         # abstract function constraints
         overlaps, overlaps_C = self._z3ify_time_constraint("overlaps", ctx=self._ctx)
-        lab_overlaps, lab_overlaps_C = self._z3ify_time_constraint(
-            "lab_overlaps", ctx=self._ctx
-        )
+        lab_overlaps, lab_overlaps_C = self._z3ify_time_constraint("lab_overlaps", ctx=self._ctx)
         lecture_next_to, lecture_next_to_C = self._z3ify_time_constraint(
             "lecture_next_to", ctx=self._ctx
         )
         faculty_available, faculty_available_C = self._z3ify_faculty_time_constraint(
             "faculty_available", ctx=self._ctx
         )
-        lab_next_to, lab_next_to_C = self._z3ify_time_constraint(
-            "lab_next_to", ctx=self._ctx
-        )
+        lab_next_to, lab_next_to_C = self._z3ify_time_constraint("lab_next_to", ctx=self._ctx)
 
         self._lab_next_to = lab_next_to
         self._lecture_next_to = lecture_next_to
@@ -392,10 +363,7 @@ class Scheduler:
                 min_credits = self._faculty_minimum_credits[faculty]
                 max_credits = self._faculty_maximum_credits[faculty]
                 credit_sum = z3.Sum(
-                    [
-                        z3.If(c.faculty() == faculty_constant, c.credits, 0)
-                        for c in faculty_courses
-                    ]
+                    [z3.If(c.faculty() == faculty_constant, c.credits, 0) for c in faculty_courses]
                 )
                 # ensure that each faculty is assigned between min and max credits
                 faculty_constraints.append(
@@ -420,20 +388,14 @@ class Scheduler:
                         teaches_course.append(
                             cast(
                                 z3.BoolRef,
-                                z3.Or(
-                                    [
-                                        c.faculty() == faculty_constant
-                                        for c in course_group
-                                    ]
-                                ),
+                                z3.Or([c.faculty() == faculty_constant for c in course_group]),
                             )
                         )
-                    # ensure that each faculty is assigned less than or equal to the unique course limit
+                    # ensure that each faculty is assigned <= unique course limit
                     limit = cast(
                         z3.BoolRef,
                         self._simplify(
-                            z3.Sum([z3.If(tc, 1, 0) for tc in teaches_course])
-                            <= unique_limit
+                            z3.Sum([z3.If(tc, 1, 0) for tc in teaches_course]) <= unique_limit
                         ),
                     )
                     faculty_constraints.append(limit)
@@ -455,9 +417,7 @@ class Scheduler:
 
             # Get valid time slots for this credit level
             start, stop = self._ranges[c.credits]
-            valid_time_slots = [
-                slot for slot in self._slots if start <= cast(int, slot.id) <= stop
-            ]
+            valid_time_slots = [slot for slot in self._slots if start <= cast(int, slot.id) <= stop]
             if valid_time_slots:
                 # Constrain time to valid slots for this credit level
                 course_constraint_list.append(
@@ -514,9 +474,7 @@ class Scheduler:
                     )
                 )
             if conflict_constraints:
-                course_constraint_list.append(
-                    cast(z3.BoolRef, z3.And(conflict_constraints))
-                )
+                course_constraint_list.append(cast(z3.BoolRef, z3.And(conflict_constraints)))
 
             course_constraints.append(cast(z3.BoolRef, z3.And(course_constraint_list)))
 
@@ -540,7 +498,8 @@ class Scheduler:
                     )
                 )
                 if i.course_id == j.course_id:
-                    # when a faculty teaches two sections of the same course, they must use the same room
+                    # when a faculty teaches two sections of the same course,
+                    # they must use the same room
                     constraint_parts.append(cast(z3.BoolRef, i.room() == j.room()))
 
             # Enforce same lab usage when both courses have labs and can use the same labs
@@ -555,15 +514,15 @@ class Scheduler:
                     )
                 )
                 if i.course_id == j.course_id:
-                    # when a faculty teaches two sections of the same course, they must use the same lab
+                    # when a faculty teaches two sections of the same course,
+                    # they must use the same lab
                     constraint_parts.append(cast(z3.BoolRef, i.lab() == j.lab()))
 
             # Prevent time overlap for courses taught by same faculty
-            constraint_parts.append(
-                cast(z3.BoolRef, z3.Not(overlaps(i.time(), j.time())))
-            )
+            constraint_parts.append(cast(z3.BoolRef, z3.Not(overlaps(i.time(), j.time()))))
             if i.course_id == j.course_id:
-                # when a faculty teaches two sections of the same course, they must be next to each other
+                # when a faculty teaches two sections of the same course,
+                # they must be next to each other
                 constraint_parts.append(
                     cast(
                         z3.BoolRef,
@@ -574,7 +533,8 @@ class Scheduler:
                     )
                 )
             else:
-                # when a faculty teaches two sections of different courses, they must not be next to each other
+                # when a faculty teaches two sections of different courses,
+                # they must not be next to each other
                 constraint_parts.append(
                     cast(
                         z3.BoolRef,
@@ -627,9 +587,7 @@ class Scheduler:
         schedule = []
         for course in self._courses:
             time = TimeSlot.get(int(str(model.eval(course.time())).split("_")[1]))
-            faculty = self._faculty_constant_to_name.get(
-                model.eval(course.faculty()), None
-            )
+            faculty = self._faculty_constant_to_name.get(model.eval(course.faculty()), None)
             room = self._room_constant_to_name.get(model.eval(course.room()), None)
             lab = self._lab_constant_to_name.get(model.eval(course.lab()), None)
 
@@ -653,10 +611,10 @@ class Scheduler:
         rearranged = []
         per_course = []
         # group courses by faculty first
-        for _, group in itertools.groupby(self._courses, key=lambda x: m[x.faculty()]):
-            group = list(group)
-            for _, cs in itertools.groupby(group, key=lambda x: x.course_id):
-                cs = list(cs)
+        for _, group_iter in itertools.groupby(self._courses, key=lambda x: m[x.faculty()]):
+            group = list(group_iter)
+            for _, cs_iter in itertools.groupby(group, key=lambda x: x.course_id):
+                cs = list(cs_iter)
                 if len(cs) > 1:
                     rearranged.append(
                         z3.And(
@@ -681,9 +639,7 @@ class Scheduler:
             )
             s.add(z3.And(rearranged))
         if per_course:
-            logger.debug(
-                f"Adding 1 per-course constraint with {len(per_course)} predicates"
-            )
+            logger.debug(f"Adding 1 per-course constraint with {len(per_course)} predicates")
             s.add(z3.Or(per_course))
 
     def get_models(self):
@@ -723,16 +679,20 @@ class Scheduler:
                 faculty_constant = self._faculty_constants[faculty_name]
                 for course in self._courses:
                     if course.course_id in preferences:
-                        # Use preference value directly (1-5 scale where 5 is strongly prefer, 1 is weakest)
+                        # Use preference value directly
+                        # (1-5 scale where 5 is strongly prefer, 1 is weakest)
                         preference_value = preferences[course.course_id]
                         term = z3.If(
-                            course.faculty() == faculty_constant, preference_value, 0
+                            course.faculty() == faculty_constant,
+                            preference_value,
+                            0,
                         )
                         course_preference_terms.append(term)
 
             if course_preference_terms:
+                n = len(course_preference_terms)
                 logger.debug(
-                    f"Adding {len(course_preference_terms)} faculty course preference optimization goals",
+                    f"Adding {n} faculty course preference optimization goals",
                 )
                 s.maximize(z3.Sum(course_preference_terms))
 
@@ -759,8 +719,9 @@ class Scheduler:
                             room_preference_terms.append(term)
 
             if room_preference_terms:
+                n = len(room_preference_terms)
                 logger.debug(
-                    f"Adding {len(room_preference_terms)} faculty room preference optimization goals",
+                    f"Adding {n} faculty room preference optimization goals",
                 )
                 s.maximize(z3.Sum(room_preference_terms))
 
@@ -817,9 +778,7 @@ class Scheduler:
                         )
                 if set(i.labs) & set(j.labs):
                     same_labs.append(
-                        z3.If(
-                            z3.And(i.faculty() == j.faculty(), i.lab() == j.lab()), 1, 0
-                        )
+                        z3.If(z3.And(i.faculty() == j.faculty(), i.lab() == j.lab()), 1, 0)
                     )
                     if i.course_id != j.course_id:
                         packing_labs.append(
@@ -840,14 +799,10 @@ class Scheduler:
                 logger.debug(f"Adding {len(same_labs)} same lab optimization goals")
                 s.maximize(z3.Sum(same_labs))
             if packing_rooms and OptimizerFlags.PACK_ROOMS in self._optimizer_flags:
-                logger.debug(
-                    f"Adding {len(packing_rooms)} room packing optimization goals"
-                )
+                logger.debug(f"Adding {len(packing_rooms)} room packing optimization goals")
                 s.maximize(z3.Sum(packing_rooms))
             if packing_labs and OptimizerFlags.PACK_LABS in self._optimizer_flags:
-                logger.debug(
-                    f"Adding {len(packing_labs)} lab packing optimization goals"
-                )
+                logger.debug(f"Adding {len(packing_labs)} lab packing optimization goals")
                 s.maximize(z3.Sum(packing_labs))
 
             logger.info("Created all optimization goals")

@@ -1,7 +1,6 @@
-from typing import Optional
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
-from enum import StrEnum
 
 
 class TimeBlock(BaseModel):
@@ -13,14 +12,14 @@ class TimeBlock(BaseModel):
 class Meeting(BaseModel):
     day: str
     duration: int
-    lab: Optional[bool] = Field(default=False)
+    lab: bool | None = Field(default=False)
 
 
 class ClassPattern(BaseModel):
     credits: int
     meetings: list[Meeting]
-    disabled: Optional[bool] = Field(default=False)
-    start_time: Optional[str] = Field(default=None)
+    disabled: bool | None = Field(default=False)
+    start_time: str | None = Field(default=None)
 
 
 class TimeSlotConfig(BaseModel):

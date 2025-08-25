@@ -1,23 +1,23 @@
 from collections import defaultdict
-from typing import DefaultDict, List, ClassVar, Optional, cast
+from typing import ClassVar, cast
+
+import z3  # type: ignore
 from pydantic import BaseModel, Field
 
-import z3
-
-from .time_slot import TimeSlot
 from .identifiable import Identifiable
+from .time_slot import TimeSlot
 
 
 class Course(Identifiable):
     credits: int
     course_id: str
     section: int | None = Field(default=None)
-    labs: List[str]
-    rooms: List[str]
-    conflicts: List[str]
-    faculties: List[str]
+    labs: list[str]
+    rooms: list[str]
+    conflicts: list[str]
+    faculties: list[str]
 
-    _total_sections: ClassVar[DefaultDict[str, int]] = defaultdict(int)
+    _total_sections: ClassVar[defaultdict[str, int]] = defaultdict(int)
 
     _lab: z3.ExprRef | None
     _room: z3.ExprRef | None
@@ -74,8 +74,8 @@ class CourseInstance(BaseModel):
     course: Course
     time: TimeSlot
     faculty: str
-    room: Optional[str] = Field(default=None)
-    lab: Optional[str] = Field(default=None)
+    room: str | None = Field(default=None)
+    lab: str | None = Field(default=None)
 
     def as_json(self):
         object = {}

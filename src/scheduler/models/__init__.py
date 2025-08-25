@@ -1,7 +1,7 @@
-from .identifiable import Identifiable
-from .day import Day
 from .course import Course, CourseInstance
-from .time_slot import TimeSlot, TimeInstance, TimePoint, Duration
+from .day import Day
+from .identifiable import Identifiable
+from .time_slot import Duration, TimeInstance, TimePoint, TimeSlot
 
 __all__ = [
     "Identifiable",

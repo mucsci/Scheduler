@@ -1,26 +1,25 @@
-import uuid
 import asyncio
-from typing import Dict, Any, Generator
-from dataclasses import dataclass, field
+import uuid
+from collections.abc import Generator
+from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import asynccontextmanager
-from concurrent.futures import ThreadPoolExecutor, Future
+from dataclasses import dataclass, field
+from typing import Any
 
 import click
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .config import CombinedConfig, OptimizerFlags
-from .scheduler import Scheduler, CourseInstance
 from .logging import logger
+from .scheduler import CourseInstance, Scheduler
 
 # Lock for generator initialization
-generator_locks: Dict[str, asyncio.Lock] = {}
+generator_locks: dict[str, asyncio.Lock] = {}
 
 # Global thread pool executor for Z3 operations
-z3_executor: ThreadPoolExecutor = ThreadPoolExecutor(
-    max_workers=16, thread_name_prefix="z3-solver"
-)
+z3_executor: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=16, thread_name_prefix="z3-solver")
 
 
 # Data models for API requests/responses
@@ -29,17 +28,13 @@ SubmitRequest = CombinedConfig
 
 class ScheduleResponse(BaseModel):
     schedule_id: str
-    schedule: list[Dict[str, Any]]
+    schedule: list[dict[str, Any]]
     index: int
     total_generated: int
 
 
-class ScheduleDetails(BaseModel):
+class ScheduleDetails(CombinedConfig):
     schedule_id: str
-    config: Dict[str, Any]
-    time_slot_config: Dict[str, Any]
-    limit: int
-    optimizer_options: list[OptimizerFlags]
     total_generated: int
 
 
@@ -52,20 +47,17 @@ class ErrorResponse(BaseModel):
 class ScheduleSession:
     """Represents an active schedule generation session."""
 
-    scheduler: None | Scheduler
-    scheduler_future: None | Future[Scheduler]
-    generator: None | Generator[list[CourseInstance], None, None]
-    config: Dict[str, Any]
-    time_slot_config: Dict[str, Any]
-    limit: int
-    optimizer_options: list[OptimizerFlags]
-    generated_schedules: list[list[Dict[str, Any]]]
+    scheduler: Scheduler | None
+    scheduler_future: Future[Scheduler | None] | None
+    generator: Generator[list[CourseInstance], None, None] | None
+    full_config: CombinedConfig
+    generated_schedules: list[list[dict[str, Any]]]
     current_index: int = 0
     background_tasks: list[asyncio.Task] = field(default_factory=list)
 
 
 # Global storage for active sessions
-schedule_sessions: Dict[str, ScheduleSession] = {}
+schedule_sessions: dict[str, ScheduleSession] = {}
 
 
 def cleanup_session(schedule_id: str):
@@ -87,9 +79,7 @@ def cleanup_session(schedule_id: str):
         del schedule_sessions[schedule_id]
         logger.debug(f"Removed session {schedule_id} from schedule_sessions")
     else:
-        logger.warning(
-            f"Session {schedule_id} not found in schedule_sessions during cleanup"
-        )
+        logger.warning(f"Session {schedule_id} not found in schedule_sessions during cleanup")
 
     # Clean up the lock too
     if schedule_id in generator_locks:
@@ -132,14 +122,10 @@ async def ensure_generator_initialized(session_id: str, session: ScheduleSession
             )
             logger.debug(f"Initialized generator for session {session_id}")
         except asyncio.CancelledError:
-            logger.warning(
-                f"Generator initialization was cancelled for session {session_id}"
-            )
+            logger.warning(f"Generator initialization was cancelled for session {session_id}")
             raise HTTPException(status_code=408, detail="Request timeout")
         except Exception as e:
-            logger.error(
-                f"Failed to initialize generator for session {session_id}: {e}"
-            )
+            logger.error(f"Failed to initialize generator for session {session_id}: {e}")
             raise HTTPException(
                 status_code=500, detail=f"Generator initialization failed: {str(e)}"
             )
@@ -173,7 +159,7 @@ app.add_middleware(
 )
 
 
-@app.post("/submit", response_model=Dict[str, str])
+@app.post("/submit", response_model=dict[str, str])
 async def submit_schedule(request: SubmitRequest):
     """Submit a new schedule generation request."""
     try:
@@ -182,9 +168,7 @@ async def submit_schedule(request: SubmitRequest):
             scheduler_future = z3_executor.submit(Scheduler, request)
         except Exception as e:
             logger.error(f"Failed to create scheduler: {e}")
-            raise HTTPException(
-                status_code=500, detail=f"Scheduler creation failed: {str(e)}"
-            )
+            raise HTTPException(status_code=500, detail=f"Scheduler creation failed: {str(e)}")
 
         # Generate unique ID for this session
         schedule_id = str(uuid.uuid4())
@@ -192,13 +176,10 @@ async def submit_schedule(request: SubmitRequest):
         # Store session
         schedule_sessions[schedule_id] = ScheduleSession(
             scheduler=None,
-            scheduler_future=scheduler_future,
+            scheduler_future=scheduler_future,  # type: ignore
             generator=None,
-            config=request.config,
-            time_slot_config=request.time_slot_config,
-            limit=request.limit,
+            full_config=request,
             generated_schedules=[],
-            optimizer_options=request.optimizer_options,
         )
 
         logger.debug(f"Created new schedule session {schedule_id}")
@@ -225,10 +206,7 @@ async def get_schedule_details(schedule_id: str):
 
     return ScheduleDetails(
         schedule_id=schedule_id,
-        config=session.config,
-        time_slot_config=session.time_slot_config,
-        limit=session.limit,
-        optimizer_options=session.optimizer_options,
+        **session.full_config.model_dump(),
         total_generated=len(session.generated_schedules),
     )
 
@@ -245,9 +223,9 @@ async def get_next_schedule(schedule_id: str):
     await ensure_generator_initialized(schedule_id, session)
 
     # Check if we've already generated all schedules
-    if len(session.generated_schedules) >= session.limit:
+    if len(session.generated_schedules) >= session.full_config.limit:
         raise HTTPException(
-            status_code=400, detail=f"All {session.limit} schedules have been generated"
+            status_code=400, detail=f"All {session.full_config.limit} schedules have been generated"
         )
 
     try:
@@ -255,13 +233,9 @@ async def get_next_schedule(schedule_id: str):
         try:
             assert session.generator is not None
             generator = session.generator
-            model = await asyncio.wrap_future(
-                z3_executor.submit(lambda: next(generator))
-            )
+            model = await asyncio.wrap_future(z3_executor.submit(lambda: next(generator)))
         except asyncio.CancelledError:
-            logger.warning(
-                f"Schedule generation was cancelled for session {schedule_id}"
-            )
+            logger.warning(f"Schedule generation was cancelled for session {schedule_id}")
             raise HTTPException(status_code=408, detail="Request timeout")
         except StopIteration:
             logger.info(f"No more schedules available for session {schedule_id}")
@@ -270,13 +244,9 @@ async def get_next_schedule(schedule_id: str):
             # Check if this is a StopIteration that was wrapped by the thread pool
             if "StopIteration" in str(e):
                 logger.info(f"No more schedules available for session {schedule_id}")
-                raise HTTPException(
-                    status_code=400, detail="No more schedules available"
-                )
+                raise HTTPException(status_code=400, detail="No more schedules available")
             logger.error(f"Failed to generate schedule for session {schedule_id}: {e}")
-            raise HTTPException(
-                status_code=500, detail=f"Schedule generation failed: {str(e)}"
-            )
+            raise HTTPException(status_code=500, detail=f"Schedule generation failed: {str(e)}")
 
         # Convert model to JSON format with transformation
         schedule_data = [course_instance.as_json() for course_instance in model]
@@ -285,9 +255,7 @@ async def get_next_schedule(schedule_id: str):
         session.generated_schedules.append(schedule_data)
         current_index = len(session.generated_schedules) - 1
 
-        logger.debug(
-            f"Generated schedule {current_index + 1} for session {schedule_id}"
-        )
+        logger.debug(f"Generated schedule {current_index + 1} for session {schedule_id}")
 
         return ScheduleResponse(
             schedule_id=schedule_id,
@@ -301,9 +269,7 @@ async def get_next_schedule(schedule_id: str):
         raise
     except Exception as e:
         logger.error(f"Error generating next schedule for {schedule_id}: {e}")
-        raise HTTPException(
-            status_code=500, detail=f"Error generating schedule: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Error generating schedule: {str(e)}")
 
 
 @app.post("/schedules/{schedule_id}/generate_all")
@@ -318,16 +284,16 @@ async def generate_all_schedules(schedule_id: str):
     await ensure_generator_initialized(schedule_id, session)
 
     # Check if we've already generated all schedules
-    if len(session.generated_schedules) >= session.limit:
+    if len(session.generated_schedules) >= session.full_config.limit:
         raise HTTPException(
             status_code=400,
-            detail=f"All {session.limit} schedules have already been generated",
+            detail=f"All {session.full_config.limit} schedules have already been generated",
         )
 
     # Start background task to generate all remaining schedules
     async def generate_all_background():
         try:
-            remaining = session.limit - len(session.generated_schedules)
+            remaining = session.full_config.limit - len(session.generated_schedules)
             logger.info(
                 f"Starting background generation of {remaining} schedules for session {schedule_id}"
             )
@@ -337,48 +303,37 @@ async def generate_all_schedules(schedule_id: str):
                     current_task = asyncio.current_task()
                     # Check if we've been cancelled
                     if current_task is not None and current_task.cancelled():
-                        logger.debug(
-                            f"Background generation cancelled for session {schedule_id}"
-                        )
+                        logger.debug(f"Background generation cancelled for session {schedule_id}")
                         return
 
                     assert session.generator is not None
                     generator = session.generator
-                    model = await asyncio.wrap_future(
-                        z3_executor.submit(lambda: next(generator))
-                    )
+                    model = await asyncio.wrap_future(z3_executor.submit(lambda: next(generator)))
 
                     # Convert model to JSON format with transformation
-                    schedule_data = [
-                        course_instance.as_json() for course_instance in model
-                    ]
+                    schedule_data = [course_instance.as_json() for course_instance in model]
 
                     # Store the generated schedule immediately
                     session.generated_schedules.append(schedule_data)
-
-                    logger.debug(
-                        f"Generated schedule {len(session.generated_schedules)} for session {schedule_id}"
-                    )
+                    n = len(session.generated_schedules)
+                    logger.debug(f"Generated schedule {n} for session {schedule_id}")
 
                 except StopIteration:
-                    logger.info(
-                        f"No more schedules available for session {schedule_id}"
-                    )
-                    session.limit = len(session.generated_schedules)
+                    logger.info(f"No more schedules available for session {schedule_id}")
+                    session.full_config.limit = len(session.generated_schedules)
                     break
                 except asyncio.CancelledError:
-                    logger.debug(
-                        f"Background generation cancelled for session {schedule_id}"
-                    )
+                    logger.debug(f"Background generation cancelled for session {schedule_id}")
                     return
                 except Exception as e:
+                    count = len(session.generated_schedules) + 1
                     logger.error(
-                        f"Failed to generate schedule {len(session.generated_schedules) + 1} for session {schedule_id}: {e}"
+                        f"Failed to generate schedule {count} for session {schedule_id}: {e}"
                     )
                     break
-
+            n = len(session.generated_schedules)
             logger.info(
-                f"Completed background generation for session {schedule_id}. Total generated: {len(session.generated_schedules)}"
+                f"Completed background generation for session {schedule_id}. Total generated: {n}"
             )
 
         except asyncio.CancelledError:
@@ -393,7 +348,7 @@ async def generate_all_schedules(schedule_id: str):
     return {
         "message": f"Started generating all remaining schedules for session {schedule_id}",
         "current_count": len(session.generated_schedules),
-        "target_count": session.limit,
+        "target_count": session.full_config.limit,
     }
 
 
@@ -408,8 +363,8 @@ async def get_schedule_count(schedule_id: str):
     return {
         "schedule_id": schedule_id,
         "current_count": len(session.generated_schedules),
-        "limit": session.limit,
-        "is_complete": len(session.generated_schedules) >= session.limit,
+        "limit": session.full_config.limit,
+        "is_complete": len(session.generated_schedules) >= session.full_config.limit,
     }
 
 
@@ -420,11 +375,11 @@ async def get_schedule_by_index(schedule_id: str, index: int):
         raise HTTPException(status_code=404, detail="Schedule session not found")
 
     session = schedule_sessions[schedule_id]
-
-    if index < 0 or index >= len(session.generated_schedules):
+    n = len(session.generated_schedules)
+    if index < 0 or index >= n:
         raise HTTPException(
             status_code=404,
-            detail=f"Schedule index {index} not found. Available indices: 0-{len(session.generated_schedules) - 1}",
+            detail=f"Schedule index {index} not found. Available indices: 0-{n - 1}",
         )
 
     return ScheduleResponse(
@@ -481,9 +436,7 @@ def main(port: int, log_level: str, host: str, workers: int):
     global z3_executor
     if workers != 16:
         z3_executor.shutdown(wait=True)
-        z3_executor = ThreadPoolExecutor(
-            max_workers=workers, thread_name_prefix="z3-solver"
-        )
+        z3_executor = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="z3-solver")
 
     logger.info(
         f"Starting server on {host}:{port} with log level {log_level} and {workers} Z3 workers"

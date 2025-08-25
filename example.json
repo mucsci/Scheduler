@@ -402,7 +402,7 @@
     ]
   },
   "limit": 100,
-  "optimizer_options": [
+  "optimizer_flags": [
     "faculty_course",
     "faculty_room",
     "faculty_lab",

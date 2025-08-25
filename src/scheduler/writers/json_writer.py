@@ -8,7 +8,7 @@ class JSONWriter:
 
     def __init__(self, filename: str | None = None):
         self.filename = filename
-        self.schedules = []
+        self.schedules: list[list[dict]] = []
 
     def __enter__(self):
         return self

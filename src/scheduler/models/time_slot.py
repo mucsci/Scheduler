@@ -1,16 +1,16 @@
-from typing import Any, ClassVar, List, Optional
+from typing import Any, ClassVar
 
 from pydantic import BaseModel, Field
 
-from .identifiable import Identifiable
 from .day import Day
+from .identifiable import Identifiable
 
 
 class Duration(BaseModel):
     duration: int
 
     @property
-    def value(self):
+    def value(self) -> int:
         return self.duration
 
     def __abs__(self) -> "Duration":
@@ -64,7 +64,7 @@ class TimePoint(BaseModel):
         return self.timepoint % 60
 
     @property
-    def value(self):
+    def value(self) -> int:
         return self.timepoint
 
     def __add__(self, dur: Duration) -> "TimePoint":
@@ -129,15 +129,15 @@ class TimeInstance(BaseModel):
 
 
 class TimeSlot(Identifiable):
-    times: List[TimeInstance]
-    lab_index: Optional[int] = Field(default=None)
+    times: list[TimeInstance]
+    lab_index: int | None = Field(default=None)
 
     _MAX_TIME_DIFF_BETWEEN_SLOTS: ClassVar[Duration] = Duration(duration=30)
 
     def __hash__(self) -> int:
         return hash(self.id)
 
-    def lab_time(self) -> Optional[TimeInstance]:
+    def lab_time(self) -> TimeInstance | None:
         """
         Returns only the two hour time (if necessary) for a lab
         """
@@ -178,7 +178,8 @@ class TimeSlot(Identifiable):
 
     def lecture_next_to(self, other: "TimeSlot") -> bool:
         """
-        Check if a time slot is logically next to another (same day + adjacent or next day + same time)
+        Check if a time slot is logically next to another
+        (same day + adjacent or next day + same time)
         """
         for i1, t1 in enumerate(self.times):
             for i2, t2 in enumerate(other.times):
@@ -186,10 +187,7 @@ class TimeSlot(Identifiable):
                     continue
                 if i1 == self.lab_index or i2 == other.lab_index:
                     continue
-                if (
-                    TimeSlot._diff_between_slots(t1, t2)
-                    <= TimeSlot._MAX_TIME_DIFF_BETWEEN_SLOTS
-                ):
+                if TimeSlot._diff_between_slots(t1, t2) <= TimeSlot._MAX_TIME_DIFF_BETWEEN_SLOTS:
                     return True
         return False
 
@@ -201,10 +199,11 @@ class TimeSlot(Identifiable):
 
     def lab_overlaps(self, other: "TimeSlot") -> bool:
         """
-        Returns true IFF this timeslot's two-hour block has any overlap with the passed time slot's two-hour block
+        Returns true IFF this timeslot's two-hour block has any overlap
+        with the passed time slot's two-hour block
         """
-        a: Optional[TimeInstance] = self.lab_time()
-        b: Optional[TimeInstance] = other.lab_time()
+        a: TimeInstance | None = self.lab_time()
+        b: TimeInstance | None = other.lab_time()
         if a is None or b is None:
             return False
         return TimeSlot._overlaps(a, b)
@@ -216,9 +215,10 @@ class TimeSlot(Identifiable):
         """
         return (a.day == b.day) and (a.start < b.stop) and (b.start < a.stop)
 
-    def in_time_ranges(self, ranges: List[TimeInstance]) -> bool:
+    def in_time_ranges(self, ranges: list[TimeInstance]) -> bool:
         """
-        Returns true if this time slot fits into the passed range list (day mask, start time, and end time)
+        Returns true if this time slot fits into the passed range list
+        (day mask, start time, and end time)
         """
         return all(
             any(
@@ -234,11 +234,10 @@ class TimeSlot(Identifiable):
 
     def __str__(self) -> str:
         return ",".join(
-            f"{str(t)}{'^' if i == self.lab_index else ''}"
-            for i, t in enumerate(self.times)
+            f"{str(t)}{'^' if i == self.lab_index else ''}" for i, t in enumerate(self.times)
         )
 
-    def as_json(self):
+    def as_json(self) -> dict[str, Any]:
         object: dict[str, Any] = {"times": [t.as_json() for t in self.times]}
         if self.lab_index is not None:
             object["lab_index"] = self.lab_index

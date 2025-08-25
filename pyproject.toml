@@ -1,6 +1,6 @@
 [project]
 name = "course-constraint-scheduler"
-version = "2.0.0"
+version = "2.0.1"
 description = "A constraint solver for generating schedules"
 license = "MIT"
 license-files = ["LICENSE*"]
@@ -47,3 +47,29 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/scheduler"]
+
+[tool.ruff]
+line-length = 100
+indent-width = 4
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "UP", "I", "SIM"]
+ignore = []
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+# Allow unused variables when underscore-prefixed.
+dummy-variable-rgx = "^_.*"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.mypy]
+warn_return_any = true
+warn_unused_configs = true

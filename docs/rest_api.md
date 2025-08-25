@@ -82,7 +82,7 @@ Currently, the API does not require authentication. All endpoints are publicly a
     ]
   },
   "limit": 10,
-  "optimizer_options": ["faculty_course", "pack_rooms"]
+  "optimizer_flags": ["faculty_course", "pack_rooms"]
 }
 ```
 
@@ -120,7 +120,7 @@ Currently, the API does not require authentication. All endpoints are publicly a
   "config": { /* Original configuration */ },
   "time_slot_config": { /* Original time slot configuration */ },
   "limit": 10,
-  "optimizer_options": ["faculty_course", "pack_rooms"],
+  "optimizer_flags": ["faculty_course", "pack_rooms"],
   "total_generated": 3
 }
 ```
@@ -358,7 +358,7 @@ Currently, the API does not require authentication. All endpoints are publicly a
   "config": "SchedulerConfig",
   "time_slot_config": "TimeSlotConfig",
   "limit": 10,
-  "optimizer_options": ["faculty_course", "pack_rooms"]
+  "optimizer_flags": ["faculty_course", "pack_rooms"]
 }
 ```
 
@@ -381,7 +381,7 @@ Currently, the API does not require authentication. All endpoints are publicly a
   "config": "SchedulerConfig",
   "time_slot_config": "TimeSlotConfig",
   "limit": 10,
-  "optimizer_options": ["faculty_course"],
+  "optimizer_flags": ["faculty_course"],
   "total_generated": 5
 }
 ```
@@ -547,7 +547,7 @@ config = {
         ]
     },
     "limit": 5,
-    "optimizer_options": ["faculty_course"]
+    "optimizer_flags": ["faculty_course"]
 }
 
 # Submit request
@@ -641,7 +641,7 @@ async function generateSchedules() {
                 ]
             },
             limit: 5,
-            optimizer_options: ["faculty_course"]
+            optimizer_flags: ["faculty_course"]
         };
 
         // Submit request
@@ -729,7 +729,7 @@ curl -X POST "http://localhost:8000/submit" \
       ]
     },
     "limit": 3,
-    "optimizer_options": ["faculty_course"]
+    "optimizer_flags": ["faculty_course"]
   }'
 ```
 

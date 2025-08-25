@@ -1,15 +1,15 @@
 from .config import (
-    SchedulerConfig,
-    TimeSlotConfig,
+    ClassPattern,
     CourseConfig,
     FacultyConfig,
-    TimeBlock,
     Meeting,
-    ClassPattern,
     OptimizerFlags,
+    SchedulerConfig,
+    TimeBlock,
+    TimeSlotConfig,
 )
 from .scheduler import Scheduler, load_config_from_file
-from .writers import JSONWriter, CSVWriter
+from .writers import CSVWriter, JSONWriter
 
 __all__ = [
     "Scheduler",

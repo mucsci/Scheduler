@@ -6,16 +6,14 @@ class CSVWriter:
 
     def __init__(self, filename: str | None = None):
         self.filename = filename
-        self.schedules = []
+        self.schedules: list[str] = []
 
     def __enter__(self):
         return self
 
     def add_schedule(self, schedule: list[CourseInstance]) -> None:
         """Add a schedule to be written."""
-        schedule_data = "\n".join(
-            course_instance.as_csv() for course_instance in schedule
-        )
+        schedule_data = "\n".join(course_instance.as_csv() for course_instance in schedule)
         if self.filename:
             self.schedules.append(schedule_data)
         else:

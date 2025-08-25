@@ -1,10 +1,9 @@
 from collections import Counter
 from functools import lru_cache
 from itertools import product
-from typing import Optional
 
-from .config import TimeSlotConfig, TimeBlock
-from .models import TimeInstance, TimeSlot, TimePoint, Duration, Day
+from .config import TimeBlock, TimeSlotConfig
+from .models import Day, Duration, TimeInstance, TimePoint, TimeSlot
 
 
 class TimeSlotGenerator:
@@ -23,7 +22,7 @@ class TimeSlotGenerator:
         day: str,
         duration: int,
         time_blocks: list[TimeBlock],
-        start_time: Optional[str] = None,
+        start_time: str | None = None,
     ) -> list[TimeInstance]:
         """Generate all possible time slots for a given day and duration."""
         day_slots = []
@@ -63,10 +62,7 @@ class TimeSlotGenerator:
                 if i != j:
                     # Check for same-day overlaps
                     if t1.day == t2.day:
-                        if (
-                            t1.start < t2.start + t2.duration
-                            and t2.start < t1.start + t1.duration
-                        ):
+                        if t1.start < t2.start + t2.duration and t2.start < t1.start + t1.duration:
                             return False
                     # Check for sufficient overlap between different days
                     else:
@@ -113,8 +109,8 @@ class TimeSlotGenerator:
                 meeting_slots.append(day_slots)
 
             # Generate and validate all possible combinations
-            for time_combination in product(*meeting_slots):
-                time_combination = list(time_combination)
+            for time_combination_tuple in product(*meeting_slots):
+                time_combination = list(time_combination_tuple)
                 # Skip if there are same-day overlaps or insufficient overlap between days
                 if not self._validate_time_combination(time_combination, min_overlap):
                     continue
@@ -131,8 +127,6 @@ class TimeSlotGenerator:
                         break
 
                 # Create TimeSlot with this combination
-                result.append(
-                    TimeSlot(times=list(time_combination), lab_index=lab_index)
-                )
+                result.append(TimeSlot(times=list(time_combination), lab_index=lab_index))
 
         return result
