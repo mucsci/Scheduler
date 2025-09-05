@@ -233,9 +233,7 @@ class TimeSlot(Identifiable):
         return str(list(repr(t) for t in self.times))
 
     def __str__(self) -> str:
-        return ",".join(
-            f"{str(t)}{'^' if i == self.lab_index else ''}" for i, t in enumerate(self.times)
-        )
+        return ",".join(f"{str(t)}{'^' if i == self.lab_index else ''}" for i, t in enumerate(self.times))
 
     def as_json(self) -> dict[str, Any]:
         object: dict[str, Any] = {"times": [t.as_json() for t in self.times]}

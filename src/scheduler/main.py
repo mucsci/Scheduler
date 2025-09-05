@@ -60,11 +60,7 @@ def main(
         for i, m in enumerate(sched.get_models()):
             writer.add_schedule(m)
             # For interactive mode (no output file), prompt user
-            if (
-                not output
-                and i + 1 < limit
-                and not click.confirm("Generate next model?", default=True)
-            ):
+            if not output and i + 1 < limit and not click.confirm("Generate next model?", default=True):
                 break
 
     if output_file:

@@ -232,7 +232,7 @@
             "name": "Schwartz",
             "maximum_credits": 0,
             "minimum_credits": 0,
-            "unique_course_limit": 0,
+            "unique_course_limit": 1,
             "times": {
                 "MON": [],
                 "TUE": [],

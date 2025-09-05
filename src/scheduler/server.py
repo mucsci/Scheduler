@@ -11,7 +11,7 @@ from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from .config import CombinedConfig, OptimizerFlags
+from .config import CombinedConfig
 from .logging import logger
 from .scheduler import CourseInstance, Scheduler
 
@@ -117,18 +117,14 @@ async def ensure_generator_initialized(session_id: str, session: ScheduleSession
 
         # Initialize generator in thread pool
         try:
-            session.generator = await asyncio.wrap_future(
-                z3_executor.submit(session.scheduler.get_models)
-            )
+            session.generator = await asyncio.wrap_future(z3_executor.submit(session.scheduler.get_models))
             logger.debug(f"Initialized generator for session {session_id}")
         except asyncio.CancelledError:
             logger.warning(f"Generator initialization was cancelled for session {session_id}")
             raise HTTPException(status_code=408, detail="Request timeout")
         except Exception as e:
             logger.error(f"Failed to initialize generator for session {session_id}: {e}")
-            raise HTTPException(
-                status_code=500, detail=f"Generator initialization failed: {str(e)}"
-            )
+            raise HTTPException(status_code=500, detail=f"Generator initialization failed: {str(e)}")
 
 
 @asynccontextmanager
@@ -224,9 +220,7 @@ async def get_next_schedule(schedule_id: str):
 
     # Check if we've already generated all schedules
     if len(session.generated_schedules) >= session.full_config.limit:
-        raise HTTPException(
-            status_code=400, detail=f"All {session.full_config.limit} schedules have been generated"
-        )
+        raise HTTPException(status_code=400, detail=f"All {session.full_config.limit} schedules have been generated")
 
     try:
         # Get the next model from the scheduler in thread pool
@@ -294,9 +288,7 @@ async def generate_all_schedules(schedule_id: str):
     async def generate_all_background():
         try:
             remaining = session.full_config.limit - len(session.generated_schedules)
-            logger.info(
-                f"Starting background generation of {remaining} schedules for session {schedule_id}"
-            )
+            logger.info(f"Starting background generation of {remaining} schedules for session {schedule_id}")
 
             for i in range(remaining):
                 try:
@@ -327,14 +319,10 @@ async def generate_all_schedules(schedule_id: str):
                     return
                 except Exception as e:
                     count = len(session.generated_schedules) + 1
-                    logger.error(
-                        f"Failed to generate schedule {count} for session {schedule_id}: {e}"
-                    )
+                    logger.error(f"Failed to generate schedule {count} for session {schedule_id}: {e}")
                     break
             n = len(session.generated_schedules)
-            logger.info(
-                f"Completed background generation for session {schedule_id}. Total generated: {n}"
-            )
+            logger.info(f"Completed background generation for session {schedule_id}. Total generated: {n}")
 
         except asyncio.CancelledError:
             logger.debug(f"Background generation cancelled for session {schedule_id}")
@@ -438,9 +426,7 @@ def main(port: int, log_level: str, host: str, workers: int):
         z3_executor.shutdown(wait=True)
         z3_executor = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="z3-solver")
 
-    logger.info(
-        f"Starting server on {host}:{port} with log level {log_level} and {workers} Z3 workers"
-    )
+    logger.info(f"Starting server on {host}:{port} with log level {log_level} and {workers} Z3 workers")
 
     uvicorn.run(app, host=host, port=port, log_level=log_level, reload=False)
 

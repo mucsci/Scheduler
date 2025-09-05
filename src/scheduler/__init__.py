@@ -16,12 +16,19 @@ __all__ = [
     "load_config_from_file",
     "JSONWriter",
     "CSVWriter",
-    "SchedulerConfig",
-    "TimeSlotConfig",
-    "CourseConfig",
-    "FacultyConfig",
+    # expose config module
+    "config",
+    # expose config types
+    "Time",
+    "TimeRange",
+    "Day",
     "TimeBlock",
     "Meeting",
     "ClassPattern",
+    "TimeSlotConfig",
+    "CourseConfig",
+    "FacultyConfig",
+    "SchedulerConfig",
+    "CombinedConfig",
     "OptimizerFlags",
 ]

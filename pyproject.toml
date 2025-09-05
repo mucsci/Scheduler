@@ -1,6 +1,10 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
 [project]
 name = "course-constraint-scheduler"
-version = "2.0.1"
+dynamic = ["version"]
 description = "A constraint solver for generating schedules"
 license = "MIT"
 license-files = ["LICENSE*"]
@@ -12,7 +16,7 @@ dependencies = [
     "z3-solver>=4.15.1.0",
     "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
-    "requests>=2.31.0"
+    "requests>=2.31.0",
 ]
 
 classifiers = [
@@ -33,23 +37,22 @@ scheduler-server = "scheduler.server:main"
 [dependency-groups]
 dev = [
   "build>=1.3.0",
-  "mypy",
   "ruff",
   "twine>=6.1.0",
+  "ty",
 ]
 
 [tool.uv]
 package = true
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+[tool.hatch.version]
+source = "vcs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/scheduler"]
 
 [tool.ruff]
-line-length = 100
+line-length = 120
 indent-width = 4
 target-version = "py312"
 
@@ -70,6 +73,5 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
 
-[tool.mypy]
-warn_return_any = true
-warn_unused_configs = true
+[tool.ty.rules]
+possibly-unresolved-reference = "warn"

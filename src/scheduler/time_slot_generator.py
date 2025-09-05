@@ -48,9 +48,7 @@ class TimeSlotGenerator:
 
         return day_slots
 
-    def _validate_time_combination(
-        self, time_combination: list[TimeInstance], min_overlap: int
-    ) -> bool:
+    def _validate_time_combination(self, time_combination: list[TimeInstance], min_overlap: int) -> bool:
         """
         Validate a time combination by checking:
         1. No overlapping meetings on the same day
@@ -89,9 +87,7 @@ class TimeSlotGenerator:
     @lru_cache(maxsize=1024)
     def time_slots(self, credits: int, *, min_overlap: int) -> list[TimeSlot]:
         # Find matching class patterns for the requested credits
-        matching_patterns = [
-            p for p in self.config.classes if p.credits == credits and not p.disabled
-        ]
+        matching_patterns = [p for p in self.config.classes if p.credits == credits and not p.disabled]
         if not matching_patterns:
             return []
 
