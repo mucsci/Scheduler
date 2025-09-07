@@ -36,27 +36,30 @@ pip install course-constraint-scheduler
 
 ```bash
 # Generate schedules from configuration file
-scheduler config.json --limit 10 --format json --output schedules
+scheduler example.json --limit 10 --format json --output schedules
 
 # Interactive mode
-scheduler config.json --limit 5
+scheduler example.json --limit 5
 ```
 
 ### Python API
 
 ```python
-from scheduler import Scheduler, load_config_from_file
+from scheduler import Scheduler, load_config_from_file, CombinedConfig
 
 # Load configuration
-config = load_config_from_file("config.json")
+config = load_config_from_file(CombinedConfig, "example.json")
 
 # Create scheduler
 scheduler = Scheduler(config)
 
 # Generate schedules
 for schedule in scheduler.get_models():
-    print(f"Generated schedule: {schedule}")
+    print("Schedule:")
+    for course in schedule:
+        print(f"{course.as_csv()}")
 ```
+
 
 ### REST API
 
@@ -73,7 +76,7 @@ curl -X POST "http://localhost:8000/submit" \
 ## Documentation
 
 - **[Python API Documentation](docs/python_api.md)** - Complete Python API reference
-- **[REST API Documentation](docs/rest_api.md.md)** - Full REST API specification
+- **[REST API Documentation](docs/rest_api.md)** - Full REST API specification
 - **[Configuration Guide](docs/configuration.md)** - Configuration file format and examples
 
 ## Configuration
@@ -188,20 +191,21 @@ ruff check src/
 
 ```
 src/scheduler/
-├── __init__.py          # Main package exports
-├── config.py            # Configuration models
-├── main.py              # Command-line interface
-├── scheduler.py         # Core scheduling logic
-├── server.py            # REST API server
-├── models/              # Data models
-│   ├── course.py        # Course and instance models
-│   ├── day.py           # Day enumeration
-│   ├── time_slot.py     # Time-related models
-│   └── identifiable.py  # Base identifiable class
-├── writers/             # Output formatters
-│   ├── json_writer.py   # JSON output
-│   └── csv_writer.py    # CSV output
-└── logging.py           # Logging configuration
+├── __init__.py              # Main package exports
+├── config.py                # Configuration models
+├── logging.py               # Logging setup
+├── main.py                  # Command-line interface
+├── scheduler.py             # Core scheduling logic
+├── server.py                # REST API server
+├── time_slot_generator.py   # Utility for generating valid time slots
+├── models/                  # Data models
+│   ├── course.py            # Course and instance models
+│   ├── day.py               # Day enumeration
+│   ├── time_slot.py         # Time-related models
+│   └── identifiable.py      # Base identifiable class
+└── writers/                 # Output formatters
+    ├── csv_writer.py        # CSV output
+    └── json_writer.py       # JSON output
 ```
 
 ## Contributing
