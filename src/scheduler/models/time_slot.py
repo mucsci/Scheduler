@@ -1,6 +1,6 @@
-from typing import Any, ClassVar
+from typing import ClassVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_serializer
 
 from .day import Day
 from .identifiable import Identifiable
@@ -8,6 +8,10 @@ from .identifiable import Identifiable
 
 class Duration(BaseModel):
     duration: int
+
+    @model_serializer
+    def serialize_model(self) -> int:
+        return self.value
 
     @property
     def value(self) -> int:
@@ -41,15 +45,16 @@ class Duration(BaseModel):
     def __str__(self) -> str:
         return str(self.value)
 
-    def as_json(self):
-        return self.value
-
     def __repr__(self):
         return self.value
 
 
 class TimePoint(BaseModel):
     timepoint: int
+
+    @model_serializer
+    def serialize_model(self) -> int:
+        return self.value
 
     @staticmethod
     def make_from(hr: int, min: int) -> "TimePoint":
@@ -104,9 +109,6 @@ class TimePoint(BaseModel):
     def __repr__(self) -> str:
         return f"TimePoint(timepoint={self.value})"
 
-    def as_json(self):
-        return self.value
-
 
 class TimeInstance(BaseModel):
     day: Day
@@ -119,13 +121,6 @@ class TimeInstance(BaseModel):
 
     def __str__(self) -> str:
         return f"{self.day.name} {str(self.start)}-{str(self.stop)}"
-
-    def as_json(self):
-        return {
-            "day": self.day.as_json(),
-            "start": self.start.as_json(),
-            "duration": self.duration.as_json(),
-        }
 
 
 class TimeSlot(Identifiable):
@@ -234,9 +229,3 @@ class TimeSlot(Identifiable):
 
     def __str__(self) -> str:
         return ",".join(f"{str(t)}{'^' if i == self.lab_index else ''}" for i, t in enumerate(self.times))
-
-    def as_json(self) -> dict[str, Any]:
-        object: dict[str, Any] = {"times": [t.as_json() for t in self.times]}
-        if self.lab_index is not None:
-            object["lab_index"] = self.lab_index
-        return object

@@ -4,7 +4,6 @@ from collections.abc import Generator
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Any
 
 import click
 from fastapi import BackgroundTasks, FastAPI, HTTPException
@@ -26,16 +25,43 @@ z3_executor: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=16, thread_name
 SubmitRequest = CombinedConfig
 
 
+class HealthCheck(BaseModel):
+    status: str
+    active_sessions: int
+
+
+class SubmitResponse(BaseModel):
+    schedule_id: str
+    endpoint: str
+
+
+class MessageResponse(BaseModel):
+    message: str
+
+
+class GenerateAllResponse(BaseModel):
+    message: str
+    current_count: int
+    target_count: int
+
+
 class ScheduleResponse(BaseModel):
     schedule_id: str
-    schedule: list[dict[str, Any]]
+    schedule: list[dict]
     index: int
     total_generated: int
 
 
-class ScheduleDetails(CombinedConfig):
+class ScheduleDetailsResponse(CombinedConfig):
     schedule_id: str
     total_generated: int
+
+
+class ScheduleCountResponse(BaseModel):
+    schedule_id: str
+    current_count: int
+    limit: int
+    is_complete: bool
 
 
 class ErrorResponse(BaseModel):
@@ -51,7 +77,7 @@ class ScheduleSession:
     scheduler_future: Future[Scheduler | None] | None
     generator: Generator[list[CourseInstance], None, None] | None
     full_config: CombinedConfig
-    generated_schedules: list[list[dict[str, Any]]]
+    generated_schedules: list[list[dict]]
     current_index: int = 0
     background_tasks: list[asyncio.Task] = field(default_factory=list)
 
@@ -155,7 +181,7 @@ app.add_middleware(
 )
 
 
-@app.post("/submit", response_model=dict[str, str])
+@app.post("/submit", response_model=SubmitResponse)
 async def submit_schedule(request: SubmitRequest):
     """Submit a new schedule generation request."""
     try:
@@ -180,7 +206,7 @@ async def submit_schedule(request: SubmitRequest):
 
         logger.debug(f"Created new schedule session {schedule_id}")
 
-        return {"schedule_id": schedule_id, "endpoint": f"/schedules/{schedule_id}"}
+        return SubmitResponse(schedule_id=schedule_id, endpoint=f"/schedules/{schedule_id}")
 
     except HTTPException:
         # Re-raise HTTP exceptions
@@ -190,7 +216,7 @@ async def submit_schedule(request: SubmitRequest):
         raise HTTPException(status_code=400, detail=f"Invalid configuration: {str(e)}")
 
 
-@app.get("/schedules/{schedule_id}/details", response_model=ScheduleDetails)
+@app.get("/schedules/{schedule_id}/details", response_model=ScheduleDetailsResponse)
 async def get_schedule_details(schedule_id: str):
     """Get details about a schedule session."""
     if schedule_id not in schedule_sessions:
@@ -200,7 +226,7 @@ async def get_schedule_details(schedule_id: str):
 
     await ensure_scheduler_initialized(schedule_id, session)
 
-    return ScheduleDetails(
+    return ScheduleDetailsResponse(
         schedule_id=schedule_id,
         **session.full_config.model_dump(),
         total_generated=len(session.generated_schedules),
@@ -243,7 +269,7 @@ async def get_next_schedule(schedule_id: str):
             raise HTTPException(status_code=500, detail=f"Schedule generation failed: {str(e)}")
 
         # Convert model to JSON format with transformation
-        schedule_data = [course_instance.as_json() for course_instance in model]
+        schedule_data = [course_instance.model_dump(by_alias=True, exclude_none=True) for course_instance in model]
 
         # Store the generated schedule
         session.generated_schedules.append(schedule_data)
@@ -266,7 +292,7 @@ async def get_next_schedule(schedule_id: str):
         raise HTTPException(status_code=500, detail=f"Error generating schedule: {str(e)}")
 
 
-@app.post("/schedules/{schedule_id}/generate_all")
+@app.post("/schedules/{schedule_id}/generate_all", response_model=GenerateAllResponse)
 async def generate_all_schedules(schedule_id: str):
     """Generate all remaining schedules for a session asynchronously."""
     if schedule_id not in schedule_sessions:
@@ -303,7 +329,9 @@ async def generate_all_schedules(schedule_id: str):
                     model = await asyncio.wrap_future(z3_executor.submit(lambda: next(generator)))
 
                     # Convert model to JSON format with transformation
-                    schedule_data = [course_instance.as_json() for course_instance in model]
+                    schedule_data = []
+                    for course_instance in model:
+                        schedule_data.append(course_instance.model_dump(by_alias=True, exclude_none=True))
 
                     # Store the generated schedule immediately
                     session.generated_schedules.append(schedule_data)
@@ -333,14 +361,14 @@ async def generate_all_schedules(schedule_id: str):
     background_task = asyncio.create_task(generate_all_background())
     session.background_tasks.append(background_task)
 
-    return {
-        "message": f"Started generating all remaining schedules for session {schedule_id}",
-        "current_count": len(session.generated_schedules),
-        "target_count": session.full_config.limit,
-    }
+    return GenerateAllResponse(
+        message=f"Started generating all remaining schedules for session {schedule_id}",
+        current_count=len(session.generated_schedules),
+        target_count=session.full_config.limit,
+    )
 
 
-@app.get("/schedules/{schedule_id}/count")
+@app.get("/schedules/{schedule_id}/count", response_model=ScheduleCountResponse)
 async def get_schedule_count(schedule_id: str):
     """Get the current count of generated schedules for a session."""
     if schedule_id not in schedule_sessions:
@@ -348,12 +376,12 @@ async def get_schedule_count(schedule_id: str):
 
     session = schedule_sessions[schedule_id]
 
-    return {
-        "schedule_id": schedule_id,
-        "current_count": len(session.generated_schedules),
-        "limit": session.full_config.limit,
-        "is_complete": len(session.generated_schedules) >= session.full_config.limit,
-    }
+    return ScheduleCountResponse(
+        schedule_id=schedule_id,
+        current_count=len(session.generated_schedules),
+        limit=session.full_config.limit,
+        is_complete=len(session.generated_schedules) >= session.full_config.limit,
+    )
 
 
 @app.get("/schedules/{schedule_id}/index/{index}", response_model=ScheduleResponse)
@@ -378,7 +406,7 @@ async def get_schedule_by_index(schedule_id: str, index: int):
     )
 
 
-@app.delete("/schedules/{schedule_id}/delete")
+@app.delete("/schedules/{schedule_id}/delete", response_model=MessageResponse)
 async def delete_schedule_session(schedule_id: str, background_tasks: BackgroundTasks):
     """Delete a schedule session."""
     if schedule_id not in schedule_sessions:
@@ -387,22 +415,22 @@ async def delete_schedule_session(schedule_id: str, background_tasks: Background
     # Schedule cleanup in background
     background_tasks.add_task(cleanup_session, schedule_id)
 
-    return {"message": f"Schedule session {schedule_id} marked for deletion"}
+    return MessageResponse(message=f"Schedule session {schedule_id} marked for deletion")
 
 
-@app.post("/schedules/{schedule_id}/cleanup")
+@app.post("/schedules/{schedule_id}/cleanup", response_model=MessageResponse)
 async def cleanup_schedule_session(schedule_id: str):
     """Immediate cleanup of a schedule session."""
     if schedule_id in schedule_sessions:
         cleanup_session(schedule_id)
 
-    return {"message": f"Schedule session {schedule_id} cleaned up"}
+    return MessageResponse(message=f"Schedule session {schedule_id} cleaned up")
 
 
-@app.get("/health")
+@app.get("/health", response_model=HealthCheck)
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "active_sessions": len(schedule_sessions)}
+    return HealthCheck(status="healthy", active_sessions=len(schedule_sessions))
 
 
 @click.command()

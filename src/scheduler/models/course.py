@@ -1,11 +1,11 @@
 from collections import defaultdict
 from typing import ClassVar, cast
 
-import z3  # type: ignore
-from pydantic import BaseModel, Field
+import z3
+from pydantic import BaseModel, Field, computed_field
 
 from .identifiable import Identifiable
-from .time_slot import TimeSlot
+from .time_slot import TimeInstance, TimeSlot
 
 
 class Course(Identifiable):
@@ -71,30 +71,31 @@ class Course(Identifiable):
 
 
 class CourseInstance(BaseModel):
-    course: Course
-    time: TimeSlot
+    course: Course = Field(exclude=True)
+    time: TimeSlot = Field(exclude=True)
     faculty: str
     room: str | None = Field(default=None)
     lab: str | None = Field(default=None)
 
-    def as_json(self):
-        object = {}
-        object["course"] = str(self.course)
-        object["faculty"] = self.faculty
-        if self.room:
-            object["room"] = self.room
-        if self.lab:
-            object["lab"] = self.lab
-        if self.time:
-            object["times"] = [t.as_json() for t in self.time.times]
-            if self.lab and self.time.lab_index is not None:
-                object["lab_index"] = self.time.lab_index
-        return object
+    @computed_field(alias="course")
+    @property
+    def course_str(self) -> str:
+        return str(self.course)
+
+    @computed_field
+    @property
+    def times(self) -> list[TimeInstance]:
+        return self.time.times
+
+    @computed_field
+    @property
+    def lab_index(self) -> int | None:
+        return self.time.lab_index if (self.lab is not None) else None
 
     def as_csv(self):
-        room_str = self.room if self.room else "None"
-        lab_str = self.lab if self.lab else "None"
-        time_str = str(self.time)
-        if not self.lab:
+        room_str = str(self.room)
+        lab_str = str(self.lab)
+        time_str = str(self.times)
+        if self.lab is None:
             time_str = time_str.replace("^", "")
         return f"{self.course},{self.faculty},{room_str},{lab_str},{time_str}"

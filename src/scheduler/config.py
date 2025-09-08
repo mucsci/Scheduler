@@ -152,6 +152,21 @@ class ClassPattern(_StrictBaseModel):
     disabled: bool = Field(default=False, description="Whether the pattern is disabled")
     start_time: TimeString | None = Field(default=None, description="Specific start time constraint")
 
+    @field_validator("meetings")
+    @classmethod
+    def validate_meetings(cls, v):
+        """Validate meeting list is not empty and has reasonable structure."""
+        if not v:
+            raise ValueError("At least one meeting is required")
+
+        # Check for duplicate days
+        days = [meeting.day for meeting in v]
+        if len(days) != len(set(days)):
+            duplicates = [day for day in set(days) if days.count(day) > 1]
+            raise ValueError(f"Duplicate meeting days found: {duplicates}")
+
+        return v
+
 
 class TimeSlotConfig(_StrictBaseModel):
     times: dict[Day, list[TimeBlock]] = Field(description="Dictionary mapping day names to time blocks")
@@ -217,9 +232,13 @@ class FacultyConfig(_StrictBaseModel):
         return v
 
     @model_validator(mode="after")
-    def validate_references(self):
-        """Validate that all references exist in the parent SchedulerConfig.
-        This validator will be called by the parent SchedulerConfig."""
+    def validate_credit_consistency(self):
+        """Validate that minimum and maximum credits are consistent."""
+        if self.minimum_credits > self.maximum_credits:
+            raise ValueError(
+                f"Minimum credits ({self.minimum_credits}) cannot be greater than "
+                f"maximum credits ({self.maximum_credits})"
+            )
         return self
 
 
@@ -267,53 +286,70 @@ class SchedulerConfig(_StrictBaseModel):
         valid_courses = {course.course_id for course in self.courses}
         valid_faculty = {faculty.name for faculty in self.faculty}
 
+        # Collect all validation errors for better user experience
+        errors = []
+
         # Validate CourseConfig references
         for course in self.courses:
             # Validate room references
             invalid_rooms = [room for room in course.room if room not in valid_rooms]
             if invalid_rooms:
-                raise ValueError(f'Course "{course.course_id}" references invalid rooms: {invalid_rooms}')
+                errors.append(f'Course "{course.course_id}" references invalid rooms: {invalid_rooms}')
 
             # Validate lab references
             invalid_labs = [lab for lab in course.lab if lab not in valid_labs]
             if invalid_labs:
-                raise ValueError(f'Course "{course.course_id}" references invalid labs: {invalid_labs}')
+                errors.append(f'Course "{course.course_id}" references invalid labs: {invalid_labs}')
 
-            # Validate conflict course references
+            # Validate conflict course references (including self-conflicts)
             invalid_conflicts = [conflict for conflict in course.conflicts if conflict not in valid_courses]
             if invalid_conflicts:
-                raise ValueError(
-                    f'Course "{course.course_id}" references invalid conflict courses: {invalid_conflicts}'
-                )
+                errors.append(f'Course "{course.course_id}" references invalid conflict courses: {invalid_conflicts}')
+
+            # Check for self-conflicts
+            if course.course_id in course.conflicts:
+                errors.append(f'Course "{course.course_id}" cannot conflict with itself')
 
             # Validate faculty references
             invalid_faculty = [faculty for faculty in course.faculty if faculty not in valid_faculty]
             if invalid_faculty:
-                raise ValueError(f'Course "{course.course_id}" references invalid faculty: {invalid_faculty}')
+                errors.append(f'Course "{course.course_id}" references invalid faculty: {invalid_faculty}')
 
         # Validate FacultyConfig references
         for faculty in self.faculty:
             # Validate course preference references
             invalid_course_prefs = [course for course in faculty.course_preferences if course not in valid_courses]
             if invalid_course_prefs:
-                raise ValueError(
+                errors.append(
                     f'Faculty "{faculty.name}" references invalid courses in preferences: {invalid_course_prefs}'
                 )
 
             # Validate room preference references
             invalid_room_prefs = [room for room in faculty.room_preferences if room not in valid_rooms]
             if invalid_room_prefs:
-                raise ValueError(
-                    f'Faculty "{faculty.name}" references invalid rooms in preferences: {invalid_room_prefs}'
-                )
+                errors.append(f'Faculty "{faculty.name}" references invalid rooms in preferences: {invalid_room_prefs}')
 
             # Validate lab preference references
             invalid_lab_prefs = [lab for lab in faculty.lab_preferences if lab not in valid_labs]
             if invalid_lab_prefs:
-                raise ValueError(
-                    f'Faculty "{faculty.name}" references invalid labs in preferences: {invalid_lab_prefs}'
-                )
+                errors.append(f'Faculty "{faculty.name}" references invalid labs in preferences: {invalid_lab_prefs}')
 
+        # Additional business logic validations
+        self._validate_business_logic(errors)
+
+        # Raise all errors at once for better debugging
+        if errors:
+            error_message = "Configuration validation errors:\n" + "\n".join(f"  - {error}" for error in errors)
+            raise ValueError(error_message)
+
+        return self
+
+    def _validate_business_logic(self, errors: list[str]):
+        """Validate business logic constraints."""
+        courses = set(c for f in self.faculty for c in f.course_preferences)
+        unassignable = set(c.course_id for c in self.courses) - courses
+        if unassignable:
+            errors.append(f"Courses without faculty assignments: {unassignable}")
         return self
 
     def _validate_uniqueness(self):
@@ -406,3 +442,34 @@ class CombinedConfig(_StrictBaseModel):
         if isinstance(v, list):
             return [OptimizerFlags(flag) if isinstance(flag, str) else flag for flag in v]
         return v
+
+    @model_validator(mode="after")
+    def validate_time_slot_config_consistency(self):
+        """Validate that time slot config is consistent with scheduler config."""
+        errors = []
+
+        # Check that all days in time_slot_config are valid
+        valid_days = {"MON", "TUE", "WED", "THU", "FRI"}
+        for day in self.time_slot_config.times:
+            if day not in valid_days:
+                errors.append(f"Invalid day '{day}' in time slot configuration")
+
+        # Check that there are time blocks for each day
+        for day in valid_days:
+            if day not in self.time_slot_config.times or not self.time_slot_config.times[day]:
+                errors.append(f"No time blocks defined for {day}")
+
+        # Check that class patterns are reasonable
+        if not self.time_slot_config.classes:
+            errors.append("At least one class pattern must be defined")
+
+        # Check for disabled patterns
+        disabled_patterns = [p for p in self.time_slot_config.classes if p.disabled]
+        if len(disabled_patterns) == len(self.time_slot_config.classes):
+            errors.append("All class patterns are disabled")
+
+        if errors:
+            error_message = "Time slot configuration errors:\n" + "\n".join(f"  - {error}" for error in errors)
+            raise ValueError(error_message)
+
+        return self

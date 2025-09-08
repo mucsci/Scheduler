@@ -16,6 +16,3 @@ class Day(IntEnum):
         Pretty Print representation of a day
         """
         return self.name
-
-    def as_json(self):
-        return self.value

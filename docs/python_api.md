@@ -26,6 +26,36 @@ for schedule in scheduler.get_models():
     print(f"Generated schedule: {schedule}")
 ```
 
+## Package Exports
+
+The main package exports the following classes and functions:
+
+```python
+from scheduler import (
+    # Core classes
+    Scheduler,
+    load_config_from_file,
+    
+    # Writers
+    JSONWriter,
+    CSVWriter,
+    
+    # Configuration types
+    Time,
+    TimeRange,
+    Day,
+    TimeBlock,
+    Meeting,
+    ClassPattern,
+    TimeSlotConfig,
+    CourseConfig,
+    FacultyConfig,
+    SchedulerConfig,
+    CombinedConfig,
+    OptimizerFlags,
+)
+```
+
 ## Core Classes
 
 ### Scheduler
@@ -59,7 +89,29 @@ for schedule in scheduler.get_models():
         print(f"  {course_instance.course} at {course_instance.time}")
 ```
 
+**Note:** The scheduler uses Z3 theorem prover for constraint solving. Each call to `get_models()` creates a new generator that can be used to iterate through valid schedules.
+
 ### Configuration Classes
+
+#### Type Definitions
+
+The configuration system uses several type aliases for validation and clarity:
+
+```python
+# Time-related types
+TimeString = Annotated[str, Field(pattern=r"^([0-1][0-9]|2[0-3]):[0-5][0-9]$")]  # HH:MM format
+TimeRangeString = Annotated[str, Field(pattern=r"^([0-1][0-9]|2[0-3]):[0-5][0-9]-([0-1][0-9]|2[0-3]):[0-5][0-9]$")]  # HH:MM-HH:MM format
+
+# Preference scoring
+Preference = Annotated[int, Field(ge=0, le=10)]  # 0-10 scale
+
+# Entity types
+Day = Annotated[Literal["MON", "TUE", "WED", "THU", "FRI"], Field(frozen=True)]
+Room = Annotated[str, Field(frozen=True)]
+Lab = Annotated[str, Field(frozen=True)]
+Course = Annotated[str, Field(frozen=True)]
+Faculty = Annotated[str, Field(frozen=True)]
+```
 
 #### CombinedConfig
 
@@ -235,10 +287,10 @@ class Course(Identifiable):
     credits: int
     course_id: str
     section: int | None
-    labs: List[str]
-    rooms: List[str]
-    conflicts: List[str]
-    faculties: List[str]
+    labs: list[str]
+    rooms: list[str]
+    conflicts: list[str]
+    faculties: list[str]
 ```
 
 **Methods:**
@@ -248,22 +300,47 @@ class Course(Identifiable):
 - `room() -> z3.ExprRef`: Returns the Z3 variable for room assignment
 - `lab() -> z3.ExprRef`: Returns the Z3 variable for lab assignment
 
+**Properties:**
+- **`credits`**: Number of credit hours for this course
+- **`course_id`**: Unique identifier for the course
+- **`section`**: Section number (automatically assigned if not provided)
+- **`labs`**: List of acceptable lab names
+- **`rooms`**: List of acceptable room names
+- **`conflicts`**: List of course IDs that cannot be scheduled simultaneously
+- **`faculties`**: List of faculty names who can teach this course
+
+**Note:** The `section` field is automatically assigned based on the course_id if not explicitly provided. Each course instance gets a unique section number.
+
 #### CourseInstance
 
 Represents a scheduled course instance.
 
 ```python
 class CourseInstance(BaseModel):
-    course: Course
-    time: TimeSlot
+    course: Course = Field(exclude=True)
+    time: TimeSlot = Field(exclude=True)
     faculty: str
-    room: str | None
-    lab: str | None
+    room: str | None = Field(default=None)
+    lab: str | None = Field(default=None)
 ```
 
 **Methods:**
-- `as_json() -> dict`: Converts to JSON representation
 - `as_csv() -> str`: Converts to CSV representation
+
+**Computed Fields:**
+- **`course_str`** (alias: `course`): String representation of the course (e.g., "CS101.01")
+- **`times`**: List of TimeInstance objects representing the scheduled times
+- **`lab_index`**: Index of the lab time in the times list (if applicable, None if no lab)
+
+**Properties:**
+- **`course`**: The Course object (excluded from serialization)
+- **`time`**: The TimeSlot object (excluded from serialization)
+- **`faculty`**: Name of the assigned faculty member
+- **`room`**: Name of the assigned room (None if not assigned)
+- **`lab`**: Name of the assigned lab (None if not assigned)
+
+**Serialization:**
+The `CourseInstance` uses Pydantic's serialization features to provide clean JSON output with computed fields. The `course` and `time` fields are excluded from serialization and replaced with their string representations. When serialized with `model_dump(by_alias=True, exclude_none=True)`, the output matches the `CourseInstanceJSON` TypedDict structure.
 
 #### TimeSlot
 
@@ -271,9 +348,25 @@ Represents a time slot assignment.
 
 ```python
 class TimeSlot(Identifiable):
-    times: List[TimeInstance]
+    times: list[TimeInstance]
     lab_index: int | None
 ```
+
+**Methods:**
+- `lab_time() -> TimeInstance | None`: Returns the lab time instance if applicable
+- `has_lab() -> bool`: Returns True if this time slot has a lab component
+- `lab_next_to(other: TimeSlot) -> bool`: Checks if lab times are adjacent
+- `lecture_next_to(other: TimeSlot) -> bool`: Checks if lecture times are adjacent
+- `overlaps(other: TimeSlot) -> bool`: Checks if time slots overlap
+- `lab_overlaps(other: TimeSlot) -> bool`: Checks if lab times overlap
+- `in_time_ranges(ranges: list[TimeInstance]) -> bool`: Checks if time slot fits in given ranges
+
+**Properties:**
+- **`times`**: List of TimeInstance objects representing all meeting times
+- **`lab_index`**: Index of the lab time in the times list (None if no lab)
+
+**Class Constants:**
+- **`_MAX_TIME_DIFF_BETWEEN_SLOTS`**: Maximum time difference (30 minutes) for considering slots as adjacent
 
 #### TimeInstance
 
@@ -285,6 +378,15 @@ class TimeInstance(BaseModel):
     start: TimePoint
     duration: Duration
 ```
+
+**Properties:**
+- **`day`**: Day of the week (Day enum)
+- **`start`**: Start time as TimePoint
+- **`duration`**: Duration as Duration object
+- **`stop`**: Calculated end time as TimePoint (start + duration)
+
+**Methods:**
+- `__str__() -> str`: String representation in format "DAY HH:MM-HH:MM"
 
 #### TimePoint
 
@@ -299,13 +401,18 @@ class TimePoint(BaseModel):
 - `make_from(hr: int, min: int) -> TimePoint`: Creates from hour and minute
 
 **Properties:**
-- `hour`: Hour component
-- `minute`: Minute component
-- `value`: Raw timepoint value in minutes
+- **`hour`**: Hour component (0-23)
+- **`minute`**: Minute component (0-59)
+- **`value`**: Raw timepoint value in minutes from midnight
 
 **Operators:**
 - `+ Duration`: Add duration to time point
 - `- TimePoint`: Calculate duration between time points
+- `<`, `<=`, `>`, `>=`, `==`, `!=`: Standard comparison operators
+
+**Methods:**
+- `__str__() -> str`: String representation in "HH:MM" format
+- `__repr__() -> str`: Detailed representation for debugging
 
 #### Duration
 
@@ -317,22 +424,84 @@ class Duration(BaseModel):
 ```
 
 **Properties:**
-- `value`: Duration value in minutes
+- **`value`**: Duration value in minutes
 
 **Operators:**
 - `+`, `-`, `<`, `<=`, `>`, `>=`, `==`, `!=`: Standard comparison operators
+- `__abs__()`: Returns absolute value of duration
+
+**Methods:**
+- `__str__() -> str`: String representation of duration value
+- `__repr__()`: Detailed representation for debugging
+
+**Serialization:**
+- Serializes to integer value (minutes)
 
 #### Day
 
 Enumeration of weekdays.
 
 ```python
-class Day(Enum):
-    MON = "MON"
-    TUE = "TUE"
-    WED = "WED"
-    THU = "THU"
-    FRI = "FRI"
+class Day(IntEnum):
+    MON = auto()
+    TUE = auto()
+    WED = auto()
+    THU = auto()
+    FRI = auto()
+```
+
+**Values:**
+- `MON = 1`: Monday
+- `TUE = 2`: Tuesday
+- `WED = 3`: Wednesday
+- `THU = 4`: Thursday
+- `FRI = 5`: Friday
+
+**Methods:**
+- `__str__() -> str`: Returns the day name (e.g., "MON")
+- `__repr__() -> str`: Returns the day name for debugging
+
+### JSON Types Module
+
+The `json_types` module provides comprehensive TypedDict definitions for all JSON structures used throughout the scheduler.
+
+#### Key Types
+
+- **`CourseInstanceJSON`**: JSON representation of a CourseInstance
+- **`TimeInstanceJSON`**: JSON representation of a TimeInstance
+
+#### CourseInstanceJSON
+
+```python
+class CourseInstanceJSON(TypedDict):
+    course: str  # Course string representation (e.g., "CS101.01")
+    faculty: str
+    room: NotRequired[str | None]
+    lab: NotRequired[str | None]
+    times: list[TimeInstanceJSON]
+    lab_index: NotRequired[int | None]
+```
+
+#### TimeInstanceJSON
+
+```python
+class TimeInstanceJSON(TypedDict):
+    day: int  # Day enum value (1=MON, 2=TUE, etc.)
+    start: int  # Timepoint in minutes from midnight
+    duration: int  # Duration in minutes
+```
+
+#### Usage
+
+```python
+from scheduler.json_types import CourseInstanceJSON, TimeInstanceJSON
+
+# Type hints for JSON data
+def process_schedule_json(schedule: list[CourseInstanceJSON]) -> None:
+    for course in schedule:
+        print(f"Course: {course['course']}")
+        for time in course['times']:
+            print(f"  Time: Day {time['day']} at {time['start']} minutes for {time['duration']} minutes")
 ```
 
 ### Writer Classes
@@ -353,6 +522,12 @@ with JSONWriter("schedules.json") as writer:
     for schedule in scheduler.get_models():
         writer.add_schedule(schedule)
 ```
+
+**Features:**
+- Context manager support for automatic file handling
+- Accumulates multiple schedules in memory
+- Outputs compact JSON format
+- Supports both file output and stdout
 
 #### CSVWriter
 

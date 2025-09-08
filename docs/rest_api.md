@@ -152,27 +152,25 @@ Currently, the API does not require authentication. All endpoints are publicly a
       "course": "CS101.01",
       "faculty": "Dr. Smith",
       "room": "Room A",
-      "lab": null,
       "times": [
         {
-          "day": "MON",
-          "start": "09:00",
+          "day": 1,
+          "start": 540,
           "duration": 150
         }
-      ]
+      ],
     },
     {
       "course": "CS102.01",
       "faculty": "Dr. Johnson",
       "room": "Room B",
-      "lab": null,
       "times": [
         {
-          "day": "MON",
-          "start": "14:00",
+          "day": 1,
+          "start": 840,
           "duration": 150
         }
-      ]
+      ],
     }
   ],
   "index": 3,
@@ -353,6 +351,8 @@ Currently, the API does not require authentication. All endpoints are publicly a
 
 ### SubmitRequest
 
+The submit request uses the same structure as `CombinedConfig`:
+
 ```json
 {
   "config": "SchedulerConfig",
@@ -367,11 +367,43 @@ Currently, the API does not require authentication. All endpoints are publicly a
 ```json
 {
   "schedule_id": "string",
-  "schedule": "array of CourseInstance",
+  "schedule": [
+    {
+      "course": "CS101.01",
+      "faculty": "Dr. Smith",
+      "room": "Room A",
+      "times": [
+        {
+          "day": 1,
+          "start": 540,
+          "duration": 150
+        }
+      ],
+    }
+  ],
   "index": 0,
   "total_generated": 1
 }
 ```
+
+**Field Details:**
+- `schedule_id`: UUID string identifying the session
+- `schedule`: Array of course instances in the schedule
+- `index`: 0-based index of this schedule in the session
+- `total_generated`: Total number of schedules generated so far
+
+**Course Instance Fields:**
+- `course`: String representation of the course (e.g., "CS101.01")
+- `faculty`: Name of the assigned faculty member
+- `room`: Name of the assigned room (omitted if not assigned)
+- `lab`: Name of the assigned lab (omitted if not assigned)
+- `times`: Array of time instances for this course
+- `lab_index`: Index of the lab time in the times array (omitted if no lab)
+
+**Time Instance Fields:**
+- `day`: Integer representing the day (1=MON, 2=TUE, 3=WED, 4=THU, 5=FRI)
+- `start`: Start time in minutes from midnight (e.g., 540 = 9:00 AM)
+- `duration`: Duration in minutes
 
 ### ScheduleDetails
 
@@ -383,6 +415,36 @@ Currently, the API does not require authentication. All endpoints are publicly a
   "limit": 10,
   "optimizer_flags": ["faculty_course"],
   "total_generated": 5
+}
+```
+
+### ScheduleCountResponse
+
+```json
+{
+  "schedule_id": "string",
+  "current_count": 3,
+  "limit": 10,
+  "is_complete": false
+}
+```
+
+### GenerateAllResponse
+
+```json
+{
+  "message": "Started generating all remaining schedules for session {schedule_id}",
+  "current_count": 3,
+  "target_count": 10
+}
+```
+
+### HealthCheck
+
+```json
+{
+  "status": "healthy",
+  "active_sessions": 5
 }
 ```
 
@@ -401,44 +463,67 @@ Currently, the API does not require authentication. All endpoints are publicly a
 
 ```json
 {
-  "rooms": ["string"],
-  "labs": ["string"],
+  "rooms": ["Room A", "Room B", "Room C"],
+  "labs": ["Lab 1", "Lab 2"],
   "courses": [
     {
-      "course_id": "string",
-      "credits": 0,
-      "room": ["string"],
-      "lab": ["string"],
-      "conflicts": ["string"],
-      "faculty": ["string"]
+      "course_id": "CS101",
+      "credits": 3,
+      "room": ["Room A", "Room B"],
+      "lab": ["Lab 1"],
+      "conflicts": ["CS102"],
+      "faculty": ["Dr. Smith", "Dr. Johnson"]
     }
   ],
   "faculty": [
     {
-      "name": "string",
-      "maximum_credits": 0,
-      "minimum_credits": 0,
-      "unique_course_limit": 0,
+      "name": "Dr. Smith",
+      "maximum_credits": 12,
+      "minimum_credits": 6,
+      "unique_course_limit": 3,
       "times": {
-        "MON": ["string"],
-        "TUE": ["string"],
-        "WED": ["string"],
-        "THU": ["string"],
-        "FRI": ["string"]
+        "MON": ["09:00-17:00"],
+        "TUE": ["09:00-17:00"],
+        "WED": ["09:00-17:00"],
+        "THU": ["09:00-17:00"],
+        "FRI": ["09:00-17:00"]
       },
       "course_preferences": {
-        "course_id": 0
+        "CS101": 10,
+        "CS102": 8
       },
       "room_preferences": {
-        "room_name": 0
+        "Room A": 10,
+        "Room B": 7
       },
       "lab_preferences": {
-        "lab_name": 0
+        "Lab 1": 8,
+        "Lab 2": 5
       }
     }
   ]
 }
 ```
+
+**Field Details:**
+- **`rooms`**: Array of available room names (strings)
+- **`labs`**: Array of available lab names (strings)
+- **`courses`**: Array of course configurations
+  - **`course_id`**: Unique course identifier (string)
+  - **`credits`**: Credit hours (positive integer)
+  - **`room`**: Array of acceptable room names
+  - **`lab`**: Array of acceptable lab names
+  - **`conflicts`**: Array of course IDs that cannot be scheduled simultaneously
+  - **`faculty`**: Array of faculty names who can teach this course
+- **`faculty`**: Array of faculty configurations
+  - **`name`**: Faculty member's name (string)
+  - **`maximum_credits`**: Maximum credit hours they can teach (non-negative integer)
+  - **`minimum_credits`**: Minimum credit hours they must teach (non-negative integer)
+  - **`unique_course_limit`**: Maximum number of different courses they can teach (positive integer)
+  - **`times`**: Available time ranges by day (format: "HH:MM-HH:MM")
+  - **`course_preferences`**: Course preference scores (0-10, higher = more preferred)
+  - **`room_preferences`**: Room preference scores (0-10, higher = more preferred)
+  - **`lab_preferences`**: Lab preference scores (0-10, higher = more preferred)
 
 ### TimeSlotConfig
 
@@ -447,39 +532,102 @@ Currently, the API does not require authentication. All endpoints are publicly a
   "times": {
     "MON": [
       {
-        "start": "string",
-        "spacing": 0,
-        "end": "string"
+        "start": "09:00",
+        "spacing": 60,
+        "end": "17:00"
+      }
+    ],
+    "TUE": [
+      {
+        "start": "09:00",
+        "spacing": 60,
+        "end": "17:00"
+      }
+    ],
+    "WED": [
+      {
+        "start": "09:00",
+        "spacing": 60,
+        "end": "17:00"
+      }
+    ],
+    "THU": [
+      {
+        "start": "09:00",
+        "spacing": 60,
+        "end": "17:00"
+      }
+    ],
+    "FRI": [
+      {
+        "start": "09:00",
+        "spacing": 60,
+        "end": "17:00"
       }
     ]
   },
   "classes": [
     {
-      "credits": 0,
+      "credits": 3,
       "meetings": [
         {
-          "day": "string",
-          "duration": 0,
+          "day": "MON",
+          "duration": 150,
+          "lab": false
+        }
+      ],
+      "disabled": false
+    },
+    {
+      "credits": 4,
+      "meetings": [
+        {
+          "day": "TUE",
+          "duration": 150,
+          "lab": true
+        },
+        {
+          "day": "THU",
+          "duration": 150,
           "lab": false
         }
       ],
       "disabled": false,
-      "start_time": "string"
+      "start_time": "10:00"
     }
   ]
 }
 ```
 
+**Field Details:**
+- **`times`**: Dictionary mapping day names to time blocks
+  - **`start`**: Start time in "HH:MM" format (24-hour)
+  - **`spacing`**: Time slot spacing in minutes (positive integer)
+  - **`end`**: End time in "HH:MM" format (24-hour, must be after start)
+- **`classes`**: Array of class pattern configurations
+  - **`credits`**: Credit hours for this pattern (integer)
+  - **`meetings`**: Array of meeting configurations
+    - **`day`**: Day of the week ("MON", "TUE", "WED", "THU", "FRI")
+    - **`duration`**: Duration in minutes (positive integer)
+    - **`lab`**: Whether this meeting requires a lab (boolean, default: false)
+  - **`disabled`**: Whether this pattern is disabled (boolean, default: false)
+  - **`start_time`**: Specific start time constraint in "HH:MM" format (optional)
+
 ### OptimizerFlags
 
 Available optimization options:
-- `"faculty_course"`: Optimize faculty-course assignments
-- `"faculty_room"`: Optimize faculty-room preferences
-- `"faculty_lab"`: Optimize faculty-lab preferences
-- `"same_room"`: Prefer same room for course sections
-- `"same_lab"`: Prefer same lab for course sections
-- `"pack_rooms"`: Pack courses into fewer rooms
-- `"pack_labs"`: Pack courses into fewer labs
+- `"faculty_course"`: Optimize faculty-course assignments based on preferences
+- `"faculty_room"`: Optimize faculty-room preferences for better assignments
+- `"faculty_lab"`: Optimize faculty-lab preferences for better assignments
+- `"same_room"`: Prefer same room for multiple sections of the same course
+- `"same_lab"`: Prefer same lab for multiple sections of the same course
+- `"pack_rooms"`: Pack courses into fewer rooms to maximize room utilization
+- `"pack_labs"`: Pack courses into fewer labs to maximize lab utilization
+
+**Usage Notes:**
+- Multiple flags can be combined for comprehensive optimization
+- More flags generally increase solving time but improve schedule quality
+- Start with basic flags like `faculty_course` and add others as needed
 
 ## Usage Examples
 
@@ -844,11 +992,17 @@ The server provides detailed logging for:
 ### Running the Server
 ```bash
 # Using the installed package
-scheduler-server --port 8000
+scheduler-server --port 8000 --host 0.0.0.0 --log-level info --workers 16
 
 # Or directly with Python
-python -m scheduler.server --port 8000
+python -m scheduler.server --port 8000 --host 0.0.0.0 --log-level info --workers 16
 ```
+
+**Command Line Options:**
+- `--port, -p`: Port to run the server on (default: 8000)
+- `--host, -h`: Host to bind the server to (default: 0.0.0.0)
+- `--log-level, -l`: Log level (debug, info, warning, error, critical) (default: info)
+- `--workers, -w`: Number of worker threads for Z3 operations (default: 16)
 
 ### Environment Variables
 - `PORT`: Server port (default: 8000)

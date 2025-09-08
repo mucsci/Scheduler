@@ -15,12 +15,17 @@ The Course Constraint Scheduler is designed to solve complex academic scheduling
 ## Features
 
 - **Z3 Integration**: Uses Microsoft's Z3 theorem prover for efficient constraint solving
-- **Flexible Configuration**: JSON-based configuration for easy customization
-- **Multiple Output Formats**: JSON and CSV output support
+- **Flexible Configuration**: JSON-based configuration with comprehensive validation
+- **Multiple Output Formats**: JSON and CSV output support with type-safe serialization
 - **REST API**: Full HTTP API for integration with web applications
 - **Asynchronous Processing**: Background schedule generation for large problems
 - **Session Management**: Persistent sessions for iterative schedule generation
 - **Optimization Flags**: Configurable optimization strategies
+- **Type Safety**: Comprehensive TypedDict definitions for all JSON structures
+- **Enhanced Validation**: Cross-reference validation and business logic constraints
+- **Improved Error Handling**: Detailed error messages for configuration debugging
+- **Strict Type Validation**: Pydantic models with strict validation and custom type definitions
+- **Computed Fields**: Automatic serialization with computed fields for clean JSON output
 
 ## Quick Start
 
@@ -64,13 +69,19 @@ for schedule in scheduler.get_models():
 ### REST API
 
 ```bash
-# Start the server
-scheduler-server --port 8000
+# Start the server with custom options
+scheduler-server --port 8000 --host 0.0.0.0 --log-level info --workers 16
 
 # Submit a schedule request
 curl -X POST "http://localhost:8000/submit" \
   -H "Content-Type: application/json" \
   -d @example.json
+
+# Get the next schedule
+curl -X POST "http://localhost:8000/schedules/{schedule_id}/next"
+
+# Check generation progress
+curl -X GET "http://localhost:8000/schedules/{schedule_id}/count"
 ```
 
 ## Documentation
@@ -155,11 +166,12 @@ Example configuration:
 The scheduler is built with a modular architecture:
 
 - **Core Solver**: Z3-based constraint satisfaction engine
-- **Configuration Management**: Pydantic-based configuration validation
-- **Model Classes**: Data structures for courses, faculty, and time slots
-- **Output Writers**: JSON and CSV output formatters
-- **REST Server**: FastAPI-based HTTP API
-- **Session Management**: Persistent session handling for large problems
+- **Configuration Management**: Pydantic-based configuration validation with comprehensive error handling
+- **Model Classes**: Enhanced data structures for courses, faculty, and time slots with improved serialization
+- **JSON Types**: Comprehensive TypedDict definitions for type-safe JSON handling
+- **Output Writers**: JSON and CSV output formatters with context manager support
+- **REST Server**: FastAPI-based HTTP API with asynchronous processing and session management
+- **Session Management**: Persistent session handling for large problems with background task support
 
 ## Performance
 
@@ -191,21 +203,24 @@ ruff check src/
 
 ```
 src/scheduler/
-├── __init__.py              # Main package exports
-├── config.py                # Configuration models
+├── __init__.py              # Main package exports with all types
+├── config.py                # Configuration models with strict validation and type definitions
+├── json_types.py            # TypedDict definitions for JSON structures
 ├── logging.py               # Logging setup
 ├── main.py                  # Command-line interface
-├── scheduler.py             # Core scheduling logic
-├── server.py                # REST API server
+├── scheduler.py             # Core scheduling logic with Z3 integration
+├── server.py                # REST API server with session management
 ├── time_slot_generator.py   # Utility for generating valid time slots
-├── models/                  # Data models
-│   ├── course.py            # Course and instance models
-│   ├── day.py               # Day enumeration
-│   ├── time_slot.py         # Time-related models
+├── models/                  # Enhanced data models
+│   ├── __init__.py          # Model exports
+│   ├── course.py            # Course and instance models with computed fields
+│   ├── day.py               # Day enumeration (IntEnum)
+│   ├── time_slot.py         # Time-related models with comprehensive methods
 │   └── identifiable.py      # Base identifiable class
 └── writers/                 # Output formatters
-    ├── csv_writer.py        # CSV output
-    └── json_writer.py       # JSON output
+    ├── __init__.py          # Writer exports
+    ├── csv_writer.py        # CSV output with context manager support
+    └── json_writer.py       # JSON output with context manager support
 ```
 
 ## Contributing
@@ -229,6 +244,32 @@ For questions, issues, or feature requests:
 - Review existing issues
 - Create a new issue with detailed information
 - Include configuration examples and error messages
+
+## Recent Updates
+
+### Enhanced Configuration Validation
+- Comprehensive cross-reference validation ensures all IDs exist
+- Business logic validation prevents impossible constraints
+- Detailed error messages for easier debugging
+- Support for preference scores (0-10) with improved validation
+
+### Improved Type Safety
+- New `json_types.py` module with comprehensive TypedDict definitions
+- Type-safe JSON handling throughout the application
+- Enhanced serialization with computed fields
+- Better integration with modern Python type checking
+
+### Enhanced REST API
+- Improved session management with background task support
+- Better error handling and status codes
+- Enhanced command-line options for server configuration
+- Comprehensive API documentation with examples
+
+### Model Improvements
+- Enhanced Course and TimeSlot models with better methods
+- Improved serialization with computed fields
+- Better time handling with IntEnum for days
+- Context manager support for writers
 
 ## Roadmap
 

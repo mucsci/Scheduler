@@ -10,8 +10,23 @@ The configuration consists of four main sections:
 
 1. **`config`**: Core scheduling configuration (rooms, labs, courses, faculty)
 2. **`time_slot_config`**: Time slot definitions and class patterns
-3. **`limit`**: Maximum number of schedules to generate
-4. **`optimizer_flags`**: Optimization preferences
+3. **`limit`**: Maximum number of schedules to generate (default: 10)
+4. **`optimizer_flags`**: Optimization preferences (optional)
+
+**Validation Features:**
+- All configurations are validated using Pydantic models with strict validation
+- Cross-reference validation ensures all IDs exist and are unique
+- Business logic validation prevents impossible constraints
+- Comprehensive error messages for debugging
+- Type-safe field validation with custom type definitions
+
+**Type Definitions:**
+The configuration system uses several type aliases for validation:
+- **`TimeString`**: Time in HH:MM format (00:00-23:59)
+- **`TimeRangeString`**: Time range in HH:MM-HH:MM format
+- **`Preference`**: Preference score between 0 and 10
+- **`Day`**: Day of the week (MON, TUE, WED, THU, FRI)
+- **`Room`**, **`Lab`**, **`Course`**, **`Faculty`**: Frozen string types for entity names
 
 ## Complete Configuration Example
 
@@ -149,12 +164,19 @@ The configuration consists of four main sections:
 ```
 
 **Fields:**
-- **`course_id`**: Unique identifier (required)
-- **`credits`**: Credit hours (required)
-- **`room`**: List of acceptable rooms (required)
-- **`lab`**: List of acceptable labs (optional)
-- **`conflicts`**: Course IDs that cannot be scheduled simultaneously
-- **`faculty`**: List of faculty who can teach this course (required)
+- **`course_id`**: Unique identifier (required, string)
+- **`credits`**: Credit hours (required, positive integer)
+- **`room`**: List of acceptable rooms (required, non-empty list)
+- **`lab`**: List of acceptable labs (optional, can be empty)
+- **`conflicts`**: Course IDs that cannot be scheduled simultaneously (optional, can be empty)
+- **`faculty`**: List of faculty who can teach this course (required, non-empty list)
+
+**Validation Rules:**
+- All room names must exist in the `rooms` list
+- All lab names must exist in the `labs` list
+- All faculty names must exist in the `faculty` list
+- All conflict course IDs must exist in the courses list
+- Course cannot conflict with itself
 
 **Best Practices:**
 - Use consistent course ID naming conventions
@@ -192,14 +214,21 @@ The configuration consists of four main sections:
 ```
 
 **Fields:**
-- **`name`**: Faculty member's name (required)
-- **`maximum_credits`**: Maximum credit hours they can teach (required)
-- **`minimum_credits`**: Minimum credit hours they must teach (required)
-- **`unique_course_limit`**: Maximum number of different courses they can teach (required)
-- **`times`**: Available time slots by day (required)
-- **`course_preferences`**: Course preference scores (1-10, higher = more preferred)
-- **`room_preferences`**: Room preference scores (1-10, higher = more preferred)
-- **`lab_preferences`**: Lab preference scores (1-10, higher = more preferred)
+- **`name`**: Faculty member's name (required, unique string)
+- **`maximum_credits`**: Maximum credit hours they can teach (required, non-negative integer)
+- **`minimum_credits`**: Minimum credit hours they must teach (required, non-negative integer)
+- **`unique_course_limit`**: Maximum number of different courses they can teach (required, positive integer)
+- **`times`**: Available time slots by day (required, non-empty dict)
+- **`course_preferences`**: Course preference scores (0-10, higher = more preferred, optional)
+- **`room_preferences`**: Room preference scores (0-10, higher = more preferred, optional)
+- **`lab_preferences`**: Lab preference scores (0-10, higher = more preferred, optional)
+
+**Validation Rules:**
+- `minimum_credits` cannot be greater than `maximum_credits`
+- All course IDs in preferences must exist in the courses list
+- All room names in preferences must exist in the rooms list
+- All lab names in preferences must exist in the labs list
+- Faculty names must be unique across all faculty members
 
 **Time Format:**
 - Use 24-hour format: "HH:MM-HH:MM"
@@ -207,6 +236,7 @@ The configuration consists of four main sections:
 - Example: `["09:00-12:00", "14:00-17:00"]`
 
 **Preference Scoring:**
+- **0**: No preference (default)
 - **1-3**: Low preference
 - **4-6**: Medium preference
 - **7-8**: High preference
@@ -244,9 +274,14 @@ The configuration consists of four main sections:
 ```
 
 **Fields:**
-- **`start`**: Start time in "HH:MM" format
-- **`spacing`**: Time slot spacing in minutes
-- **`end`**: End time in "HH:MM" format
+- **`start`**: Start time in "HH:MM" format (required, 24-hour format)
+- **`spacing`**: Time slot spacing in minutes (required, positive integer)
+- **`end`**: End time in "HH:MM" format (required, must be after start time)
+
+**Validation Rules:**
+- End time must be after start time
+- Spacing must be a positive integer
+- Time format must be valid "HH:MM" (00:00-23:59)
 
 **Best Practices:**
 - Use consistent time formats across all days
@@ -267,15 +302,21 @@ The configuration consists of four main sections:
     }
   ],
   "disabled": false,
-  "start_time": null
 }
 ```
 
 **Fields:**
-- **`credits`**: Credit hours for this pattern (required)
-- **`meetings`**: List of meeting configurations (required)
+- **`credits`**: Credit hours for this pattern (required, integer)
+- **`meetings`**: List of meeting configurations (required, non-empty list)
 - **`disabled`**: Whether this pattern is disabled (optional, default: false)
-- **`start_time`**: Specific start time constraint (optional)
+- **`start_time`**: Specific start time constraint (optional, "HH:MM" format)
+
+**Validation Rules:**
+- At least one meeting is required
+- No duplicate days in meetings list
+- Duration must be positive integer
+- Day must be valid weekday (MON, TUE, WED, THU, FRI)
+- Start time must be valid "HH:MM" format if provided
 
 **Meeting Configuration:**
 - **`day`**: Day of the week (MON, TUE, WED, THU, FRI)
@@ -384,13 +425,25 @@ The following fields are required and must be present:
 
 ### Field Validation
 
+**Basic Field Validation:**
 - **Course IDs**: Must be unique strings
 - **Faculty Names**: Must be unique strings
 - **Room/Lab Names**: Must exist in the respective lists
-- **Time Formats**: Must be valid "HH:MM" format
+- **Time Formats**: Must be valid "HH:MM" format (00:00-23:59)
 - **Credit Hours**: Must be positive integers
 - **Durations**: Must be positive integers
-- **Preference Scores**: Must be integers 1-10
+- **Preference Scores**: Must be integers 0-10
+- **Time Ranges**: End time must be after start time
+- **Cross-References**: All referenced IDs must exist in their respective lists
+
+**Advanced Validation Rules:**
+- **Strict Model Validation**: All models use `extra="forbid"` and `strict=True`
+- **Time Block Validation**: End time must be after start time in TimeBlock objects
+- **Faculty Credit Validation**: Minimum credits cannot exceed maximum credits
+- **Meeting Validation**: No duplicate days allowed in class pattern meetings
+- **Business Logic Validation**: All courses must have at least one faculty assignment
+- **Uniqueness Validation**: Room names, lab names, and faculty names must be unique
+- **Self-Conflict Prevention**: Courses cannot conflict with themselves
 
 ### Common Validation Errors
 
@@ -410,6 +463,20 @@ The following fields are required and must be present:
    ```
    ValidationError: 1 validation error for CourseConfig
    faculty -> 0: "Dr. Unknown" is not in faculty list
+   ```
+
+4. **Business Logic Violation**
+   ```
+   ValidationError: Configuration validation errors:
+     - Faculty "Dr. Smith" has minimum credits (8) greater than maximum credits (6)
+     - Course "CS101" cannot conflict with itself
+     - Courses without faculty assignments: ["CS102"]
+   ```
+
+5. **Time Validation Error**
+   ```
+   ValidationError: 1 validation error for TimeBlock
+   end: End time must be after start time
    ```
 
 ## Performance Considerations

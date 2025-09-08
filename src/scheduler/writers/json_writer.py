@@ -1,5 +1,6 @@
 import json
 
+from ..json_types import CourseInstanceJSON
 from ..models import CourseInstance
 
 
@@ -8,15 +9,16 @@ class JSONWriter:
 
     def __init__(self, filename: str | None = None):
         self.filename = filename
-        self.schedules: list[list[dict]] = []
+        self.schedules: list[list[CourseInstanceJSON]] = []
 
     def __enter__(self):
         return self
 
     def add_schedule(self, schedule: list[CourseInstance]) -> None:
         """Add a schedule to be written."""
-
-        schedule_data = [course_instance.as_json() for course_instance in schedule]
+        schedule_data = []
+        for course_instance in schedule:
+            schedule_data.append(course_instance.model_dump(by_alias=True, exclude_none=True))
         if self.filename:
             self.schedules.append(schedule_data)
         else:

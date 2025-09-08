@@ -1,4 +1,4 @@
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from pydantic import BaseModel, Field
 
@@ -16,7 +16,7 @@ class Identifiable(BaseModel):
         cls._id = cls._default_id
         cls._all = dict()
 
-    def __init__(self, **kwargs: Any) -> None:
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         if not hasattr(self, "id") or self.id is None:
             self.id = self.__class__._id
