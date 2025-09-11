@@ -50,7 +50,11 @@ scheduler example.json --limit 5
 ### Python API
 
 ```python
-from scheduler import Scheduler, load_config_from_file, CombinedConfig
+from scheduler import (
+    CombinedConfig,
+    Scheduler,
+    load_config_from_file,
+)
 
 # Load configuration
 config = load_config_from_file(CombinedConfig, "example.json")

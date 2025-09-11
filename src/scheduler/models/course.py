@@ -95,7 +95,7 @@ class CourseInstance(BaseModel):
     def as_csv(self):
         room_str = str(self.room)
         lab_str = str(self.lab)
-        time_str = str(self.times)
+        time_str = str(self.time)
         if self.lab is None:
             time_str = time_str.replace("^", "")
         return f"{self.course},{self.faculty},{room_str},{lab_str},{time_str}"

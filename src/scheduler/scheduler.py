@@ -10,7 +10,11 @@ from typing import cast
 import z3  # type: ignore
 from pydantic import BaseModel
 
-from .config import CombinedConfig, FacultyConfig, OptimizerFlags
+from .config import (
+    CombinedConfig,
+    FacultyConfig,
+    OptimizerFlags,
+)
 from .logging import logger
 from .models import (
     Course,
