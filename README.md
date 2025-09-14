@@ -90,9 +90,31 @@ curl -X GET "http://localhost:8000/schedules/{schedule_id}/count"
 
 ## Documentation
 
-- **[Python API Documentation](docs/python_api.md)** - Complete Python API reference
-- **[REST API Documentation](docs/rest_api.md)** - Full REST API specification
-- **[Configuration Guide](docs/configuration.md)** - Configuration file format and examples
+First, ensure the scheduler is installed via the [Installation](#installation) section above.
+
+### Python API Documentation
+
+To view the Python API documentation:
+
+```console
+pip install pdoc
+pdoc scheduler
+```
+
+### REST API Documentation
+
+To access the REST API documentation:
+
+```console
+scheduler-server
+# open http://localhost:8000/docs/ in a web browser
+```
+
+### Configuration Guide
+
+It is recommended to launch the REST API documentation and look at the Schema for `/submit`
+
+Alternatively, you can visit [./docs/configuration.md](./docs/configuration.md) to see the documentation related to the configuration file format and examples.
 
 ## Configuration
 

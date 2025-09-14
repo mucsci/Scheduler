@@ -19,6 +19,9 @@ type TimeString = Annotated[
         example="10:00",
     ),
 ]
+"""
+TimeString is a string in the format of HH:MM.
+"""
 
 type TimeRangeString = Annotated[
     str,
@@ -30,6 +33,10 @@ type TimeRangeString = Annotated[
     ),
 ]
 
+"""
+TimeRangeString is a string in the format of HH:MM-HH:MM.
+"""
+
 type Preference = Annotated[
     int,
     Field(
@@ -39,6 +46,9 @@ type Preference = Annotated[
         example=5,
     ),
 ]
+"""
+Preference is a score between 0 and 10.
+"""
 
 type Day = Annotated[
     Literal["MON", "TUE", "WED", "THU", "FRI"],
@@ -48,6 +58,9 @@ type Day = Annotated[
         example="MON",
     ),
 ]
+"""
+Day is a day of the week (MON, TUE, WED, THU, FRI).
+"""
 
 type Room = Annotated[
     str,
@@ -57,6 +70,9 @@ type Room = Annotated[
         example="Room 101",
     ),
 ]
+"""
+Room is a room name.
+"""
 
 type Lab = Annotated[
     str,
@@ -66,6 +82,9 @@ type Lab = Annotated[
         example="Lab 101",
     ),
 ]
+"""
+Lab is a lab name.
+"""
 
 type Course = Annotated[
     str,
@@ -75,6 +94,9 @@ type Course = Annotated[
         example="CS 101",
     ),
 ]
+"""
+Course is a course name.
+"""
 
 type Faculty = Annotated[
     str,
@@ -84,13 +106,24 @@ type Faculty = Annotated[
         example="Dr. Smith",
     ),
 ]
+"""
+Faculty is a faculty name.
+"""
 
 
 class _StrictBaseModel(BaseModel):
+    """
+    Base class for all models which need strict validation.
+    """
+
     model_config = ConfigDict(extra="forbid", strict=True)
 
 
 class TimeBlock(_StrictBaseModel):
+    """
+    Represents a time block within a day.
+    """
+
     start: TimeString = Field(description="Start time of the time block", example="10:00")
     spacing: PositiveInt = Field(description="Time spacing between slots in minutes", example=60)
     end: TimeString = Field(description="End time of the time block", example="17:00")
@@ -110,7 +143,9 @@ class TimeBlock(_StrictBaseModel):
 
 
 class TimeRange(_StrictBaseModel):
-    """A time range with start and end times, ensuring start < end."""
+    """
+    A time range with start and end times, ensuring start < end.
+    """
 
     start: TimeString = Field(description="Start time of the time range", example="10:00")
     end: TimeString = Field(description="End time of the time range", example="17:00")
@@ -139,12 +174,20 @@ class TimeRange(_StrictBaseModel):
 
 
 class Meeting(_StrictBaseModel):
+    """
+    Represents a single meeting instance.
+    """
+
     day: Day = Field(description="Day of the week", example="MON")
     duration: PositiveInt = Field(description="Duration of the meeting in minutes", example=150)
     lab: bool = Field(default=False, description="Whether the meeting is in a lab")
 
 
 class ClassPattern(_StrictBaseModel):
+    """
+    Represents a class pattern.
+    """
+
     credits: int = Field(description="Number of credit hours", example=3)
     meetings: list[Meeting] = Field(
         description="List of meeting times", example=[{"day": "MON", "duration": 150, "lab": False}]
@@ -169,11 +212,19 @@ class ClassPattern(_StrictBaseModel):
 
 
 class TimeSlotConfig(_StrictBaseModel):
+    """
+    Represents a time slot configuration.
+    """
+
     times: dict[Day, list[TimeBlock]] = Field(description="Dictionary mapping day names to time blocks")
     classes: list[ClassPattern] = Field(description="List of class patterns")
 
 
 class CourseConfig(_StrictBaseModel):
+    """
+    Represents a course configuration.
+    """
+
     course_id: Course = Field(description="Unique identifier for the course", example="CS 101")
     credits: int = Field(description="Number of credit hours", example=3)
     room: list[Room] = Field(description="List of acceptable room names", example=["Room 101"])
@@ -189,6 +240,10 @@ class CourseConfig(_StrictBaseModel):
 
 
 class FacultyConfig(_StrictBaseModel):
+    """
+    Represents a faculty configuration.
+    """
+
     name: Faculty = Field(description='Faculty member"s name', example="Dr. Smith")
     maximum_credits: int = Field(description="Maximum credit hours they can teach", ge=0, example=12)
     minimum_credits: int = Field(description="Minimum credit hours they must teach", ge=0, example=3)
@@ -243,6 +298,10 @@ class FacultyConfig(_StrictBaseModel):
 
 
 class SchedulerConfig(_StrictBaseModel):
+    """
+    Represents a scheduler configuration.
+    """
+
     rooms: list[Room] = Field(description="List of available room names", example=["Room 101"])
     labs: list[Lab] = Field(description="List of available lab names", example=["Lab 101"])
     courses: list[CourseConfig] = Field(
@@ -385,6 +444,10 @@ class OptimizerFlags(str, Enum):
 
 
 class CombinedConfig(_StrictBaseModel):
+    """
+    Represents a combined configuration.
+    """
+
     config: SchedulerConfig = Field(
         description="Scheduler configuration",
         example=SchedulerConfig(
@@ -439,6 +502,7 @@ class CombinedConfig(_StrictBaseModel):
     @field_validator("optimizer_flags", mode="before")
     @classmethod
     def convert_optimizer_flags(cls, v):
+        """Convert optimizer flags to OptimizerFlags objects."""
         if isinstance(v, list):
             return [OptimizerFlags(flag) if isinstance(flag, str) else flag for flag in v]
         return v
