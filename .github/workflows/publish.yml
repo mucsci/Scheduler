@@ -8,6 +8,7 @@ on:
 # security: restrict permissions for CI jobs.
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   build:
@@ -32,5 +33,5 @@ jobs:
       - name: Build the package
         run: uv build
 
-      - name: Upload the package
-        run: uv publish
+      - name: Publish package distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
