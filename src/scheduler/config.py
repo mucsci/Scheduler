@@ -23,6 +23,7 @@ type TimeString = Annotated[
 TimeString is a string in the format of HH:MM.
 """
 
+# TimeRangeString is a string in the format of HH:MM-HH:MM.
 type TimeRangeString = Annotated[
     str,
     Field(
@@ -37,6 +38,7 @@ type TimeRangeString = Annotated[
 TimeRangeString is a string in the format of HH:MM-HH:MM.
 """
 
+# Preference is an integer score between 0 and 10.
 type Preference = Annotated[
     int,
     Field(
@@ -46,8 +48,9 @@ type Preference = Annotated[
         example=5,
     ),
 ]
+
 """
-Preference is a score between 0 and 10.
+Preference is an integer score between 0 and 10.
 """
 
 type Day = Annotated[
@@ -58,8 +61,9 @@ type Day = Annotated[
         example="MON",
     ),
 ]
+
 """
-Day is a day of the week (MON, TUE, WED, THU, FRI).
+Day is a day of the week (must be one of: MON, TUE, WED, THU, FRI).
 """
 
 type Room = Annotated[
@@ -70,6 +74,7 @@ type Room = Annotated[
         example="Room 101",
     ),
 ]
+
 """
 Room is a room name.
 """
@@ -82,6 +87,7 @@ type Lab = Annotated[
         example="Lab 101",
     ),
 ]
+
 """
 Lab is a lab name.
 """
@@ -94,6 +100,7 @@ type Course = Annotated[
         example="CS 101",
     ),
 ]
+
 """
 Course is a course name.
 """
@@ -106,6 +113,7 @@ type Faculty = Annotated[
         example="Dr. Smith",
     ),
 ]
+
 """
 Faculty is a faculty name.
 """
@@ -114,9 +122,15 @@ Faculty is a faculty name.
 class _StrictBaseModel(BaseModel):
     """
     Base class for all models which need strict validation.
+
+    **Fields:**
+    - model_config: Configuration for the model
     """
 
     model_config = ConfigDict(extra="forbid", strict=True)
+    """
+    Configuration for the model which forbids extra fields and is strict
+    """
 
 
 class TimeBlock(_StrictBaseModel):
@@ -125,12 +139,26 @@ class TimeBlock(_StrictBaseModel):
     """
 
     start: TimeString = Field(description="Start time of the time block", example="10:00")
+    """
+    Start time of the time block
+    """
+
     spacing: PositiveInt = Field(description="Time spacing between slots in minutes", example=60)
+    """
+    Time spacing between slots in minutes
+    """
+
     end: TimeString = Field(description="End time of the time block", example="17:00")
+    """
+    End time of the time block
+    """
 
     @field_validator("end")
     @classmethod
     def validate_end_after_start(cls, v, info):
+        """
+        Validate that the end time is after the start time
+        """
         if "start" in info.data:
             start_time = info.data["start"]
             # Convert time strings to minutes for comparison
@@ -148,11 +176,20 @@ class TimeRange(_StrictBaseModel):
     """
 
     start: TimeString = Field(description="Start time of the time range", example="10:00")
+    """
+    Start time of the time range
+    """
     end: TimeString = Field(description="End time of the time range", example="17:00")
+    """
+    End time of the time range
+    """
 
     @field_validator("end")
     @classmethod
     def validate_end_after_start(cls, v, info):
+        """
+        Validate that the end time is after the start time
+        """
         if "start" in info.data:
             start_time = info.data["start"]
             # Convert time strings to minutes for comparison
@@ -167,8 +204,10 @@ class TimeRange(_StrictBaseModel):
         return f"{self.start}-{self.end}"
 
     @classmethod
-    def from_string(cls, time_range_str: str) -> "TimeRange":
-        """Create TimeRange from string format "HH:MM-HH:MM"."""
+    def from_string(cls, time_range_str: TimeRangeString) -> "TimeRange":
+        """
+        Create TimeRange from string format "HH:MM-HH:MM"
+        """
         start, end = time_range_str.split("-")
         return cls(start=start, end=end)
 
@@ -179,8 +218,24 @@ class Meeting(_StrictBaseModel):
     """
 
     day: Day = Field(description="Day of the week", example="MON")
+    """
+    Day of the week
+    """
+
+    start_time: TimeString | None = Field(default=None, description="Specific start time constraint")
+    """
+    Specific start time constraint
+    """
+
     duration: PositiveInt = Field(description="Duration of the meeting in minutes", example=150)
+    """
+    Duration of the meeting in minutes
+    """
+
     lab: bool = Field(default=False, description="Whether the meeting is in a lab")
+    """
+    Whether the meeting is in a lab
+    """
 
 
 class ClassPattern(_StrictBaseModel):
@@ -189,11 +244,26 @@ class ClassPattern(_StrictBaseModel):
     """
 
     credits: int = Field(description="Number of credit hours", example=3)
+    """
+    Number of credit hours
+    """
+
     meetings: list[Meeting] = Field(
         description="List of meeting times", example=[{"day": "MON", "duration": 150, "lab": False}]
     )
+    """
+    List of meeting times
+    """
+
     disabled: bool = Field(default=False, description="Whether the pattern is disabled")
+    """
+    Whether the pattern is disabled
+    """
+
     start_time: TimeString | None = Field(default=None, description="Specific start time constraint")
+    """
+    Specific start time constraint
+    """
 
     @field_validator("meetings")
     @classmethod
@@ -217,7 +287,13 @@ class TimeSlotConfig(_StrictBaseModel):
     """
 
     times: dict[Day, list[TimeBlock]] = Field(description="Dictionary mapping day names to time blocks")
+    """
+    Dictionary mapping day names to time blocks
+    """
     classes: list[ClassPattern] = Field(description="List of class patterns")
+    """
+    List of class patterns
+    """
 
 
 class CourseConfig(_StrictBaseModel):
@@ -226,11 +302,34 @@ class CourseConfig(_StrictBaseModel):
     """
 
     course_id: Course = Field(description="Unique identifier for the course", example="CS 101")
+    """
+    Unique identifier for the course
+    """
+
     credits: int = Field(description="Number of credit hours", example=3)
+    """
+    Number of credit hours
+    """
+
     room: list[Room] = Field(description="List of acceptable room names", example=["Room 101"])
+    """
+    List of acceptable room names
+    """
+
     lab: list[Lab] = Field(description="List of acceptable lab names", example=["Lab 101"])
+    """
+    List of acceptable lab names
+    """
+
     conflicts: list[Course] = Field(description="List of course IDs that cannot be scheduled simultaneously")
+    """
+    List of course IDs that cannot be scheduled simultaneously
+    """
+
     faculty: list[Faculty] = Field(description="List of faculty names", example=["Dr. Smith"])
+    """
+    List of faculty names
+    """
 
     @model_validator(mode="after")
     def validate_references(self):
@@ -245,35 +344,69 @@ class FacultyConfig(_StrictBaseModel):
     """
 
     name: Faculty = Field(description='Faculty member"s name', example="Dr. Smith")
+    """
+    Faculty member's name
+    """
+
     maximum_credits: int = Field(description="Maximum credit hours they can teach", ge=0, example=12)
+    """
+    Maximum credit hours they can teach
+    """
+
     minimum_credits: int = Field(description="Minimum credit hours they must teach", ge=0, example=3)
+    """
+    Minimum credit hours they must teach
+    """
+
     unique_course_limit: PositiveInt = Field(
         description="Maximum number of different courses they can teach", example=3
     )
+    """
+    Maximum number of different courses they can teach
+    """
+
     times: dict[Day, list[TimeRange]] = Field(
         description="Dictionary mapping day names to time ranges",
         example={"MON": ["10:00-12:00"], "TUE": ["10:00-12:00"]},
     )
+    """
+    Dictionary mapping day names to time ranges
+    """
+
     course_preferences: dict[Course, Preference] = Field(
         default_factory=dict,
         description="Dictionary mapping course IDs to preference scores",
         example={"CS 101": 5},
     )
+    """
+    Dictionary mapping `Course` IDs to `Preference` scores
+    """
+
     room_preferences: dict[Room, Preference] = Field(
         default_factory=dict,
         description="Dictionary mapping room IDs to preference scores",
         example={"Room 101": 5},
     )
+
+    """
+    Dictionary mapping `Room` IDs to `Preference` scores
+    """
+
     lab_preferences: dict[Lab, Preference] = Field(
         default_factory=dict,
         description="Dictionary mapping lab IDs to preference scores",
         example={"Lab 101": 5},
     )
+    """
+    Dictionary mapping `Lab` IDs to `Preference` scores
+    """
 
     @field_validator("times", mode="before")
     @classmethod
     def convert_time_strings(cls, v):
-        """Convert time strings to TimeRange objects."""
+        """
+        Convert time strings to `TimeRange` objects
+        """
         if isinstance(v, dict):
             converted = {}
             for day, time_list in v.items():
@@ -288,7 +421,9 @@ class FacultyConfig(_StrictBaseModel):
 
     @model_validator(mode="after")
     def validate_credit_consistency(self):
-        """Validate that minimum and maximum credits are consistent."""
+        """
+        Validate that minimum and maximum credits are consistent
+        """
         if self.minimum_credits > self.maximum_credits:
             raise ValueError(
                 f"Minimum credits ({self.minimum_credits}) cannot be greater than "
@@ -303,7 +438,15 @@ class SchedulerConfig(_StrictBaseModel):
     """
 
     rooms: list[Room] = Field(description="List of available room names", example=["Room 101"])
+    """
+    List of available `Room` names
+    """
+
     labs: list[Lab] = Field(description="List of available lab names", example=["Lab 101"])
+    """
+    List of available `Lab` names
+    """
+
     courses: list[CourseConfig] = Field(
         description="List of course configurations",
         example=[
@@ -317,6 +460,10 @@ class SchedulerConfig(_StrictBaseModel):
             }
         ],
     )
+    """
+    List of `CourseConfig` configurations
+    """
+
     faculty: list[FacultyConfig] = Field(
         description="List of faculty configurations",
         example=[
@@ -332,10 +479,16 @@ class SchedulerConfig(_StrictBaseModel):
             }
         ],
     )
+    """
+    List of `FacultyConfig` configurations
+    """
 
     @model_validator(mode="after")
     def validate_all_references(self):
-        """Validate that all Faculty, Room, Lab, and Course references exist and are unique."""
+        """
+        Validate that all `Faculty`, `Room`, `Lab`, and `Course` references exist.
+        Validate that all `Faculty`, `Room`, and `Lab` definitions are unique.
+        """
         # Validate uniqueness first
         self._validate_uniqueness()
 
@@ -403,8 +556,16 @@ class SchedulerConfig(_StrictBaseModel):
 
         return self
 
-    def _validate_business_logic(self, errors: list[str]):
-        """Validate business logic constraints."""
+    def _validate_business_logic(self, errors: list[str]) -> "SchedulerConfig":
+        """
+        Validate business logic constraints.
+
+        **Args:**
+        - errors: List of error messages
+
+        **Returns:**
+        - `SchedulerConfig` (self)
+        """
         courses = set(c for f in self.faculty for c in f.course_preferences)
         unassignable = set(c.course_id for c in self.courses) - courses
         if unassignable:
@@ -435,12 +596,39 @@ class SchedulerConfig(_StrictBaseModel):
 
 class OptimizerFlags(str, Enum):
     FACULTY_COURSE = "faculty_course"
+    """
+    Optimize faculty course assignments using preferences
+    """
+
     FACULTY_ROOM = "faculty_room"
+    """
+    Optimize faculty room assignments using preferences
+    """
+
     FACULTY_LAB = "faculty_lab"
+    """
+    Optimize faculty lab assignments using preferences
+    """
+
     SAME_ROOM = "same_room"
+    """
+    Force same room usage for courses taught by the same faculty
+    """
+
     SAME_LAB = "same_lab"
+    """
+    Force same lab usage for courses taught by the same faculty
+    """
+
     PACK_ROOMS = "pack_rooms"
+    """
+    Optimize packing of rooms for courses taught
+    """
+
     PACK_LABS = "pack_labs"
+    """
+    Optimize packing of labs for courses taught
+    """
 
 
 class CombinedConfig(_StrictBaseModel):
@@ -477,6 +665,10 @@ class CombinedConfig(_StrictBaseModel):
             ],
         ),
     )
+    """
+    Scheduler configuration
+    """
+
     time_slot_config: TimeSlotConfig = Field(
         description="Time slot configuration",
         example=TimeSlotConfig(
@@ -484,7 +676,15 @@ class CombinedConfig(_StrictBaseModel):
             classes=[{"credits": 3, "meetings": [{"day": "MON", "duration": 150, "lab": False}]}],
         ),
     )
+    """
+    Time slot configuration
+    """
+
     limit: PositiveInt = Field(default=10, description="Maximum number of schedules to generate", example=10)
+    """
+    Maximum number of schedules to generate (default: 10)
+    """
+
     optimizer_flags: list[OptimizerFlags] = Field(
         default_factory=list,
         description="List of optimizer flags",
@@ -498,18 +698,25 @@ class CombinedConfig(_StrictBaseModel):
             OptimizerFlags.PACK_LABS,
         ],
     )
+    """
+    List of optimizer flags to pass to the scheduler
+    """
 
     @field_validator("optimizer_flags", mode="before")
     @classmethod
     def convert_optimizer_flags(cls, v):
-        """Convert optimizer flags to OptimizerFlags objects."""
+        """
+        Convert optimizer flags to OptimizerFlags objects
+        """
         if isinstance(v, list):
             return [OptimizerFlags(flag) if isinstance(flag, str) else flag for flag in v]
         return v
 
     @model_validator(mode="after")
     def validate_time_slot_config_consistency(self):
-        """Validate that time slot config is consistent with scheduler config."""
+        """
+        Validate that time slot config is consistent with scheduler config
+        """
         errors = []
 
         # Check that all days in time_slot_config are valid

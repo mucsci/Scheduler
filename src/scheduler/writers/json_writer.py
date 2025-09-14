@@ -8,6 +8,12 @@ class JSONWriter:
     """Writer class for JSON output with consistent interface."""
 
     def __init__(self, filename: str | None = None):
+        """
+        Initialize the JSONWriter.
+
+        **Args:**
+        - filename: The name of the file to write the JSON to
+        """
         self.filename = filename
         self.schedules: list[list[CourseInstanceJSON]] = []
 
@@ -15,7 +21,12 @@ class JSONWriter:
         return self
 
     def add_schedule(self, schedule: list[CourseInstance]) -> None:
-        """Add a schedule to be written."""
+        """
+        Add a schedule to be written to the JSON file.
+
+        **Args:**
+        - schedule: The schedule to be written
+        """
         schedule_data = []
         for course_instance in schedule:
             schedule_data.append(course_instance.model_dump(by_alias=True, exclude_none=True))

@@ -7,7 +7,11 @@ from .identifiable import Identifiable
 
 
 class Duration(BaseModel):
-    duration: int
+    """
+    A duration of a time slot in minutes.
+    """
+
+    duration: int = Field(description="The duration of the time slot in minutes")
 
     @model_serializer
     def serialize_model(self) -> int:
@@ -50,7 +54,11 @@ class Duration(BaseModel):
 
 
 class TimePoint(BaseModel):
-    timepoint: int
+    """
+    A time point in minutes since midnight.
+    """
+
+    timepoint: int = Field(description="The time point in minutes since midnight")
 
     @model_serializer
     def serialize_model(self) -> int:
@@ -111,9 +119,13 @@ class TimePoint(BaseModel):
 
 
 class TimeInstance(BaseModel):
-    day: Day
-    start: TimePoint
-    duration: Duration
+    """
+    A time instance with a day, start time, and duration.
+    """
+
+    day: Day = Field(description="The day of the time instance")
+    start: TimePoint = Field(description="The start time of the time instance")
+    duration: Duration = Field(description="The duration of the time instance")
 
     @property
     def stop(self) -> TimePoint:
@@ -124,8 +136,12 @@ class TimeInstance(BaseModel):
 
 
 class TimeSlot(Identifiable):
-    times: list[TimeInstance]
-    lab_index: int | None = Field(default=None)
+    """
+    A time slot with a list of time instances and a lab index.
+    """
+
+    times: list[TimeInstance] = Field(description="The list of time instances in the time slot")
+    lab_index: int | None = Field(default=None, description="The index of the lab in the time slot")
 
     _MAX_TIME_DIFF_BETWEEN_SLOTS: ClassVar[Duration] = Duration(duration=30)
 
@@ -134,7 +150,11 @@ class TimeSlot(Identifiable):
 
     def lab_time(self) -> TimeInstance | None:
         """
-        Returns only the two hour time (if necessary) for a lab
+        Returns the time instance corresponding to the lab time slot
+
+        **Returns:**
+        The time instance of the lab
+        None if the time slot does not have a lab
         """
         if self.lab_index is not None:
             return self.times[self.lab_index]
@@ -143,7 +163,11 @@ class TimeSlot(Identifiable):
 
     def has_lab(self) -> bool:
         """
-        Returns True IFF the timeslot has a lab (two hour component)
+        Check if the time slot has a lab
+
+        **Returns:**
+        True if the time slot has a lab.
+        False otherwise
         """
         return self.lab_index is not None
 
@@ -155,6 +179,13 @@ class TimeSlot(Identifiable):
             return min(abs(t1.start - t2.start), abs(t1.stop - t2.stop))
 
     def lab_next_to(self, other: "TimeSlot") -> bool:
+        """
+        Check if the time slot has a lab that is next to another time slot
+
+        **Returns:**
+        True if the time slot has a lab that is next to another time slot.
+        False otherwise
+        """
         a = self.lab_time()
         b = other.lab_time()
         if a is None or b is None:
@@ -174,7 +205,10 @@ class TimeSlot(Identifiable):
     def lecture_next_to(self, other: "TimeSlot") -> bool:
         """
         Check if a time slot is logically next to another
-        (same day + adjacent or next day + same time)
+
+        **Returns:**
+        True if the time slot is logically next to another.
+        False otherwise
         """
         for i1, t1 in enumerate(self.times):
             for i2, t2 in enumerate(other.times):
@@ -188,14 +222,21 @@ class TimeSlot(Identifiable):
 
     def overlaps(self, other: "TimeSlot") -> bool:
         """
-        Returns true IFF this timeslot has any overlap with the passed time slot
+        Check if a time slot has any overlap with another time slot
+
+        **Returns:**
+        True if the time slot has any overlap with another time slot.
+        False otherwise
         """
         return any(TimeSlot._overlaps(a, b) for a in self.times for b in other.times)
 
     def lab_overlaps(self, other: "TimeSlot") -> bool:
         """
-        Returns true IFF this timeslot's two-hour block has any overlap
-        with the passed time slot's two-hour block
+        Check if a course's lab time slot has any overlap with another course's lab time slot
+
+        **Returns:**
+        True if the course's lab time slot has any overlap with another course's lab time slot.
+        False otherwise
         """
         a: TimeInstance | None = self.lab_time()
         b: TimeInstance | None = other.lab_time()
@@ -212,8 +253,11 @@ class TimeSlot(Identifiable):
 
     def in_time_ranges(self, ranges: list[TimeInstance]) -> bool:
         """
-        Returns true if this time slot fits into the passed range list
-        (day mask, start time, and end time)
+        Check if a time slot fits into a list of time ranges
+
+        **Returns:**
+        True if the time slot fits into the list of time ranges
+        False otherwise
         """
         return all(
             any(

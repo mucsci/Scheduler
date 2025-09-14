@@ -220,23 +220,23 @@ from .config import SchedulerConfig
 
 ### Documentation Standards
 
-**Docstrings (Google Style):**
+**Docstrings:**
 ```python
 def generate_schedule(config: SchedulerConfig, limit: int = 10) -> List[CourseInstance]:
     """Generate a course schedule based on configuration.
     
-    Args:
-        config: The scheduler configuration containing courses, faculty, and constraints.
-        limit: Maximum number of schedules to generate. Defaults to 10.
+    **Args:**
+    - config: The scheduler configuration containing courses, faculty, and constraints.
+    - limit: Maximum number of schedules to generate. Defaults to 10.
     
-    Returns:
-        A list of course instances representing the generated schedule.
+    **Returns:**
+    A list of course instances representing the generated schedule.
     
-    Raises:
-        ValueError: If the configuration is invalid.
-        RuntimeError: If no valid schedule can be generated.
+    **Raises:**
+    - ValueError: If the configuration is invalid.
+    - RuntimeError: If no valid schedule can be generated.
     
-    Example:
+    **Example:**
         >>> config = load_config_from_file("config.json")
         >>> schedule = generate_schedule(config, limit=5)
         >>> print(f"Generated {len(schedule)} courses")

@@ -3,7 +3,7 @@ import json
 import threading
 import time
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from functools import cache
 from typing import cast
 
@@ -33,7 +33,16 @@ def load_config_from_file[T: BaseModel](
     config_cls: type[T],
     filename: str,
 ) -> T:
-    """Load scheduler configuration from a JSON file."""
+    """
+    Load scheduler configuration from a JSON file.
+
+    **Args:**
+    - config_cls: The class of the configuration to load
+    - filename: The name of the file to load the configuration from
+
+    **Returns:**
+    The loaded configuration
+    """
     with open(filename, encoding="utf-8") as f:
         data = json.load(f)
     return config_cls(**data)
@@ -42,6 +51,15 @@ def load_config_from_file[T: BaseModel](
 def get_faculty_availability(
     faculty_config: FacultyConfig,
 ) -> list[TimeInstance]:
+    """
+    Calculate the availability of a faculty as a list of `TimeInstance` objects.
+
+    **Args:**
+    - faculty_config: The configuration of the faculty
+
+    **Returns:**
+    The availability of the faculty as a list of `TimeInstance` objects
+    """
     days: list[Day] = [Day.MON, Day.TUE, Day.WED, Day.THU, Day.FRI]
     result: list[TimeInstance] = list()
     for day in days:
@@ -67,15 +85,23 @@ def get_faculty_availability(
 
 
 class Scheduler:
+    """
+    Scheduler class for generating schedules.
+    """
+
     _init_lock = threading.Lock()
 
     def __init__(self, full_config: CombinedConfig):
         """
-        Initialize the scheduler.
+        Initializes the scheduler with all the necessary constraints and variables.
 
-        Args:
-            config: Configuration object containing courses, faculty, rooms, and labs
-            time_slot_config: Time slot configuration object
+        **Args:**
+        - full_config: `CombinedConfig` object containing all the configuration
+                       settings including the scheduler config, time slot config,
+                       limit, and optimizer flags
+
+        **Raises:**
+        - ValueError: If the optimizer flags are invalid
         """
 
         config = full_config.config
@@ -536,13 +562,13 @@ class Scheduler:
 
     def _get_schedule(self, model: z3.ModelRef) -> list["CourseInstance"]:
         """
-        Internal method to convert a Z3 model to a schedule of CourseInstance objects.
+        Internal method to convert a Z3 model to a schedule of `CourseInstance` objects.
 
-        Args:
-            model: The Z3 model containing assignments
+        **Args:**
+        - model: The Z3 model containing assignments
 
-        Returns:
-            List of CourseInstance objects representing the schedule
+        **Returns:**
+        List of `CourseInstance` objects representing the schedule
         """
 
         schedule = []
@@ -601,16 +627,12 @@ class Scheduler:
             logger.debug(f"Adding 1 per-course constraint with {len(per_course)} predicates")
             s.add(z3.Or(per_course))
 
-    def get_models(self):
+    def get_models(self) -> Generator[list[CourseInstance], None, None]:
         """
-        Generate schedule models.
+        Generate schedules one-at-a-time using the Z3 solver.
 
-        Args:
-            limit: Maximum number of schedules to generate (default: 10)
-            optimizer_config: Configuration for the optimizer (default: None)
-
-        Yields:
-            List of CourseInstance objects representing a complete schedule
+        **Returns:**
+        Generator of lists of `CourseInstance` objects representing complete schedules
         """
         s = z3.Optimize(ctx=self._ctx)
 

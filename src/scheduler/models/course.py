@@ -9,13 +9,17 @@ from .time_slot import TimeInstance, TimeSlot
 
 
 class Course(Identifiable):
-    credits: int
-    course_id: str
-    section: int | None = Field(default=None)
-    labs: list[str]
-    rooms: list[str]
-    conflicts: list[str]
-    faculties: list[str]
+    """
+    A course with a course_id, section, labs, rooms, conflicts, and faculties.
+    """
+
+    credits: int = Field(description="The number of credits for the course")
+    course_id: str = Field(description="The unique identifier for the course")
+    section: int | None = Field(default=None, description="The section number for the course")
+    labs: list[str] = Field(description="The list of potential labs for the course")
+    rooms: list[str] = Field(description="The list of potential rooms for the course")
+    conflicts: list[str] = Field(description="The list of course conflicts for the course")
+    faculties: list[str] = Field(description="The list of potential faculty for the course")
 
     _total_sections: ClassVar[defaultdict[str, int]] = defaultdict(int)
 
@@ -25,8 +29,15 @@ class Course(Identifiable):
     _faculty: z3.ExprRef | None
 
     def __init__(self, **kwargs):
+        """
+        Initializes a course with a course_id, section, labs, rooms, conflicts, and faculties.
+
+        **Args:**
+        - **kwargs: The keyword arguments to initialize the course
+        """
+        section = kwargs.pop("section", None)
         super().__init__(**kwargs)
-        self.section = kwargs.get("section", Course._next_section(self.course_id))
+        self.section = section or Course._next_section(self.course_id)
 
         # These will be set by the scheduler after EnumSorts are created
         self._lab = None
@@ -71,28 +82,78 @@ class Course(Identifiable):
 
 
 class CourseInstance(BaseModel):
-    course: Course = Field(exclude=True)
-    time: TimeSlot = Field(exclude=True)
-    faculty: str
-    room: str | None = Field(default=None)
-    lab: str | None = Field(default=None)
+    """
+    A course instance with a course, time, faculty, room, and lab.
+    """
+
+    course: Course = Field(description="The corresponding course object", exclude=True)
+    """
+    The corresponding course object
+    """
+
+    time: TimeSlot = Field(description="The assigned time slot", exclude=True)
+    """
+    The assigned time slot
+    """
+
+    faculty: str = Field(description="The assigned faculty")
+    """
+    The assigned faculty
+    """
+
+    room: str | None = Field(default=None, description="The assigned room")
+    """
+    The assigned room
+    """
+
+    lab: str | None = Field(default=None, description="The assigned lab")
+    """
+    The assigned lab
+    """
 
     @computed_field(alias="course")
     @property
     def course_str(self) -> str:
+        """
+        The string representation of the course
+
+        **Returns:**
+        The string representation of the course
+        """
         return str(self.course)
 
     @computed_field
     @property
     def times(self) -> list[TimeInstance]:
+        """
+        The list of times assigned to the course instance
+
+        **Returns:**
+        The list of times assigned to the course instance
+        """
         return self.time.times
 
     @computed_field
     @property
     def lab_index(self) -> int | None:
+        """
+        The index of the lab assigned to the course instance
+
+        **Returns:**
+        The index of the lab assigned to the course instance.
+        None if the course instance does not have a lab
+        """
         return self.time.lab_index if (self.lab is not None) else None
 
-    def as_csv(self):
+    def as_csv(self) -> str:
+        """
+        The CSV representation of the course instance in the format:
+
+        `<course>,<faculty>,<room>,<lab>,<times>`
+
+        **Returns:**
+        The CSV representation of the course instance
+        """
         room_str = str(self.room)
         lab_str = str(self.lab)
         time_str = str(self.time)
