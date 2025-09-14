@@ -51,10 +51,10 @@ scheduler example.json --limit 5
 
 ```python
 from scheduler import (
-    CombinedConfig,
     Scheduler,
     load_config_from_file,
 )
+from scheduler.config import CombinedConfig
 
 # Load configuration
 config = load_config_from_file(CombinedConfig, "example.json")
@@ -241,8 +241,7 @@ src/scheduler/
 │   ├── __init__.py          # Model exports
 │   ├── course.py            # Course and instance models with computed fields
 │   ├── day.py               # Day enumeration (IntEnum)
-│   ├── time_slot.py         # Time-related models with comprehensive methods
-│   └── identifiable.py      # Base identifiable class
+│   └── time_slot.py         # Time-related models with comprehensive methods
 └── writers/                 # Output formatters
     ├── __init__.py          # Writer exports
     ├── csv_writer.py        # CSV output with context manager support

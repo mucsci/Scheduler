@@ -1,60 +1,73 @@
-from collections import defaultdict
-from typing import ClassVar, cast
-
 import z3
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from .identifiable import Identifiable
 from .time_slot import TimeInstance, TimeSlot
 
 
-class Course(Identifiable):
+class Course(BaseModel):
     """
-    A course with a course_id, section, labs, rooms, conflicts, and faculties.
+    A course with a course_id, section, credits, conflicts, potential labs, potential rooms, and potential faculty.
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True, arbitrary_types_allowed=True)
+    """
+    Configuration for the model which forbids extra fields and is strict (@private)
+    """
+
+    course_id: str = Field(description="The unique identifier for the course")
+    """
+    The unique identifier for the course
     """
 
     credits: int = Field(description="The number of credits for the course")
-    course_id: str = Field(description="The unique identifier for the course")
-    section: int | None = Field(default=None, description="The section number for the course")
-    labs: list[str] = Field(description="The list of potential labs for the course")
-    rooms: list[str] = Field(description="The list of potential rooms for the course")
-    conflicts: list[str] = Field(description="The list of course conflicts for the course")
-    faculties: list[str] = Field(description="The list of potential faculty for the course")
+    """
+    The number of credits for the course
+    """
 
-    _total_sections: ClassVar[defaultdict[str, int]] = defaultdict(int)
+    section: int = Field(description="The section number for the course")
+    """
+    The section number for the course
+    """
 
-    _lab: z3.ExprRef | None
-    _room: z3.ExprRef | None
-    _time: z3.ExprRef | None
-    _faculty: z3.ExprRef | None
+    labs: list[str] = Field(default_factory=list, description="The list of potential labs for the course")
+    """
+    The list of potential labs for the course
+    """
 
-    def __init__(self, **kwargs):
-        """
-        Initializes a course with a course_id, section, labs, rooms, conflicts, and faculties.
+    rooms: list[str] = Field(default_factory=list, description="The list of potential rooms for the course")
+    """
+    The list of potential rooms for the course
+    """
 
-        **Args:**
-        - **kwargs: The keyword arguments to initialize the course
-        """
-        section = kwargs.pop("section", None)
-        super().__init__(**kwargs)
-        self.section = section or Course._next_section(self.course_id)
+    conflicts: list[str] = Field(default_factory=list, description="The list of course conflicts for the course")
+    """
+    The list of course conflicts for the course
+    """
 
-        # These will be set by the scheduler after EnumSorts are created
-        self._lab = None
-        self._room = None
-        self._time = None
-        self._faculty = None
+    faculties: list[str] = Field(default_factory=list, description="The list of potential faculty for the course")
+    """
+    The list of potential faculty for the course
+    """
 
-    @staticmethod
-    def _next_section(course_id: str) -> int:
-        Course._total_sections[course_id] += 1
-        return Course._total_sections[course_id]
+    lab: z3.ExprRef | None = None
+    """
+    The z3 variable used for assigning a lab
+    """
 
-    def uid(self) -> str:
-        return self.course_id
+    room: z3.ExprRef | None = None
+    """
+    The z3 variable used for assigning a room
+    """
 
-    def faculty(self) -> z3.ExprRef:
-        return cast(z3.ExprRef, self._faculty)
+    time: z3.ExprRef | None = None
+    """
+    The z3 variable used for assigning a time slot
+    """
+
+    faculty: z3.ExprRef | None = None
+    """
+    The z3 variable used for assigning a faculty
+    """
 
     def __str__(self) -> str:
         """
@@ -62,28 +75,15 @@ class Course(Identifiable):
         """
         return f"{self.course_id}.{self.section:02d}"
 
-    def time(self) -> z3.ExprRef:
-        """
-        the z3 variable used for assigning a time slot
-        """
-        return cast(z3.ExprRef, self._time)
-
-    def room(self) -> z3.ExprRef:
-        """
-        the z3 variable used for assigning a room
-        """
-        return cast(z3.ExprRef, self._room)
-
-    def lab(self) -> z3.ExprRef:
-        """
-        the z3 variable used for assigning a lab
-        """
-        return cast(z3.ExprRef, self._lab)
-
 
 class CourseInstance(BaseModel):
     """
     A course instance with a course, time, faculty, room, and lab.
+    """
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+    """
+    Configuration for the model which forbids extra fields and is strict (@private)
     """
 
     course: Course = Field(description="The corresponding course object", exclude=True)

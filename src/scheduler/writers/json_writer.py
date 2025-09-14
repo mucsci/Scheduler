@@ -5,7 +5,12 @@ from ..models import CourseInstance
 
 
 class JSONWriter:
-    """Writer class for JSON output with consistent interface."""
+    """
+    Writer class for JSON output with consistent interface.
+
+    This class provides a context manager interface for writing course schedules
+    to JSON format, either to a file or stdout.
+    """
 
     def __init__(self, filename: str | None = None):
         """
@@ -18,6 +23,12 @@ class JSONWriter:
         self.schedules: list[list[CourseInstanceJSON]] = []
 
     def __enter__(self):
+        """
+        Enter the context manager.
+
+        **Returns:**
+        The JSONWriter instance
+        """
         return self
 
     def add_schedule(self, schedule: list[CourseInstance]) -> None:
@@ -36,7 +47,14 @@ class JSONWriter:
             print(json.dumps(schedule_data, separators=(",", ":")))
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
-        """Write all accumulated schedules as one JSON array."""
+        """
+        Exit the context manager and write all accumulated schedules as one JSON array.
+
+        **Args:**
+        - exc_type: Exception type if an exception occurred
+        - exc_value: Exception value if an exception occurred
+        - traceback: Traceback if an exception occurred
+        """
         if self.filename:
             content = json.dumps(self.schedules, separators=(",", ":"))
             with open(self.filename, "w", encoding="utf-8") as f:

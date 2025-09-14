@@ -7,10 +7,23 @@ from .models import Day, Duration, TimeInstance, TimePoint, TimeSlot
 
 
 class TimeSlotGenerator:
-    """Generator for time slots."""
+    """
+    Generator for time slots based on configuration.
+
+    This class generates all possible time slot combinations for courses
+    based on the provided TimeSlotConfig, ensuring valid scheduling patterns
+    and constraints are met.
+    """
 
     def __init__(self, config: TimeSlotConfig):
+        """
+        Initialize the TimeSlotGenerator.
+
+        **Args:**
+        - config: The TimeSlotConfig containing time blocks and class patterns
+        """
         self.config = config
+        self._slot_counter = 0
 
     def _parse_time(self, time_str: str) -> int:
         """Convert time string (HH:MM) to minutes since midnight."""
@@ -48,7 +61,7 @@ class TimeSlotGenerator:
 
         return day_slots
 
-    def _validate_time_combination(self, time_combination: list[TimeInstance], min_overlap: int) -> bool:
+    def _validate_time_combination(self, time_combination: list[TimeInstance]) -> bool:
         """
         Validate a time combination by checking:
         1. No overlapping meetings on the same day
@@ -73,7 +86,7 @@ class TimeSlotGenerator:
                         overlap_end = min(t1_end, t2_end)
                         overlap_minutes = overlap_end - overlap_start
 
-                        if overlap_minutes < Duration(duration=min_overlap):
+                        if overlap_minutes < Duration(duration=self.config.min_time_overlap):
                             return False
         return True
 
@@ -85,7 +98,16 @@ class TimeSlotGenerator:
         return max(start_times.values()) >= 2
 
     @lru_cache(maxsize=1024)
-    def time_slots(self, credits: int, *, min_overlap: int) -> list[TimeSlot]:
+    def time_slots(self, credits: int) -> list[TimeSlot]:
+        """
+        Generate all possible time slots for a given credit level.
+
+        **Args:**
+        - credits: The course credit count to generate time slots for
+
+        **Returns:**
+        A list of TimeSlot objects
+        """
         # Find matching class patterns for the requested credits
         matching_patterns = [p for p in self.config.classes if p.credits == credits and not p.disabled]
         if not matching_patterns:
@@ -108,7 +130,7 @@ class TimeSlotGenerator:
             for time_combination_tuple in product(*meeting_slots):
                 time_combination = list(time_combination_tuple)
                 # Skip if there are same-day overlaps or insufficient overlap between days
-                if not self._validate_time_combination(time_combination, min_overlap):
+                if not self._validate_time_combination(time_combination):
                     continue
 
                 # Skip if there aren't at least two meetings starting at the same time
@@ -123,6 +145,14 @@ class TimeSlotGenerator:
                         break
 
                 # Create TimeSlot with this combination
-                result.append(TimeSlot(times=list(time_combination), lab_index=lab_index))
+                slot = TimeSlot(
+                    id=self._slot_counter,
+                    times=list(time_combination),
+                    lab_index=lab_index,
+                    max_time_gap=Duration(duration=self.config.max_time_gap),
+                )
+                if slot not in result:
+                    result.append(slot)
+                    self._slot_counter += 1
 
         return result

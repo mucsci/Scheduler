@@ -7,6 +7,16 @@ from .writers import CSVWriter, JSONWriter
 
 
 def _get_writer(format: str, output_file: str | None) -> JSONWriter | CSVWriter:
+    """
+    Get the appropriate writer based on the output format.
+
+    **Args:**
+    - format: The output format ("json" or "csv")
+    - output_file: The output file path, or None for stdout
+
+    **Returns:**
+    The appropriate writer instance (JSONWriter or CSVWriter)
+    """
     if format == "json":
         return JSONWriter(output_file)
     else:

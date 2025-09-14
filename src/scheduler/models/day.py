@@ -2,6 +2,14 @@ from enum import IntEnum, auto
 
 
 class Day(IntEnum):
+    """
+    Enumeration representing days of the week for scheduling.
+
+    This enum provides integer values for each weekday, starting from 1 (Monday)
+    and incrementing through Friday. Used throughout the scheduler for day-based
+    time slot management.
+    """
+
     MON = auto()
     TUE = auto()
     WED = auto()

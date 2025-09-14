@@ -26,26 +26,68 @@ SubmitRequest = CombinedConfig
 
 
 class HealthCheck(BaseModel):
+    """
+    Health check response model.
+
+    **Fields:**
+    - status: Health status of the service
+    - active_sessions: Number of active schedule generation sessions
+    """
+
     status: str
     active_sessions: int
 
 
 class SubmitResponse(BaseModel):
+    """
+    Response model for schedule submission requests.
+
+    **Fields:**
+    - schedule_id: Unique identifier for the generated schedule session
+    - endpoint: URL endpoint to access the schedule
+    """
+
     schedule_id: str
     endpoint: str
 
 
 class MessageResponse(BaseModel):
+    """
+    Generic message response model.
+
+    **Fields:**
+    - message: Response message text
+    """
+
     message: str
 
 
 class GenerateAllResponse(BaseModel):
+    """
+    Response model for generate-all schedule requests.
+
+    **Fields:**
+    - message: Status message about the generation process
+    - current_count: Number of schedules already generated
+    - target_count: Target number of schedules to generate
+    """
+
     message: str
     current_count: int
     target_count: int
 
 
 class ScheduleResponse(BaseModel):
+    """
+    Response model for schedule retrieval requests.
+
+    **Fields:**
+    - schedule_id: Unique identifier for the schedule session
+    - schedule: The generated schedule as a list of course instances
+    - index: Index of this schedule in the generation sequence
+    - total_generated: Total number of schedules generated so far
+    """
+
     schedule_id: str
     schedule: list[dict]
     index: int
@@ -53,11 +95,31 @@ class ScheduleResponse(BaseModel):
 
 
 class ScheduleDetailsResponse(CombinedConfig):
+    """
+    Response model for schedule details requests.
+
+    Inherits all fields from CombinedConfig and adds:
+
+    **Fields:**
+    - schedule_id: Unique identifier for the schedule session
+    - total_generated: Total number of schedules generated
+    """
+
     schedule_id: str
     total_generated: int
 
 
 class ScheduleCountResponse(BaseModel):
+    """
+    Response model for schedule count requests.
+
+    **Fields:**
+    - schedule_id: Unique identifier for the schedule session
+    - current_count: Number of schedules currently generated
+    - limit: Maximum number of schedules to generate
+    - is_complete: Whether all schedules have been generated
+    """
+
     schedule_id: str
     current_count: int
     limit: int
@@ -65,6 +127,14 @@ class ScheduleCountResponse(BaseModel):
 
 
 class ErrorResponse(BaseModel):
+    """
+    Error response model for API errors.
+
+    **Fields:**
+    - error: Error type or code
+    - message: Detailed error message
+    """
+
     error: str
     message: str
 
@@ -87,7 +157,12 @@ schedule_sessions: dict[str, ScheduleSession] = {}
 
 
 def cleanup_session(schedule_id: str):
-    """Remove a session from memory."""
+    """
+    Remove a session from memory and clean up associated resources.
+
+    **Args:**
+    - schedule_id: Unique identifier for the schedule session to clean up
+    """
     logger.debug(f"Cleaning up session {schedule_id}")
     logger.debug(f"Active sessions before cleanup: {list(schedule_sessions.keys())}")
 
@@ -117,7 +192,13 @@ def cleanup_session(schedule_id: str):
 
 
 async def ensure_scheduler_initialized(session_id: str, session: ScheduleSession):
-    """Ensure the scheduler is initialized for a session."""
+    """
+    Ensure the scheduler is initialized for a session.
+
+    **Args:**
+    - session_id: Unique identifier for the schedule session
+    - session: The ScheduleSession object to initialize
+    """
     if session.scheduler is not None:
         return
     assert session.scheduler_future is not None
@@ -126,7 +207,16 @@ async def ensure_scheduler_initialized(session_id: str, session: ScheduleSession
 
 
 async def ensure_generator_initialized(session_id: str, session: ScheduleSession):
-    """Ensure the generator is initialized for a session."""
+    """
+    Ensure the generator is initialized for a session.
+
+    **Args:**
+    - session_id: Unique identifier for the schedule session
+    - session: The ScheduleSession object to initialize the generator for
+
+    **Raises:**
+    - HTTPException: If generator initialization fails or times out
+    """
     if session.generator is not None:
         return
     if session.scheduler is None:

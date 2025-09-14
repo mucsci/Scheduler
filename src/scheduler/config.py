@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated, Literal
 
 from pydantic import (
@@ -129,7 +129,7 @@ class _StrictBaseModel(BaseModel):
 
     model_config = ConfigDict(extra="forbid", strict=True)
     """
-    Configuration for the model which forbids extra fields and is strict
+    Configuration for the model which forbids extra fields and is strict (@private)
     """
 
 
@@ -155,7 +155,7 @@ class TimeBlock(_StrictBaseModel):
 
     @field_validator("end")
     @classmethod
-    def validate_end_after_start(cls, v, info):
+    def _validate_end_after_start(cls, v, info):
         """
         Validate that the end time is after the start time
         """
@@ -186,7 +186,7 @@ class TimeRange(_StrictBaseModel):
 
     @field_validator("end")
     @classmethod
-    def validate_end_after_start(cls, v, info):
+    def _validate_end_after_start(cls, v, info):
         """
         Validate that the end time is after the start time
         """
@@ -267,7 +267,7 @@ class ClassPattern(_StrictBaseModel):
 
     @field_validator("meetings")
     @classmethod
-    def validate_meetings(cls, v):
+    def _validate_meetings(cls, v):
         """Validate meeting list is not empty and has reasonable structure."""
         if not v:
             raise ValueError("At least one meeting is required")
@@ -290,9 +290,30 @@ class TimeSlotConfig(_StrictBaseModel):
     """
     Dictionary mapping day names to time blocks
     """
+
     classes: list[ClassPattern] = Field(description="List of class patterns")
     """
     List of class patterns
+    """
+
+    max_time_gap: PositiveInt = Field(
+        default=30,
+        description="Maximum time gap between time slots to determine if they are adjacent",
+        example=30,
+        ge=0,
+    )
+    """
+    Maximum time gap between time slots to determine if they are adjacent (default: 30)
+    """
+
+    min_time_overlap: PositiveInt = Field(
+        default=45,
+        description="Minimum overlap between time slots",
+        example=45,
+        gt=0,
+    )
+    """
+    Minimum time overlap between time slots (default: 45)
     """
 
 
@@ -332,7 +353,7 @@ class CourseConfig(_StrictBaseModel):
     """
 
     @model_validator(mode="after")
-    def validate_references(self):
+    def _validate_references(self):
         """Validate that all references exist in the parent SchedulerConfig.
         This validator will be called by the parent SchedulerConfig."""
         return self
@@ -403,7 +424,7 @@ class FacultyConfig(_StrictBaseModel):
 
     @field_validator("times", mode="before")
     @classmethod
-    def convert_time_strings(cls, v):
+    def _convert_time_strings(cls, v):
         """
         Convert time strings to `TimeRange` objects
         """
@@ -420,7 +441,7 @@ class FacultyConfig(_StrictBaseModel):
         return v
 
     @model_validator(mode="after")
-    def validate_credit_consistency(self):
+    def _validate_credit_consistency(self):
         """
         Validate that minimum and maximum credits are consistent
         """
@@ -484,7 +505,7 @@ class SchedulerConfig(_StrictBaseModel):
     """
 
     @model_validator(mode="after")
-    def validate_all_references(self):
+    def _validate_all_references(self):
         """
         Validate that all `Faculty`, `Room`, `Lab`, and `Course` references exist.
         Validate that all `Faculty`, `Room`, and `Lab` definitions are unique.
@@ -594,7 +615,7 @@ class SchedulerConfig(_StrictBaseModel):
             raise ValueError(f"Duplicate faculty names found: {duplicates}")
 
 
-class OptimizerFlags(str, Enum):
+class OptimizerFlags(StrEnum):
     FACULTY_COURSE = "faculty_course"
     """
     Optimize faculty course assignments using preferences
@@ -704,7 +725,7 @@ class CombinedConfig(_StrictBaseModel):
 
     @field_validator("optimizer_flags", mode="before")
     @classmethod
-    def convert_optimizer_flags(cls, v):
+    def _convert_optimizer_flags(cls, v):
         """
         Convert optimizer flags to OptimizerFlags objects
         """
@@ -713,7 +734,7 @@ class CombinedConfig(_StrictBaseModel):
         return v
 
     @model_validator(mode="after")
-    def validate_time_slot_config_consistency(self):
+    def _validate_time_slot_config_consistency(self):
         """
         Validate that time slot config is consistent with scheduler config
         """

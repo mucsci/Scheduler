@@ -109,6 +109,7 @@ pytest
 src/scheduler/
 ├── __init__.py             # Main package exports
 ├── config.py               # Configuration models and validation
+├── json_types.py           # TypedDict definitions for JSON structures
 ├── main.py                 # Command-line interface
 ├── scheduler.py            # Core scheduling logic and Z3 integration
 ├── server.py               # FastAPI REST server
@@ -117,8 +118,7 @@ src/scheduler/
 │   ├── __init__.py         # Model exports
 │   ├── course.py           # Course and CourseInstance models
 │   ├── day.py              # Day enumeration
-│   ├── time_slot.py        # Time-related models (TimeSlot, TimeInstance, etc.)
-│   └── identifiable.py     # Base identifiable class
+│   └── time_slot.py        # Time-related models (TimeSlot, TimeInstance, etc.)
 ├── writers/                # Output formatters
 │   ├── __init__.py         # Writer exports
 │   ├── json_writer.py      # JSON output writer
@@ -154,11 +154,10 @@ git checkout -b feature/your-feature-name
 
 ```bash
 # Run linting
-ruff check src/
-ruff check tests/
+ruff check
 
 # Run type checking
-mypy src/
+ty check
 ```
 
 ### 4. Commit Your Changes
@@ -222,12 +221,11 @@ from .config import SchedulerConfig
 
 **Docstrings:**
 ```python
-def generate_schedule(config: SchedulerConfig, limit: int = 10) -> List[CourseInstance]:
+def generate_schedule(config: SchedulerConfig) -> List[CourseInstance]:
     """Generate a course schedule based on configuration.
     
     **Args:**
     - config: The scheduler configuration containing courses, faculty, and constraints.
-    - limit: Maximum number of schedules to generate. Defaults to 10.
     
     **Returns:**
     A list of course instances representing the generated schedule.
@@ -248,8 +246,8 @@ def generate_schedule(config: SchedulerConfig, limit: int = 10) -> List[CourseIn
 ```python
 # Use comments to explain WHY, not WHAT
 # Avoid obvious comments like "increment counter"
-# Good: "Skip weekends as they're not available for scheduling"
-if day in [Day.SAT, Day.SUN]:
+# Good: "Skip Fridays for labs as they're not available for scheduling"
+if day == Day.FRI:
     continue
 ```
 
@@ -301,7 +299,7 @@ if not faculty_available:
 Before submitting a pull request, ensure:
 
 - [ ] Code passes linting (`ruff check`)
-- [ ] Type checking passes (`mypy`)
+- [ ] Type checking passes (`ty check`)
 - [ ] Documentation is updated
 - [ ] Breaking changes are documented
 - [ ] Commit messages follow conventional format
@@ -367,9 +365,6 @@ We use [Semantic Versioning](https://semver.org/):
 ### Release Commands
 
 ```bash
-# Update version
-uv run bump2version patch  # or minor/major
-
 # Build package
 uv run build
 
