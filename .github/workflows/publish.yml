@@ -5,6 +5,10 @@ on:
     tags:
       - '*'
 
+jobs:
+  JOB-ID:
+    environment: release
+
 # security: restrict permissions for CI jobs.
 permissions:
   contents: read
