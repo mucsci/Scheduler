@@ -5,17 +5,13 @@ on:
     tags:
       - '*'
 
-jobs:
-  JOB-ID:
-    environment: release
-
-# security: restrict permissions for CI jobs.
 permissions:
   contents: read
   id-token: write
 
 jobs:
   build:
+    environment: release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
