@@ -1,5 +1,5 @@
 from collections import Counter
-from functools import lru_cache
+from functools import cache
 from itertools import product
 
 from .config import TimeBlock, TimeSlotConfig
@@ -23,7 +23,6 @@ class TimeSlotGenerator:
         - config: The TimeSlotConfig containing time blocks and class patterns
         """
         self.config = config
-        self._slot_counter = 0
 
     def _parse_time(self, time_str: str) -> int:
         """Convert time string (HH:MM) to minutes since midnight."""
@@ -97,7 +96,7 @@ class TimeSlotGenerator:
         start_times = Counter(t.start.timepoint for t in time_combination)
         return max(start_times.values()) >= 2
 
-    @lru_cache(maxsize=1024)
+    @cache
     def time_slots(self, credits: int) -> list[TimeSlot]:
         """
         Generate all possible time slots for a given credit level.
@@ -146,13 +145,11 @@ class TimeSlotGenerator:
 
                 # Create TimeSlot with this combination
                 slot = TimeSlot(
-                    id=self._slot_counter,
                     times=list(time_combination),
                     lab_index=lab_index,
                     max_time_gap=Duration(duration=self.config.max_time_gap),
                 )
                 if slot not in result:
                     result.append(slot)
-                    self._slot_counter += 1
 
         return result

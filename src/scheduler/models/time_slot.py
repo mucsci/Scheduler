@@ -1,3 +1,5 @@
+from typing import Self
+
 from pydantic import BaseModel, ConfigDict, Field, model_serializer
 
 from .day import Day
@@ -35,16 +37,16 @@ class Duration(BaseModel):
     def __abs__(self) -> "Duration":
         return Duration(duration=abs(self.value))
 
-    def __lt__(self, other: "Duration") -> bool:
+    def __lt__(self, other: Self) -> bool:
         return self.value < other.value
 
-    def __le__(self, other: "Duration") -> bool:
+    def __le__(self, other: Self) -> bool:
         return self.value <= other.value
 
-    def __gt__(self, other: "Duration") -> bool:
+    def __gt__(self, other: Self) -> bool:
         return self.value > other.value
 
-    def __ge__(self, other: "Duration") -> bool:
+    def __ge__(self, other: Self) -> bool:
         return self.value >= other.value
 
     def __eq__(self, other: object) -> bool:
@@ -117,22 +119,22 @@ class TimePoint(BaseModel):
     def __add__(self, dur: Duration) -> "TimePoint":
         return TimePoint(timepoint=(self.value + dur.value))
 
-    def __sub__(self, other: "TimePoint") -> Duration:
+    def __sub__(self, other: Self) -> Duration:
         return Duration(duration=(self.value - other.value))
 
     def __abs__(self) -> Duration:
         return Duration(duration=abs(self.value))
 
-    def __lt__(self, other: "TimePoint") -> bool:
+    def __lt__(self, other: Self) -> bool:
         return self.value < other.value
 
-    def __le__(self, other: "TimePoint") -> bool:
+    def __le__(self, other: Self) -> bool:
         return self.value <= other.value
 
-    def __gt__(self, other: "TimePoint") -> bool:
+    def __gt__(self, other: Self) -> bool:
         return self.value > other.value
 
-    def __ge__(self, other: "TimePoint") -> bool:
+    def __ge__(self, other: Self) -> bool:
         return self.value >= other.value
 
     def __eq__(self, other: object) -> bool:
@@ -198,11 +200,6 @@ class TimeSlot(BaseModel):
     Configuration for the model which allows extra fields and is not strict (@private)
     """
 
-    id: int = Field(description="The unique identifier for the time slot")
-    """
-    The unique identifier for the time slot
-    """
-
     times: list[TimeInstance] = Field(description="The list of time instances in the time slot")
     """
     The list of time instances in the time slot
@@ -219,7 +216,10 @@ class TimeSlot(BaseModel):
     """
 
     def __hash__(self) -> int:
-        return hash(self.id)
+        """
+        Hash the time slot by its string representation
+        """
+        return hash(str(self))
 
     def lab_time(self) -> TimeInstance | None:
         """
