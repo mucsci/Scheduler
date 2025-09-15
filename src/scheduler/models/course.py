@@ -1,50 +1,48 @@
+from dataclasses import dataclass
+
 import z3
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from .time_slot import TimeInstance, TimeSlot
 
 
-class Course(BaseModel):
+@dataclass
+class Course:
     """
     A course with a course_id, section, credits, conflicts, potential labs, potential rooms, and potential faculty.
     """
 
-    model_config = ConfigDict(extra="forbid", strict=True, arbitrary_types_allowed=True)
-    """
-    Configuration for the model which forbids extra fields and is strict (@private)
-    """
-
-    course_id: str = Field(description="The unique identifier for the course")
+    course_id: str
     """
     The unique identifier for the course
     """
 
-    credits: int = Field(description="The number of credits for the course")
+    credits: int
     """
     The number of credits for the course
     """
 
-    section: int = Field(description="The section number for the course")
+    section: int
     """
     The section number for the course
     """
 
-    labs: list[str] = Field(default_factory=list, description="The list of potential labs for the course")
+    labs: list[str]
     """
     The list of potential labs for the course
     """
 
-    rooms: list[str] = Field(default_factory=list, description="The list of potential rooms for the course")
+    rooms: list[str]
     """
     The list of potential rooms for the course
     """
 
-    conflicts: list[str] = Field(default_factory=list, description="The list of course conflicts for the course")
+    conflicts: list[str]
     """
     The list of course conflicts for the course
     """
 
-    faculties: list[str] = Field(default_factory=list, description="The list of potential faculty for the course")
+    faculties: list[str]
     """
     The list of potential faculty for the course
     """
@@ -81,7 +79,7 @@ class CourseInstance(BaseModel):
     A course instance with a course, time, faculty, room, and lab.
     """
 
-    model_config = ConfigDict(extra="forbid", strict=True)
+    model_config = ConfigDict(extra="forbid", strict=True, arbitrary_types_allowed=True)
     """
     Configuration for the model which forbids extra fields and is strict (@private)
     """

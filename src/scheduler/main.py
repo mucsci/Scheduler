@@ -54,7 +54,7 @@ def main(
     if limit is not None:
         full_config.limit = limit
     limit = full_config.limit
-    if optimizer_flags is not None:
+    if optimizer_flags:
         full_config.optimizer_flags = optimizer_flags
 
     logger.info(f"Using limit={limit}")
