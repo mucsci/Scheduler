@@ -32,7 +32,7 @@ jobs:
         run: uv run pdoc -o docs/ scheduler
 
       - name: Upload the documentation
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: docs/
 
