@@ -325,7 +325,7 @@ class Scheduler:
         true: list[tuple[z3.BoolRef, z3.BoolRef]] = []
         false: list[tuple[z3.BoolRef, z3.BoolRef]] = []
 
-        for slot_i, slot_j in itertools.combinations(self._slots, 2):
+        for slot_i, slot_j in itertools.combinations_with_replacement(self._slots, 2):
             c_i = z3_data.time_slot_constants[slot_i]
             c_j = z3_data.time_slot_constants[slot_j]
             if self._cached_slot_relationship(name, slot_i, slot_j):
