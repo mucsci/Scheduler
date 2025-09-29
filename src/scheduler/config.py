@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from enum import StrEnum
 from typing import Annotated, Literal
 
@@ -127,9 +128,9 @@ class _StrictBaseModel(BaseModel):
     - model_config: Configuration for the model
     """
 
-    model_config = ConfigDict(extra="forbid", strict=True)
+    model_config = ConfigDict(extra="forbid", strict=True, validate_assignment=True)
     """
-    Configuration for the model which forbids extra fields and is strict (@private)
+    Configuration for the model which forbids extra fields, is strict, and validates on assignment (@private)
     """
 
 
@@ -352,12 +353,6 @@ class CourseConfig(_StrictBaseModel):
     List of faculty names
     """
 
-    @model_validator(mode="after")
-    def _validate_references(self):
-        """Validate that all references exist in the parent SchedulerConfig.
-        This validator will be called by the parent SchedulerConfig."""
-        return self
-
 
 class FacultyConfig(_StrictBaseModel):
     """
@@ -505,10 +500,19 @@ class SchedulerConfig(_StrictBaseModel):
     """
 
     @model_validator(mode="after")
-    def _validate_all_references(self):
+    def validate_references(self):
         """
-        Validate that all `Faculty`, `Room`, `Lab`, and `Course` references exist.
-        Validate that all `Faculty`, `Room`, and `Lab` definitions are unique.
+        Validate all cross-references between child models.
+        This method can be called manually or is used by Pydantic validators.
+
+        **Usage:**
+        ```python
+        config.courses[0].room = ["NewRoom"]
+        config.validate_references()  # Validates all cross-references
+        ```
+
+        **Raises:**
+        - ValueError: If any cross-reference validation fails
         """
         # Validate uniqueness first
         self._validate_uniqueness()
@@ -576,6 +580,31 @@ class SchedulerConfig(_StrictBaseModel):
             raise ValueError(error_message)
 
         return self
+
+    @contextmanager
+    def edit_mode(self):
+        """
+        Context manager for making multiple changes with automatic rollback on validation failure.
+
+        **Usage:**
+        ```python
+        with config.edit_mode() as editable_config:
+            editable_config.courses[0].room = ["NewRoom"]
+            editable_config.courses[0].faculty = ["NewFaculty"]
+            editable_config.rooms.append("AnotherRoom")
+        # If validation fails, changes are automatically rolled back
+        ```
+
+        **Raises:**
+        - ValueError: If any cross-reference validation fails (with automatic rollback)
+        """
+        # Create a working copy for editing
+        working_copy = self.model_copy(deep=True)
+        yield working_copy
+        # Validate the working copy
+        working_copy.validate_references()
+        # If validation passes, update the original object
+        self.__dict__.update(working_copy.__dict__)
 
     def _validate_business_logic(self, errors: list[str]) -> "SchedulerConfig":
         """
