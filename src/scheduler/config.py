@@ -121,7 +121,7 @@ Faculty is a faculty name.
 """
 
 
-class _StrictBaseModel(BaseModel):
+class StrictBaseModel(BaseModel):
     """
     Base class for all models which need strict validation.
 
@@ -163,7 +163,7 @@ class _StrictBaseModel(BaseModel):
             raise e
 
 
-class TimeBlock(_StrictBaseModel):
+class TimeBlock(StrictBaseModel):
     """
     Represents a time block within a day.
     """
@@ -201,7 +201,7 @@ class TimeBlock(_StrictBaseModel):
         return v
 
 
-class TimeRange(_StrictBaseModel):
+class TimeRange(StrictBaseModel):
     """
     A time range with start and end times, ensuring start < end.
     """
@@ -243,7 +243,7 @@ class TimeRange(_StrictBaseModel):
         return cls(start=start, end=end)
 
 
-class Meeting(_StrictBaseModel):
+class Meeting(StrictBaseModel):
     """
     Represents a single meeting instance.
     """
@@ -269,7 +269,7 @@ class Meeting(_StrictBaseModel):
     """
 
 
-class ClassPattern(_StrictBaseModel):
+class ClassPattern(StrictBaseModel):
     """
     Represents a class pattern.
     """
@@ -312,7 +312,7 @@ class ClassPattern(_StrictBaseModel):
         return v
 
 
-class TimeSlotConfig(_StrictBaseModel):
+class TimeSlotConfig(StrictBaseModel):
     """
     Represents a time slot configuration.
     """
@@ -381,7 +381,7 @@ class TimeSlotConfig(_StrictBaseModel):
         return self
 
 
-class CourseConfig(_StrictBaseModel):
+class CourseConfig(StrictBaseModel):
     """
     Represents a course configuration.
     """
@@ -417,7 +417,7 @@ class CourseConfig(_StrictBaseModel):
     """
 
 
-class FacultyConfig(_StrictBaseModel):
+class FacultyConfig(StrictBaseModel):
     """
     Represents a faculty configuration.
     """
@@ -511,7 +511,7 @@ class FacultyConfig(_StrictBaseModel):
         return self
 
 
-class SchedulerConfig(_StrictBaseModel):
+class SchedulerConfig(StrictBaseModel):
     """
     Represents a scheduler configuration.
     """
@@ -644,31 +644,6 @@ class SchedulerConfig(_StrictBaseModel):
 
         return self
 
-    @contextmanager
-    def edit_mode(self):
-        """
-        Context manager for making multiple changes with automatic rollback on validation failure.
-
-        **Usage:**
-        ```python
-        with config.edit_mode() as editable_config:
-            editable_config.courses[0].room = ["NewRoom"]
-            editable_config.courses[0].faculty = ["NewFaculty"]
-            editable_config.rooms.append("AnotherRoom")
-        # If validation fails, changes are automatically rolled back
-        ```
-
-        **Raises:**
-        - ValueError: If any cross-reference validation fails (with automatic rollback)
-        """
-        # Create a working copy for editing
-        working_copy = self.model_copy(deep=True)
-        yield working_copy
-        # Validate the working copy
-        working_copy.validate_references()
-        # If validation passes, update the original object
-        self.__dict__.update(working_copy.__dict__)
-
     def _validate_business_logic(self, errors: list[str]) -> "SchedulerConfig":
         """
         Validate business logic constraints.
@@ -744,7 +719,7 @@ class OptimizerFlags(StrEnum):
     """
 
 
-class CombinedConfig(_StrictBaseModel):
+class CombinedConfig(StrictBaseModel):
     """
     Represents a combined configuration.
     """
