@@ -644,6 +644,31 @@ class SchedulerConfig(_StrictBaseModel):
 
         return self
 
+    @contextmanager
+    def edit_mode(self):
+        """
+        Context manager for making multiple changes with automatic rollback on validation failure.
+
+        **Usage:**
+        ```python
+        with config.edit_mode() as editable_config:
+            editable_config.courses[0].room = ["NewRoom"]
+            editable_config.courses[0].faculty = ["NewFaculty"]
+            editable_config.rooms.append("AnotherRoom")
+        # If validation fails, changes are automatically rolled back
+        ```
+
+        **Raises:**
+        - ValueError: If any cross-reference validation fails (with automatic rollback)
+        """
+        # Create a working copy for editing
+        working_copy = self.model_copy(deep=True)
+        yield working_copy
+        # Validate the working copy
+        working_copy.validate_references()
+        # If validation passes, update the original object
+        self.__dict__.update(working_copy.__dict__)
+
     def _validate_business_logic(self, errors: list[str]) -> "SchedulerConfig":
         """
         Validate business logic constraints.
