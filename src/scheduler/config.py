@@ -8,6 +8,7 @@ from pydantic import (
     Field,
     PositiveInt,
     ValidationError,
+    ValidationInfo,
     field_validator,
     model_validator,
 )
@@ -18,7 +19,7 @@ type TimeString = Annotated[
         pattern=r"^([0-1][0-9]|2[0-3]):[0-5][0-9]$",
         description="Time in HH:MM format",
         frozen=True,
-        example="10:00",
+        json_schema_extra={"example": "10:00"},
     ),
 ]
 """
@@ -32,7 +33,7 @@ type TimeRangeString = Annotated[
         pattern=r"^([0-1][0-9]|2[0-3]):[0-5][0-9]-([0-1][0-9]|2[0-3]):[0-5][0-9]$",
         description="Time range in HH:MM-HH:MM format",
         frozen=True,
-        example="10:00-12:00",
+        json_schema_extra={"example": "10:00-12:00"},
     ),
 ]
 
@@ -47,7 +48,7 @@ type Preference = Annotated[
         ge=0,
         le=10,
         description="Preference score between 0 and 10",
-        example=5,
+        json_schema_extra={"example": 5},
     ),
 ]
 
@@ -60,7 +61,7 @@ type Day = Annotated[
     Field(
         description="Day of the week",
         frozen=True,
-        example="MON",
+        json_schema_extra={"example": "MON"},
     ),
 ]
 
@@ -73,7 +74,7 @@ type Room = Annotated[
     Field(
         frozen=True,
         description="Room name",
-        example="Room 101",
+        json_schema_extra={"example": "Room 101"},
     ),
 ]
 
@@ -86,7 +87,7 @@ type Lab = Annotated[
     Field(
         frozen=True,
         description="Lab name",
-        example="Lab 101",
+        json_schema_extra={"example": "Lab 101"},
     ),
 ]
 
@@ -99,7 +100,7 @@ type Course = Annotated[
     Field(
         frozen=True,
         description="Course name",
-        example="CS 101",
+        json_schema_extra={"example": "CS 101"},
     ),
 ]
 
@@ -112,7 +113,7 @@ type Faculty = Annotated[
     Field(
         frozen=True,
         description="Faculty name",
-        example="Dr. Smith",
+        json_schema_extra={"example": "Dr. Smith"},
     ),
 ]
 
@@ -168,36 +169,39 @@ class TimeBlock(StrictBaseModel):
     Represents a time block within a day.
     """
 
-    start: TimeString = Field(description="Start time of the time block", example="10:00")
+    start: TimeString = Field(description="Start time of the time block", json_schema_extra={"example": "10:00"})
     """
     Start time of the time block
     """
 
-    spacing: PositiveInt = Field(description="Time spacing between slots in minutes", example=60)
+    spacing: PositiveInt = Field(description="Time spacing between slots in minutes", json_schema_extra={"example": 60})
     """
     Time spacing between slots in minutes
     """
 
-    end: TimeString = Field(description="End time of the time block", example="17:00")
+    end: TimeString = Field(description="End time of the time block", json_schema_extra={"example": "17:00"})
     """
     End time of the time block
     """
 
     @field_validator("start", "end")
     @classmethod
-    def _validate_end_after_start(cls, v, info):
+    def _validate_end_after_start(cls, v, info: ValidationInfo):
         """
         Validate that the end time is after the start time
         """
-        if "start" in info.data and "end" in info.data:
-            start_time = info.data["start"]
-            end_time = info.data["end"]
-            # Convert time strings to minutes for comparison
-            start_minutes = int(start_time.split(":")[0]) * 60 + int(start_time.split(":")[1])
-            end_minutes = int(end_time.split(":")[0]) * 60 + int(end_time.split(":")[1])
+        # Only validate when both fields are available
+        if "start" not in info.data or "end" not in info.data:
+            return v
 
-            if end_minutes <= start_minutes:
-                raise ValueError("End time must be after start time")
+        start_time = info.data["start"]
+        end_time = info.data["end"]
+        # Convert time strings to minutes for comparison
+        start_minutes = int(start_time.split(":")[0]) * 60 + int(start_time.split(":")[1])
+        end_minutes = int(end_time.split(":")[0]) * 60 + int(end_time.split(":")[1])
+
+        if end_minutes <= start_minutes:
+            raise ValueError("End time must be after start time")
         return v
 
 
@@ -206,29 +210,33 @@ class TimeRange(StrictBaseModel):
     A time range with start and end times, ensuring start < end.
     """
 
-    start: TimeString = Field(description="Start time of the time range", example="10:00")
+    start: TimeString = Field(description="Start time of the time range", json_schema_extra={"example": "10:00"})
     """
     Start time of the time range
     """
-    end: TimeString = Field(description="End time of the time range", example="17:00")
+    end: TimeString = Field(description="End time of the time range", json_schema_extra={"example": "17:00"})
     """
     End time of the time range
     """
 
-    @field_validator("end")
+    @field_validator("start", "end")
     @classmethod
-    def _validate_end_after_start(cls, v, info):
+    def _validate_end_after_start(cls, v, info: ValidationInfo):
         """
         Validate that the end time is after the start time
         """
-        if "start" in info.data:
-            start_time = info.data["start"]
-            # Convert time strings to minutes for comparison
-            start_minutes = int(start_time.split(":")[0]) * 60 + int(start_time.split(":")[1])
-            end_minutes = int(v.split(":")[0]) * 60 + int(v.split(":")[1])
+        # Only validate when both fields are available
+        if "start" not in info.data or "end" not in info.data:
+            return v
 
-            if end_minutes <= start_minutes:
-                raise ValueError("End time must be after start time")
+        start_time = info.data["start"]
+        end_time = info.data["end"]
+        # Convert time strings to minutes for comparison
+        start_minutes = int(start_time.split(":")[0]) * 60 + int(start_time.split(":")[1])
+        end_minutes = int(end_time.split(":")[0]) * 60 + int(end_time.split(":")[1])
+
+        if end_minutes <= start_minutes:
+            raise ValueError("End time must be after start time")
         return v
 
     def __str__(self) -> str:
@@ -248,7 +256,7 @@ class Meeting(StrictBaseModel):
     Represents a single meeting instance.
     """
 
-    day: Day = Field(description="Day of the week", example="MON")
+    day: Day = Field(description="Day of the week", json_schema_extra={"example": "MON"})
     """
     Day of the week
     """
@@ -258,7 +266,7 @@ class Meeting(StrictBaseModel):
     Specific start time constraint
     """
 
-    duration: PositiveInt = Field(description="Duration of the meeting in minutes", example=150)
+    duration: PositiveInt = Field(description="Duration of the meeting in minutes", json_schema_extra={"example": 150})
     """
     Duration of the meeting in minutes
     """
@@ -274,13 +282,14 @@ class ClassPattern(StrictBaseModel):
     Represents a class pattern.
     """
 
-    credits: int = Field(description="Number of credit hours", example=3)
+    credits: int = Field(description="Number of credit hours", json_schema_extra={"example": 3})
     """
     Number of credit hours
     """
 
     meetings: list[Meeting] = Field(
-        description="List of meeting times", example=[{"day": "MON", "duration": 150, "lab": False}]
+        description="List of meeting times",
+        json_schema_extra={"example": [{"day": "MON", "duration": 150, "lab": False}]},
     )
     """
     List of meeting times
@@ -296,9 +305,9 @@ class ClassPattern(StrictBaseModel):
     Specific start time constraint
     """
 
-    @field_validator("meetings")
+    @field_validator("meetings", mode="after")
     @classmethod
-    def _validate_meetings(cls, v):
+    def _validate_meetings(cls, v: list[Meeting], info: ValidationInfo):
         """Validate meeting list is not empty and has reasonable structure."""
         if not v:
             raise ValueError("At least one meeting is required")
@@ -330,7 +339,7 @@ class TimeSlotConfig(StrictBaseModel):
     max_time_gap: PositiveInt = Field(
         default=30,
         description="Maximum time gap between time slots to determine if they are adjacent",
-        example=30,
+        json_schema_extra={"example": 30},
         ge=0,
     )
     """
@@ -340,7 +349,7 @@ class TimeSlotConfig(StrictBaseModel):
     min_time_overlap: PositiveInt = Field(
         default=45,
         description="Minimum overlap between time slots",
-        example=45,
+        json_schema_extra={"example": 45},
         gt=0,
     )
     """
@@ -386,22 +395,22 @@ class CourseConfig(StrictBaseModel):
     Represents a course configuration.
     """
 
-    course_id: Course = Field(description="Unique identifier for the course", example="CS 101")
+    course_id: Course = Field(description="Unique identifier for the course", json_schema_extra={"example": "CS 101"})
     """
     Unique identifier for the course
     """
 
-    credits: int = Field(description="Number of credit hours", example=3)
+    credits: int = Field(description="Number of credit hours", json_schema_extra={"example": 3})
     """
     Number of credit hours
     """
 
-    room: list[Room] = Field(description="List of acceptable room names", example=["Room 101"])
+    room: list[Room] = Field(description="List of acceptable room names", json_schema_extra={"example": ["Room 101"]})
     """
     List of acceptable room names
     """
 
-    lab: list[Lab] = Field(description="List of acceptable lab names", example=["Lab 101"])
+    lab: list[Lab] = Field(description="List of acceptable lab names", json_schema_extra={"example": ["Lab 101"]})
     """
     List of acceptable lab names
     """
@@ -411,7 +420,7 @@ class CourseConfig(StrictBaseModel):
     List of course IDs that cannot be scheduled simultaneously
     """
 
-    faculty: list[Faculty] = Field(description="List of faculty names", example=["Dr. Smith"])
+    faculty: list[Faculty] = Field(description="List of faculty names", json_schema_extra={"example": ["Dr. Smith"]})
     """
     List of faculty names
     """
@@ -422,23 +431,27 @@ class FacultyConfig(StrictBaseModel):
     Represents a faculty configuration.
     """
 
-    name: Faculty = Field(description='Faculty member"s name', example="Dr. Smith")
+    name: Faculty = Field(description='Faculty member"s name', json_schema_extra={"example": "Dr. Smith"})
     """
     Faculty member's name
     """
 
-    maximum_credits: int = Field(description="Maximum credit hours they can teach", ge=0, example=12)
+    maximum_credits: int = Field(
+        description="Maximum credit hours they can teach", ge=0, json_schema_extra={"example": 12}
+    )
     """
     Maximum credit hours they can teach
     """
 
-    minimum_credits: int = Field(description="Minimum credit hours they must teach", ge=0, example=3)
+    minimum_credits: int = Field(
+        description="Minimum credit hours they must teach", ge=0, json_schema_extra={"example": 3}
+    )
     """
     Minimum credit hours they must teach
     """
 
     unique_course_limit: PositiveInt = Field(
-        description="Maximum number of different courses they can teach", example=3
+        description="Maximum number of different courses they can teach", json_schema_extra={"example": 3}
     )
     """
     Maximum number of different courses they can teach
@@ -446,7 +459,7 @@ class FacultyConfig(StrictBaseModel):
 
     times: dict[Day, list[TimeRange]] = Field(
         description="Dictionary mapping day names to time ranges",
-        example={"MON": ["10:00-12:00"], "TUE": ["10:00-12:00"]},
+        json_schema_extra={"example": {"MON": ["10:00-12:00"], "TUE": ["10:00-12:00"]}},
     )
     """
     Dictionary mapping day names to time ranges
@@ -455,7 +468,7 @@ class FacultyConfig(StrictBaseModel):
     course_preferences: dict[Course, Preference] = Field(
         default_factory=dict,
         description="Dictionary mapping course IDs to preference scores",
-        example={"CS 101": 5},
+        json_schema_extra={"example": {"CS 101": 5}},
     )
     """
     Dictionary mapping `Course` IDs to `Preference` scores
@@ -464,7 +477,7 @@ class FacultyConfig(StrictBaseModel):
     room_preferences: dict[Room, Preference] = Field(
         default_factory=dict,
         description="Dictionary mapping room IDs to preference scores",
-        example={"Room 101": 5},
+        json_schema_extra={"example": {"Room 101": 5}},
     )
 
     """
@@ -474,7 +487,7 @@ class FacultyConfig(StrictBaseModel):
     lab_preferences: dict[Lab, Preference] = Field(
         default_factory=dict,
         description="Dictionary mapping lab IDs to preference scores",
-        example={"Lab 101": 5},
+        json_schema_extra={"example": {"Lab 101": 5}},
     )
     """
     Dictionary mapping `Lab` IDs to `Preference` scores
@@ -516,28 +529,30 @@ class SchedulerConfig(StrictBaseModel):
     Represents a scheduler configuration.
     """
 
-    rooms: list[Room] = Field(description="List of available room names", example=["Room 101"])
+    rooms: list[Room] = Field(description="List of available room names", json_schema_extra={"example": ["Room 101"]})
     """
     List of available `Room` names
     """
 
-    labs: list[Lab] = Field(description="List of available lab names", example=["Lab 101"])
+    labs: list[Lab] = Field(description="List of available lab names", json_schema_extra={"example": ["Lab 101"]})
     """
     List of available `Lab` names
     """
 
     courses: list[CourseConfig] = Field(
         description="List of course configurations",
-        example=[
-            {
-                "course_id": "CS 101",
-                "credits": 3,
-                "room": ["Room 101"],
-                "lab": ["Lab 101"],
-                "conflicts": ["CS 102"],
-                "faculty": ["Dr. Smith"],
-            }
-        ],
+        json_schema_extra={
+            "example": [
+                {
+                    "course_id": "CS 101",
+                    "credits": 3,
+                    "room": ["Room 101"],
+                    "lab": ["Lab 101"],
+                    "conflicts": ["CS 102"],
+                    "faculty": ["Dr. Smith"],
+                }
+            ]
+        },
     )
     """
     List of `CourseConfig` configurations
@@ -545,18 +560,20 @@ class SchedulerConfig(StrictBaseModel):
 
     faculty: list[FacultyConfig] = Field(
         description="List of faculty configurations",
-        example=[
-            {
-                "name": "Dr. Smith",
-                "maximum_credits": 12,
-                "minimum_credits": 3,
-                "unique_course_limit": 3,
-                "times": {"MON": ["10:00-12:00"], "TUE": ["10:00-12:00"]},
-                "course_preferences": {"CS 101": 5},
-                "room_preferences": {"Room 101": 5},
-                "lab_preferences": {"Lab 101": 5},
-            }
-        ],
+        json_schema_extra={
+            "example": [
+                {
+                    "name": "Dr. Smith",
+                    "maximum_credits": 12,
+                    "minimum_credits": 3,
+                    "unique_course_limit": 3,
+                    "times": {"MON": ["10:00-12:00"], "TUE": ["10:00-12:00"]},
+                    "course_preferences": {"CS 101": 5},
+                    "room_preferences": {"Room 101": 5},
+                    "lab_preferences": {"Lab 101": 5},
+                }
+            ]
+        },
     )
     """
     List of `FacultyConfig` configurations
@@ -634,30 +651,11 @@ class SchedulerConfig(StrictBaseModel):
             if invalid_lab_prefs:
                 errors.append(f'Faculty "{faculty.name}" references invalid labs in preferences: {invalid_lab_prefs}')
 
-        # Additional business logic validations
-        self._validate_business_logic(errors)
-
         # Raise all errors at once for better debugging
         if errors:
             error_message = "Configuration validation errors:\n" + "\n".join(f"  - {error}" for error in errors)
             raise ValueError(error_message)
 
-        return self
-
-    def _validate_business_logic(self, errors: list[str]) -> "SchedulerConfig":
-        """
-        Validate business logic constraints.
-
-        **Args:**
-        - errors: List of error messages
-
-        **Returns:**
-        - `SchedulerConfig` (self)
-        """
-        courses = set(c for f in self.faculty for c in f.course_preferences)
-        unassignable = set(c.course_id for c in self.courses) - courses
-        if unassignable:
-            errors.append(f"Courses without faculty assignments: {unassignable}")
         return self
 
     def _validate_uniqueness(self):
@@ -726,32 +724,34 @@ class CombinedConfig(StrictBaseModel):
 
     config: SchedulerConfig = Field(
         description="Scheduler configuration",
-        example=SchedulerConfig(
-            rooms=["Room 101"],
-            labs=["Lab 101"],
-            courses=[
-                {
-                    "course_id": "CS 101",
-                    "credits": 3,
-                    "room": ["Room 101"],
-                    "lab": ["Lab 101"],
-                    "conflicts": [],
-                    "faculty": ["Dr. Smith"],
-                }
-            ],
-            faculty=[
-                {
-                    "name": "Dr. Smith",
-                    "maximum_credits": 12,
-                    "minimum_credits": 3,
-                    "unique_course_limit": 3,
-                    "times": {"MON": ["10:00-12:00"], "TUE": ["10:00-12:00"]},
-                    "course_preferences": {"CS 101": 5},
-                    "room_preferences": {"Room 101": 5},
-                    "lab_preferences": {"Lab 101": 5},
-                }
-            ],
-        ),
+        json_schema_extra={
+            "example": {
+                "rooms": ["Room 101"],
+                "labs": ["Lab 101"],
+                "courses": [
+                    {
+                        "course_id": "CS 101",
+                        "credits": 3,
+                        "room": ["Room 101"],
+                        "lab": ["Lab 101"],
+                        "conflicts": [],
+                        "faculty": ["Dr. Smith"],
+                    }
+                ],
+                "faculty": [
+                    {
+                        "name": "Dr. Smith",
+                        "maximum_credits": 12,
+                        "minimum_credits": 3,
+                        "unique_course_limit": 3,
+                        "times": {"MON": ["10:00-12:00"], "TUE": ["10:00-12:00"]},
+                        "course_preferences": {"CS 101": 5},
+                        "room_preferences": {"Room 101": 5},
+                        "lab_preferences": {"Lab 101": 5},
+                    }
+                ],
+            }
+        },
     )
     """
     Scheduler configuration
@@ -759,22 +759,26 @@ class CombinedConfig(StrictBaseModel):
 
     time_slot_config: TimeSlotConfig = Field(
         description="Time slot configuration",
-        example=TimeSlotConfig(
-            times={
-                "MON": [{"start": "10:00", "spacing": 60, "end": "12:00"}],
-                "TUE": [{"start": "10:00", "spacing": 60, "end": "12:00"}],
-                "WED": [{"start": "10:00", "spacing": 60, "end": "12:00"}],
-                "THU": [{"start": "10:00", "spacing": 60, "end": "12:00"}],
-                "FRI": [{"start": "10:00", "spacing": 60, "end": "12:00"}],
-            },
-            classes=[{"credits": 3, "meetings": [{"day": "MON", "duration": 150, "lab": False}]}],
-        ),
+        json_schema_extra={
+            "example": {
+                "times": {
+                    "MON": [{"start": "10:00", "spacing": 60, "end": "12:00"}],
+                    "TUE": [{"start": "10:00", "spacing": 60, "end": "12:00"}],
+                    "WED": [{"start": "10:00", "spacing": 60, "end": "12:00"}],
+                    "THU": [{"start": "10:00", "spacing": 60, "end": "12:00"}],
+                    "FRI": [{"start": "10:00", "spacing": 60, "end": "12:00"}],
+                },
+                "classes": [{"credits": 3, "meetings": [{"day": "MON", "duration": 150, "lab": False}]}],
+            }
+        },
     )
     """
     Time slot configuration
     """
 
-    limit: PositiveInt = Field(default=10, description="Maximum number of schedules to generate", example=10)
+    limit: PositiveInt = Field(
+        default=10, description="Maximum number of schedules to generate", json_schema_extra={"example": 10}
+    )
     """
     Maximum number of schedules to generate (default: 10)
     """
@@ -782,15 +786,17 @@ class CombinedConfig(StrictBaseModel):
     optimizer_flags: list[OptimizerFlags] = Field(
         default_factory=list,
         description="List of optimizer flags",
-        example=[
-            OptimizerFlags.FACULTY_COURSE,
-            OptimizerFlags.FACULTY_ROOM,
-            OptimizerFlags.FACULTY_LAB,
-            OptimizerFlags.SAME_ROOM,
-            OptimizerFlags.SAME_LAB,
-            OptimizerFlags.PACK_ROOMS,
-            OptimizerFlags.PACK_LABS,
-        ],
+        json_schema_extra={
+            "example": [
+                OptimizerFlags.FACULTY_COURSE,
+                OptimizerFlags.FACULTY_ROOM,
+                OptimizerFlags.FACULTY_LAB,
+                OptimizerFlags.SAME_ROOM,
+                OptimizerFlags.SAME_LAB,
+                OptimizerFlags.PACK_ROOMS,
+                OptimizerFlags.PACK_LABS,
+            ]
+        },
     )
     """
     List of optimizer flags to pass to the scheduler
