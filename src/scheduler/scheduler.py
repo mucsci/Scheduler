@@ -645,27 +645,19 @@ class Scheduler:
             if i.course_id == j.course_id:
                 # when a faculty teaches two sections of the same course,
                 # they must be next to each other
-                constraint_parts.append(
-                    cast(
-                        z3.BoolRef,
-                        z3.And(
-                            lecture_next_to(i.time, j.time),
-                            lab_next_to(i.time, j.time),
-                        ),
-                    )
-                )
+                same_course_constraints = [lecture_next_to(i.time, j.time)]
+                # Only require lab_next_to if the course has labs
+                if i.labs:
+                    same_course_constraints.append(lab_next_to(i.time, j.time))
+                constraint_parts.append(cast(z3.BoolRef, z3.And(same_course_constraints)))
             else:
                 # when a faculty teaches two sections of different courses,
                 # they must not be next to each other
-                constraint_parts.append(
-                    cast(
-                        z3.BoolRef,
-                        z3.And(
-                            z3.Not(lecture_next_to(i.time, j.time)),
-                            z3.Not(lab_next_to(i.time, j.time)),
-                        ),
-                    )
-                )
+                diff_course_constraints = [z3.Not(lecture_next_to(i.time, j.time))]
+                # Only require lab_next_to constraint if both courses have labs
+                if i.labs and j.labs:
+                    diff_course_constraints.append(z3.Not(lab_next_to(i.time, j.time)))
+                constraint_parts.append(cast(z3.BoolRef, z3.And(diff_course_constraints)))
 
             if resource:
                 # add all resource constraints (room, lab, etc.)

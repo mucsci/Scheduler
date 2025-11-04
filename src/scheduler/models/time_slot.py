@@ -290,10 +290,6 @@ class TimeSlot(BaseModel):
         """
         for i1, t1 in enumerate(self.times):
             for i2, t2 in enumerate(other.times):
-                if self.lab_index is None or other.lab_index is None:
-                    continue
-                if i1 == self.lab_index or i2 == other.lab_index:
-                    continue
                 if TimeSlot._diff_between_slots(t1, t2) <= self.max_time_gap:
                     return True
         return False
