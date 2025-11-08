@@ -443,6 +443,17 @@ class FacultyConfig(StrictBaseModel):
     Maximum credit hours they can teach
     """
 
+    maximum_days: int = Field(
+        default=5,
+        ge=0,
+        le=5,
+        description="Maximum number of days they are willing to teach (0-5, optional)",
+        json_schema_extra={"example": 3},
+    )
+    """
+    Maximum number of days they are willing to teach (optional)
+    """
+
     minimum_credits: int = Field(
         description="Minimum credit hours they must teach", ge=0, json_schema_extra={"example": 3}
     )
@@ -493,6 +504,15 @@ class FacultyConfig(StrictBaseModel):
     Dictionary mapping `Lab` IDs to `Preference` scores
     """
 
+    mandatory_days: set[Day] = Field(
+        default_factory=set,
+        description="Set of days the faculty must teach on",
+        json_schema_extra={"example": ["MON", "WED"]},
+    )
+    """
+    Set of days the faculty must teach on
+    """
+
     @field_validator("times", mode="before")
     @classmethod
     def _convert_time_strings(cls, v):
@@ -511,6 +531,13 @@ class FacultyConfig(StrictBaseModel):
             return converted
         return v
 
+    @field_validator("mandatory_days", mode="before")
+    @classmethod
+    def _convert_mandatory_days(cls, v):
+        if isinstance(v, list | tuple):
+            return set(v)
+        return v
+
     @model_validator(mode="after")
     def validate(self):
         """
@@ -520,6 +547,18 @@ class FacultyConfig(StrictBaseModel):
             raise ValueError(
                 f"Minimum credits ({self.minimum_credits}) cannot be greater than "
                 f"maximum credits ({self.maximum_credits})"
+            )
+        if self.maximum_days < len(self.mandatory_days):
+            raise ValueError(
+                f"maximum_days ({self.maximum_days}) cannot be less than the number of mandatory days "
+                f"({len(self.mandatory_days)})"
+            )
+        available_days = {day if isinstance(day, str) else str(day) for day in self.times}
+        mandatory_days = {day if isinstance(day, str) else str(day) for day in self.mandatory_days}
+        unavailable_mandatory = mandatory_days - available_days
+        if unavailable_mandatory:
+            raise ValueError(
+                f"Mandatory days {sorted(unavailable_mandatory)} must be present in the availability times"
             )
         return self
 
@@ -565,9 +604,11 @@ class SchedulerConfig(StrictBaseModel):
                 {
                     "name": "Dr. Smith",
                     "maximum_credits": 12,
+                    "maximum_days": 3,
                     "minimum_credits": 3,
                     "unique_course_limit": 3,
                     "times": {"MON": ["10:00-12:00"], "TUE": ["10:00-12:00"]},
+                    "mandatory_days": ["MON"],
                     "course_preferences": {"CS 101": 5},
                     "room_preferences": {"Room 101": 5},
                     "lab_preferences": {"Lab 101": 5},

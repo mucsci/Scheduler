@@ -123,11 +123,15 @@ class Scheduler:
             faculty_name = faculty_data.name
             self._faculty.add(faculty_name)
             self._faculty_maximum_credits[faculty_name] = faculty_data.maximum_credits
+            self._faculty_maximum_days[faculty_name] = faculty_data.maximum_days
             self._faculty_minimum_credits[faculty_name] = faculty_data.minimum_credits
             self._faculty_unique_course_limits[faculty_name] = faculty_data.unique_course_limit
             self._faculty_course_preferences[faculty_name] = faculty_data.course_preferences
             self._faculty_room_preferences[faculty_name] = faculty_data.room_preferences
             self._faculty_lab_preferences[faculty_name] = faculty_data.lab_preferences
+            self._faculty_mandatory_days[faculty_name] = {
+                day if isinstance(day, Day) else Day[day] for day in faculty_data.mandatory_days
+            }
             self._faculty_availability[faculty_name] = get_faculty_availability(faculty_data)
 
     def _initialize_courses(self, config) -> tuple[list[Course], set[int]]:
@@ -246,11 +250,13 @@ class Scheduler:
         # Initialize data structures
         self._faculty: set[str] = set()
         self._faculty_maximum_credits: dict[str, int] = dict()
+        self._faculty_maximum_days: dict[str, int] = dict()
         self._faculty_minimum_credits: dict[str, int] = dict()
         self._faculty_unique_course_limits: dict[str, int] = dict()
         self._faculty_course_preferences: dict[str, dict[str, int]] = dict()
         self._faculty_room_preferences: dict[str, dict[str, int]] = dict()
         self._faculty_lab_preferences: dict[str, dict[str, int]] = dict()
+        self._faculty_mandatory_days: dict[str, set[Day]] = dict()
         self._faculty_availability: dict[str, list[TimeInstance]] = dict()
         self._initialize_faculty_data(config)
 
@@ -326,8 +332,8 @@ class Scheduler:
         false: list[tuple[z3.BoolRef, z3.BoolRef]] = []
 
         for slot_i, slot_j in itertools.combinations_with_replacement(self._slots, 2):
-            c_i = z3_data.time_slot_constants[slot_i]
-            c_j = z3_data.time_slot_constants[slot_j]
+            c_i = cast(z3.BoolRef, z3_data.time_slot_constants[slot_i])
+            c_j = cast(z3.BoolRef, z3_data.time_slot_constants[slot_j])
             if self._cached_slot_relationship(name, slot_i, slot_j):
                 true.append((c_i, c_j))
                 true.append((c_j, c_i))
@@ -361,7 +367,7 @@ class Scheduler:
         true: list[z3.BoolRef] = []
         false: list[z3.BoolRef] = []
         for slot in self._slots:
-            c = z3_data.time_slot_constants[slot]
+            c = cast(z3.BoolRef, z3_data.time_slot_constants[slot])
             if fn(slot):
                 true.append(c)
             else:
@@ -388,9 +394,9 @@ class Scheduler:
             true: list[tuple[z3.BoolRef, z3.BoolRef]] = []
             false: list[tuple[z3.BoolRef, z3.BoolRef]] = []
             faculty_times = self._faculty_availability[faculty]
-            faculty_constant = z3_data.faculty_constants[faculty]
+            faculty_constant = cast(z3.BoolRef, z3_data.faculty_constants[faculty])
             for slot in self._slots:
-                slot_constant = z3_data.time_slot_constants[slot]
+                slot_constant = cast(z3.BoolRef, z3_data.time_slot_constants[slot])
                 if slot.in_time_ranges(faculty_times):
                     true.append((faculty_constant, slot_constant))
                 else:
@@ -463,11 +469,23 @@ class Scheduler:
             for faculty in c.faculties:
                 faculty_course_map[faculty].append(c)
 
+        # Pre-compute time slot constants per day for reuse
+        day_slot_map: defaultdict[Day, set[z3.ExprRef]] = defaultdict(set)
+        for slot in self._slots:
+            slot_constant = z3_data.time_slot_constants[slot]
+            for time_instance in slot.times:
+                day_slot_map[time_instance.day].add(slot_constant)
+        day_to_slot_constants: dict[Day, tuple[z3.ExprRef, ...]] = {
+            day: tuple(slot_constants) for day, slot_constants in day_slot_map.items()
+        }
+
         # Add faculty credit and unique course limits - batch generation
         faculty_constraints: list[z3.BoolRef] = []
         for faculty in self._faculty:
             faculty_courses = faculty_course_map.get(faculty, [])
             faculty_constant = z3_data.faculty_constants[faculty]
+            max_days = self._faculty_maximum_days[faculty]
+            mandatory_days = self._faculty_mandatory_days[faculty]
             if faculty_courses:
                 min_credits = self._faculty_minimum_credits[faculty]
                 max_credits = self._faculty_maximum_credits[faculty]
@@ -504,6 +522,54 @@ class Scheduler:
                         self._simplify(z3.Sum([z3.If(tc, 1, 0) for tc in teaches_course]) <= unique_limit),
                     )
                     faculty_constraints.append(limit)
+
+            # Track whether the faculty teaches on a given day
+            day_indicator_map: dict[Day, z3.BoolRef] = {}
+            for day in Day:
+                slot_constants = day_to_slot_constants.get(day, ())
+                course_day_assignments: list[z3.BoolRef] = []
+                if slot_constants and faculty_courses:
+                    for course in faculty_courses:
+                        slot_matches = [course.time == slot_const for slot_const in slot_constants]
+                        if slot_matches:
+                            course_day_assignments.append(
+                                cast(
+                                    z3.BoolRef,
+                                    self._simplify(
+                                        z3.And(
+                                            course.faculty == faculty_constant,
+                                            z3.Or(slot_matches),
+                                        )
+                                    ),
+                                )
+                            )
+                if course_day_assignments:
+                    day_indicator_map[day] = cast(
+                        z3.BoolRef,
+                        self._simplify(z3.Or(course_day_assignments)),
+                    )
+                else:
+                    day_indicator_map[day] = z3.BoolVal(False, ctx=self._ctx)
+
+            # Maximum-day constraint
+            day_sum_terms = [z3.If(indicator, 1, 0) for indicator in day_indicator_map.values()]
+            day_sum = z3.Sum(day_sum_terms) if day_sum_terms else z3.IntVal(0, ctx=self._ctx)
+            faculty_constraints.append(
+                cast(
+                    z3.BoolRef,
+                    self._simplify(day_sum <= max_days),
+                )
+            )
+
+            # Mandatory-day constraints
+            for mandatory_day in mandatory_days:
+                indicator = day_indicator_map.get(mandatory_day, z3.BoolVal(False, ctx=self._ctx))
+                faculty_constraints.append(
+                    cast(
+                        z3.BoolRef,
+                        self._simplify(indicator),
+                    )
+                )
 
         return faculty_constraints
 
@@ -658,6 +724,10 @@ class Scheduler:
                 if i.labs and j.labs:
                     diff_course_constraints.append(z3.Not(lab_next_to(i.time, j.time)))
                 constraint_parts.append(cast(z3.BoolRef, z3.And(diff_course_constraints)))
+
+            if i.course_id == j.course_id:
+                # prevent overlapping times for different sections of the same course
+                resource_constraints.append(cast(z3.BoolRef, z3.Not(overlaps(i.time, j.time))))
 
             if resource:
                 # add all resource constraints (room, lab, etc.)

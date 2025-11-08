@@ -27,6 +27,7 @@
             "maximum_credits": 12,
             "minimum_credits": 12,
             "unique_course_limit": 3,
+            "maximum_days": 4,
             "times": {
                 "MON": ["11:00-16:00"],
                 "TUE": [],
@@ -54,11 +55,13 @@
             "maximum_credits": 14,
             "minimum_credits": 12,
             "unique_course_limit": 2,
+            "maximum_days": 4,
+            "mandatory_days": ["MON", "WED", "FRI"],
             "times": {
                 "MON": ["09:00-15:00"],
                 "TUE": ["09:00-15:00"],
                 "WED": ["09:00-15:00"],
-                "THU": [],
+                "THU": ["09:00-15:00"],
                 "FRI": ["09:00-15:00"]
             },
             "course_preferences": {
@@ -80,9 +83,11 @@
             "maximum_credits": 8,
             "minimum_credits": 8,
             "unique_course_limit": 2,
+            "maximum_days": 4,
+            "mandatory_days": ["MON", "WED"],
             "times": {
                 "MON": ["09:00-13:00"],
-                "TUE": [],
+                "TUE": ["09:00-15:00"],
                 "WED": ["09:00-15:00"],
                 "THU": ["09:00-15:00"],
                 "FRI": ["09:00-15:00"]
@@ -106,11 +111,13 @@
             "maximum_credits": 12,
             "minimum_credits": 12,
             "unique_course_limit": 2,
+            "maximum_days": 4,
+            "mandatory_days": ["WED"],
             "times": {
                 "MON": ["09:00-15:00"],
                 "TUE": ["09:00-15:00"],
                 "WED": ["09:00-15:00"],
-                "THU": [],
+                "THU": ["09:00-15:00"],
                 "FRI": ["09:00-15:00"]
             },
             "course_preferences": {
@@ -207,11 +214,13 @@
             "maximum_credits": 12,
             "minimum_credits": 12,
             "unique_course_limit": 2,
+            "maximum_days": 4,
+            "mandatory_days": ["WED"],
             "times": {
                 "MON": ["09:00-17:00"],
                 "TUE": ["09:00-17:00"],
                 "WED": ["09:00-15:00"],
-                "THU": [],
+                "THU": ["09:00-17:00"],
                 "FRI": ["09:00-17:00"]
             },
             "course_preferences": {

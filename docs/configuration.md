@@ -59,6 +59,8 @@ The configuration system uses several type aliases for validation:
         "maximum_credits": 12,
         "minimum_credits": 6,
         "unique_course_limit": 3,
+        "maximum_days": 4,
+        "mandatory_days": ["MON", "WED"],
         "times": {
           "MON": ["09:00-17:00"],
           "TUE": ["09:00-17:00"],
@@ -218,6 +220,8 @@ The configuration system uses several type aliases for validation:
 - **`maximum_credits`**: Maximum credit hours they can teach (required, non-negative integer)
 - **`minimum_credits`**: Minimum credit hours they must teach (required, non-negative integer)
 - **`unique_course_limit`**: Maximum number of different courses they can teach (required, positive integer)
+- **`maximum_days`**: Maximum number of distinct days they will teach (optional, defaults to 5)
+- **`mandatory_days`**: Set of days they must teach on (optional, defaults to empty)
 - **`times`**: Available time slots by day (required, non-empty dict)
 - **`course_preferences`**: Course preference scores (0-10, higher = more preferred, optional)
 - **`room_preferences`**: Room preference scores (0-10, higher = more preferred, optional)
@@ -225,6 +229,8 @@ The configuration system uses several type aliases for validation:
 
 **Validation Rules:**
 - `minimum_credits` cannot be greater than `maximum_credits`
+- `mandatory_days` must be a subset of the days listed in `times`
+- `maximum_days` must be greater than or equal to the number of `mandatory_days`
 - All course IDs in preferences must exist in the courses list
 - All room names in preferences must exist in the rooms list
 - All lab names in preferences must exist in the labs list
@@ -244,6 +250,8 @@ The configuration system uses several type aliases for validation:
 
 **Best Practices:**
 - Set realistic credit limits based on faculty workload
+- Use `maximum_days` to cap teaching days when faculty want compressed schedules
+- Reserve `mandatory_days` for commitments like standing department meetings or required course coverage
 - Use preference scores to guide optimization
 - Ensure availability times are accurate and comprehensive
 - Consider faculty expertise when assigning course preferences
