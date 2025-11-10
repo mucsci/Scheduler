@@ -797,7 +797,7 @@ class Scheduler:
             room = self._z3_data.room_constants.inverse.get(model.eval(course.room), None)
             lab = self._z3_data.lab_constants.inverse.get(model.eval(course.lab), None)
 
-            if time is None or faculty is None or room is None:
+            if time is None or faculty is None:
                 raise ValueError(f"Invalid model: {model}")
 
             # Create CourseInstance
@@ -1023,15 +1023,15 @@ class Scheduler:
             s.maximize(z3.Sum(packing_labs))
 
         if len(self._optimizer_flags) > 0:
-            logger.info("Created all optimization goals")
+            logger.debug("Created all optimization goals")
         else:
-            logger.info("Skipping optimization goals")
+            logger.debug("Skipping optimization goals")
 
         for i in range(self._limit):
             start_time = time.time()
             if s.check() == z3.sat:
                 generation_time = time.time() - start_time
-                logger.info(f"Schedule {i + 1} generation took {generation_time:.2f}s")
+                logger.debug(f"Schedule {i + 1} generation took {generation_time:.2f}s")
                 yield self._get_schedule(s.model())
                 if i < self._limit - 1:
                     self._update(s)
@@ -1042,5 +1042,5 @@ class Scheduler:
                     logger.error("No solution found")
                 else:
                     logger.warning("No more solutions found")
-                logger.info(f"Final check took {generation_time:.2f} seconds")
+                logger.debug(f"Final check took {generation_time:.2f} seconds")
                 break
