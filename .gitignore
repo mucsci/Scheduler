@@ -20,5 +20,6 @@ htmlcov/
 **/*.json
 !example.json
 !tests/fixtures/**/*.json
+!fern/fern.config.json
 
 **/.DS_Store
