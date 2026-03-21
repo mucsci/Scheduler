@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 import click
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 from .config import CombinedConfig
 from .logging import configure_logging, logger
@@ -26,9 +26,44 @@ z3_executor: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=16, thread_name
 SubmitRequest = CombinedConfig
 
 
+class TimeInstanceResponse(BaseModel):
+    """One meeting time block within a scheduled course (JSON shape)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    day: int = Field(description="Weekday as `Day` enum value (1=Monday … 5=Friday).")
+    start: int = Field(description="Start time in minutes since midnight.")
+    duration: int = Field(description="Duration in minutes.")
+
+
+class CourseInstanceResponse(BaseModel):
+    """One course row in a generated schedule (`CourseInstance.model_dump` JSON shape)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    course: str = Field(description='Course id with section, e.g. `"CS101.01"`.')
+    faculty: str
+    times: list[TimeInstanceResponse]
+    room: str | None = Field(default=None, description="Assigned room when present.")
+    lab: str | None = Field(default=None, description="Assigned lab when present.")
+    lab_index: int | None = Field(
+        default=None,
+        description="When `lab` is set, index into `times` for the lab meeting.",
+    )
+
+
+def _schedule_response_rows(courses: list[CourseInstance]) -> list[CourseInstanceResponse]:
+    return [CourseInstanceResponse.model_validate(c.model_dump(by_alias=True, exclude_none=True)) for c in courses]
+
+
 class HealthCheck(BaseModel):
     """
     Health check response model.
+
+    **Usage:**
+    ```python
+    HealthCheck(status="healthy", active_sessions=0)
+    ```
 
     **Fields:**
     - status: Health status of the service
@@ -43,6 +78,11 @@ class SubmitResponse(BaseModel):
     """
     Response model for schedule submission requests.
 
+    **Usage:**
+    ```python
+    SubmitResponse(schedule_id="...", endpoint="/schedules/...")
+    ```
+
     **Fields:**
     - schedule_id: Unique identifier for the generated schedule session
     - endpoint: URL endpoint to access the schedule
@@ -56,6 +96,11 @@ class MessageResponse(BaseModel):
     """
     Generic message response model.
 
+    **Usage:**
+    ```python
+    MessageResponse(message="ok")
+    ```
+
     **Fields:**
     - message: Response message text
     """
@@ -66,6 +111,11 @@ class MessageResponse(BaseModel):
 class GenerateAllResponse(BaseModel):
     """
     Response model for generate-all schedule requests.
+
+    **Usage:**
+    ```python
+    GenerateAllResponse(message='...', current_count=1, target_count=10)
+    ```
 
     **Fields:**
     - message: Status message about the generation process
@@ -82,15 +132,20 @@ class ScheduleResponse(BaseModel):
     """
     Response model for schedule retrieval requests.
 
+    **Usage:**
+    ```python
+    ScheduleResponse(schedule_id='...', schedule=[...], index=0, total_generated=1)
+    ```
+
     **Fields:**
     - schedule_id: Unique identifier for the schedule session
-    - schedule: The generated schedule as a list of course instances
+    - schedule: Generated schedule as `list[CourseInstanceResponse]` (typed JSON rows)
     - index: Index of this schedule in the generation sequence
     - total_generated: Total number of schedules generated so far
     """
 
     schedule_id: str
-    schedule: list[dict]
+    schedule: list[CourseInstanceResponse]
     index: int
     total_generated: int
 
@@ -100,6 +155,11 @@ class ScheduleDetailsResponse(CombinedConfig):
     Response model for schedule details requests.
 
     Inherits all fields from CombinedConfig and adds:
+
+    **Usage:**
+    ```python
+    ScheduleDetailsResponse(schedule_id='...', total_generated=0, **combined.model_dump())
+    ```
 
     **Fields:**
     - schedule_id: Unique identifier for the schedule session
@@ -113,6 +173,11 @@ class ScheduleDetailsResponse(CombinedConfig):
 class ScheduleCountResponse(BaseModel):
     """
     Response model for schedule count requests.
+
+    **Usage:**
+    ```python
+    ScheduleCountResponse(schedule_id='...', current_count=2, limit=10, is_complete=False)
+    ```
 
     **Fields:**
     - schedule_id: Unique identifier for the schedule session
@@ -131,6 +196,11 @@ class ErrorResponse(BaseModel):
     """
     Error response model for API errors.
 
+    **Usage:**
+    ```python
+    ErrorResponse(error="bad_request", message="...")
+    ```
+
     **Fields:**
     - error: Error type or code
     - message: Detailed error message
@@ -142,13 +212,20 @@ class ErrorResponse(BaseModel):
 
 @dataclass
 class ScheduleSession:
-    """Represents an active schedule generation session."""
+    """
+    Represents an active schedule generation session.
+
+    **Usage:**
+    ```python
+    # Internal session object for the HTTP API
+    ```
+    """
 
     scheduler: Scheduler | None
     scheduler_future: Future[Scheduler | None] | None
     generator: Generator[list[CourseInstance], None, None] | None
     full_config: CombinedConfig
-    generated_schedules: list[list[dict]]
+    generated_schedules: list[list[CourseInstanceResponse]]
     current_index: int = 0
     background_tasks: list[asyncio.Task] = field(default_factory=list)
 
@@ -160,6 +237,11 @@ schedule_sessions: dict[str, ScheduleSession] = {}
 def cleanup_session(schedule_id: str):
     """
     Remove a session from memory and clean up associated resources.
+
+    **Usage:**
+    ```python
+    cleanup_session(schedule_id)
+    ```
 
     **Args:**
     - schedule_id: Unique identifier for the schedule session to clean up
@@ -196,6 +278,11 @@ async def ensure_scheduler_initialized(session_id: str, session: ScheduleSession
     """
     Ensure the scheduler is initialized for a session.
 
+    **Usage:**
+    ```python
+    await ensure_scheduler_initialized(session_id, session)
+    ```
+
     **Args:**
     - session_id: Unique identifier for the schedule session
     - session: The ScheduleSession object to initialize
@@ -210,6 +297,11 @@ async def ensure_scheduler_initialized(session_id: str, session: ScheduleSession
 async def ensure_generator_initialized(session_id: str, session: ScheduleSession):
     """
     Ensure the generator is initialized for a session.
+
+    **Usage:**
+    ```python
+    await ensure_generator_initialized(session_id, session)
+    ```
 
     **Args:**
     - session_id: Unique identifier for the schedule session
@@ -246,7 +338,14 @@ async def ensure_generator_initialized(session_id: str, session: ScheduleSession
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan manager for cleanup."""
+    """
+    Application lifespan manager for cleanup.
+
+    **Usage:**
+    ```python
+    # FastAPI(..., lifespan=lifespan)
+    ```
+    """
     yield
     # Cleanup all sessions on shutdown
     for session_id in list(schedule_sessions.keys()):
@@ -284,7 +383,14 @@ app.add_middleware(
 
 @app.post("/submit", response_model=SubmitResponse)
 async def submit_schedule(request: SubmitRequest):
-    """Submit a new schedule generation request."""
+    """
+    Submit a new schedule generation request.
+
+    **Usage:**
+    ```python
+    httpx.post("http://localhost:8000/submit", json=body)
+    ```
+    """
     try:
         # Create scheduler in thread pool to avoid blocking
         try:
@@ -319,7 +425,14 @@ async def submit_schedule(request: SubmitRequest):
 
 @app.get("/schedules/{schedule_id}/details", response_model=ScheduleDetailsResponse)
 async def get_schedule_details(schedule_id: str):
-    """Get details about a schedule session."""
+    """
+    Get details about a schedule session.
+
+    **Usage:**
+    ```python
+    httpx.get(f"http://localhost:8000/schedules/{sid}/details")
+    ```
+    """
     if schedule_id not in schedule_sessions:
         raise HTTPException(status_code=404, detail="Schedule session not found")
 
@@ -336,7 +449,14 @@ async def get_schedule_details(schedule_id: str):
 
 @app.post("/schedules/{schedule_id}/next", response_model=ScheduleResponse)
 async def get_next_schedule(schedule_id: str):
-    """Get the next generated schedule."""
+    """
+    Get the next generated schedule.
+
+    **Usage:**
+    ```python
+    httpx.post(f"http://localhost:8000/schedules/{sid}/next")
+    ```
+    """
     if schedule_id not in schedule_sessions:
         raise HTTPException(status_code=404, detail="Schedule session not found")
 
@@ -369,18 +489,17 @@ async def get_next_schedule(schedule_id: str):
             logger.error(f"Failed to generate schedule for session {schedule_id}: {e}")
             raise HTTPException(status_code=500, detail=f"Schedule generation failed: {str(e)}") from e
 
-        # Convert model to JSON format with transformation
-        schedule_data = [course_instance.model_dump(by_alias=True, exclude_none=True) for course_instance in model]
+        rows = _schedule_response_rows(model)
 
         # Store the generated schedule
-        session.generated_schedules.append(schedule_data)
+        session.generated_schedules.append(rows)
         current_index = len(session.generated_schedules) - 1
 
         logger.debug(f"Generated schedule {current_index + 1} for session {schedule_id}")
 
         return ScheduleResponse(
             schedule_id=schedule_id,
-            schedule=schedule_data,
+            schedule=rows,
             index=current_index,
             total_generated=len(session.generated_schedules),
         )
@@ -395,7 +514,14 @@ async def get_next_schedule(schedule_id: str):
 
 @app.post("/schedules/{schedule_id}/generate_all", response_model=GenerateAllResponse)
 async def generate_all_schedules(schedule_id: str):
-    """Generate all remaining schedules for a session asynchronously."""
+    """
+    Generate all remaining schedules for a session asynchronously.
+
+    **Usage:**
+    ```python
+    httpx.post(f"http://localhost:8000/schedules/{sid}/generate_all")
+    ```
+    """
     if schedule_id not in schedule_sessions:
         raise HTTPException(status_code=404, detail="Schedule session not found")
 
@@ -429,13 +555,10 @@ async def generate_all_schedules(schedule_id: str):
                     generator = session.generator
                     model = await asyncio.wrap_future(z3_executor.submit(lambda g=generator: next(g)))
 
-                    # Convert model to JSON format with transformation
-                    schedule_data = []
-                    for course_instance in model:
-                        schedule_data.append(course_instance.model_dump(by_alias=True, exclude_none=True))
+                    rows = _schedule_response_rows(model)
 
                     # Store the generated schedule immediately
-                    session.generated_schedules.append(schedule_data)
+                    session.generated_schedules.append(rows)
                     n = len(session.generated_schedules)
                     logger.debug(f"Generated schedule {n} for session {schedule_id}")
 
@@ -471,7 +594,14 @@ async def generate_all_schedules(schedule_id: str):
 
 @app.get("/schedules/{schedule_id}/count", response_model=ScheduleCountResponse)
 async def get_schedule_count(schedule_id: str):
-    """Get the current count of generated schedules for a session."""
+    """
+    Get the current count of generated schedules for a session.
+
+    **Usage:**
+    ```python
+    httpx.get(f"http://localhost:8000/schedules/{sid}/count")
+    ```
+    """
     if schedule_id not in schedule_sessions:
         raise HTTPException(status_code=404, detail="Schedule session not found")
 
@@ -487,7 +617,14 @@ async def get_schedule_count(schedule_id: str):
 
 @app.get("/schedules/{schedule_id}/index/{index}", response_model=ScheduleResponse)
 async def get_schedule_by_index(schedule_id: str, index: int):
-    """Get a previously generated schedule by index."""
+    """
+    Get a previously generated schedule by index.
+
+    **Usage:**
+    ```python
+    httpx.get(f"http://localhost:8000/schedules/{sid}/index/0")
+    ```
+    """
     if schedule_id not in schedule_sessions:
         raise HTTPException(status_code=404, detail="Schedule session not found")
 
@@ -509,7 +646,14 @@ async def get_schedule_by_index(schedule_id: str, index: int):
 
 @app.delete("/schedules/{schedule_id}/delete", response_model=MessageResponse)
 async def delete_schedule_session(schedule_id: str, background_tasks: BackgroundTasks):
-    """Delete a schedule session."""
+    """
+    Delete a schedule session.
+
+    **Usage:**
+    ```python
+    httpx.delete(f"http://localhost:8000/schedules/{sid}/delete")
+    ```
+    """
     if schedule_id not in schedule_sessions:
         raise HTTPException(status_code=404, detail="Schedule session not found")
 
@@ -521,7 +665,14 @@ async def delete_schedule_session(schedule_id: str, background_tasks: Background
 
 @app.post("/schedules/{schedule_id}/cleanup", response_model=MessageResponse)
 async def cleanup_schedule_session(schedule_id: str):
-    """Immediate cleanup of a schedule session."""
+    """
+    Immediate cleanup of a schedule session.
+
+    **Usage:**
+    ```python
+    httpx.post(f"http://localhost:8000/schedules/{sid}/cleanup")
+    ```
+    """
     if schedule_id in schedule_sessions:
         cleanup_session(schedule_id)
 
@@ -530,7 +681,14 @@ async def cleanup_schedule_session(schedule_id: str):
 
 @app.get("/health", response_model=HealthCheck)
 async def health_check():
-    """Health check endpoint."""
+    """
+    Health check endpoint.
+
+    **Usage:**
+    ```python
+    httpx.get("http://localhost:8000/health")
+    ```
+    """
     return HealthCheck(status="healthy", active_sessions=len(schedule_sessions))
 
 
@@ -546,7 +704,14 @@ async def health_check():
 @click.option("--host", "-h", default="0.0.0.0", help="Host to bind the server to")
 @click.option("--workers", "-w", default=16, help="Number of worker threads", type=int)
 def main(port: int, log_level: str, host: str, workers: int):
-    """Run the Course Scheduler HTTP API server."""
+    """
+    Run the Course Scheduler HTTP API server.
+
+    **Usage:**
+    ```python
+    python -m scheduler.server --port 8000
+    ```
+    """
     configure_logging()
 
     import uvicorn

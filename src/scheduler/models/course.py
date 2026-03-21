@@ -10,6 +10,11 @@ from .time_slot import TimeInstance, TimeSlot
 class Course:
     """
     A course with a course_id, section, credits, conflicts, potential labs, potential rooms, and potential faculty.
+
+    **Usage:**
+    ```python
+    Course(course_id="CS 101", section=1, labs=[], rooms=[], conflicts=[], faculties=[])
+    ```
     """
 
     course_id: str
@@ -70,6 +75,11 @@ class Course:
     def __str__(self) -> str:
         """
         Pretty Print representation of a course is its course_id and section
+
+        **Usage:**
+        ```python
+        str(course)
+        ```
         """
         return f"{self.course_id}.{self.section:02d}"
 
@@ -77,6 +87,11 @@ class Course:
 class CourseInstance(BaseModel):
     """
     A course instance with a course, time, faculty, room, and lab.
+
+    **Usage:**
+    ```python
+    CourseInstance(course=c, time=slot, faculty="Dr. Smith", room="R1", lab=None)
+    ```
     """
 
     model_config = ConfigDict(extra="forbid", strict=True, arbitrary_types_allowed=True)
@@ -115,6 +130,11 @@ class CourseInstance(BaseModel):
         """
         The string representation of the course
 
+        **Usage:**
+        ```python
+        payload["course"]
+        ```
+
         **Returns:**
         The string representation of the course
         """
@@ -125,6 +145,11 @@ class CourseInstance(BaseModel):
     def times(self) -> list[TimeInstance]:
         """
         The list of times assigned to the course instance
+
+        **Usage:**
+        ```python
+        instance.times
+        ```
 
         **Returns:**
         The list of times assigned to the course instance
@@ -137,6 +162,11 @@ class CourseInstance(BaseModel):
         """
         The index of the lab assigned to the course instance
 
+        **Usage:**
+        ```python
+        instance.lab_index
+        ```
+
         **Returns:**
         The index of the lab assigned to the course instance.
         None if the course instance does not have a lab
@@ -148,6 +178,11 @@ class CourseInstance(BaseModel):
         The CSV representation of the course instance in the format:
 
         `<course>,<faculty>,<room>,<lab>,<times>`
+
+        **Usage:**
+        ```python
+        row = instance.as_csv()
+        ```
 
         **Returns:**
         The CSV representation of the course instance

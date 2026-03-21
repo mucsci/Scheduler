@@ -10,6 +10,11 @@ def _get_writer(format: str, output_file: str | None) -> JSONWriter | CSVWriter:
     """
     Get the appropriate writer based on the output format.
 
+    **Usage:**
+    ```python
+    w = _get_writer("json", "out.json")
+    ```
+
     **Args:**
     - format: The output format ("json" or "csv")
     - output_file: The output file path, or None for stdout
@@ -48,7 +53,14 @@ def main(
     output: str,
     optimizer_flags: list[OptimizerFlags],
 ):
-    """Generate course schedules using constraint satisfaction solving."""
+    """
+    Generate course schedules using constraint satisfaction solving.
+
+    **Usage:**
+    ```python
+    scheduler path/to/config.json -f csv -o out
+    ```
+    """
     configure_logging()
 
     full_config = load_config_from_file(CombinedConfig, config)

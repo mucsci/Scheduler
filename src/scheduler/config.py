@@ -24,6 +24,12 @@ type TimeString = Annotated[
 ]
 """
 TimeString is a string in the format of HH:MM.
+
+**Usage:**
+```python
+from scheduler.config import TimeString
+value: TimeString = "10:00"
+```
 """
 
 # TimeRangeString is a string in the format of HH:MM-HH:MM.
@@ -39,6 +45,12 @@ type TimeRangeString = Annotated[
 
 """
 TimeRangeString is a string in the format of HH:MM-HH:MM.
+
+**Usage:**
+```python
+from scheduler.config import TimeRangeString
+value: TimeRangeString = "10:00-12:00"
+```
 """
 
 # Preference is an integer score between 0 and 10.
@@ -54,6 +66,12 @@ type Preference = Annotated[
 
 """
 Preference is an integer score between 0 and 10.
+
+**Usage:**
+```python
+from scheduler.config import Preference
+score: Preference = 5
+```
 """
 
 type Day = Annotated[
@@ -67,6 +85,12 @@ type Day = Annotated[
 
 """
 Day is a day of the week (must be one of: MON, TUE, WED, THU, FRI).
+
+**Usage:**
+```python
+from scheduler.config import Day
+d: Day = "MON"
+```
 """
 
 type Room = Annotated[
@@ -80,6 +104,12 @@ type Room = Annotated[
 
 """
 Room is a room name.
+
+**Usage:**
+```python
+from scheduler.config import Room
+r: Room = "Room 101"
+```
 """
 
 type Lab = Annotated[
@@ -93,6 +123,12 @@ type Lab = Annotated[
 
 """
 Lab is a lab name.
+
+**Usage:**
+```python
+from scheduler.config import Lab
+lab: Lab = "Lab 101"
+```
 """
 
 type Course = Annotated[
@@ -106,6 +142,12 @@ type Course = Annotated[
 
 """
 Course is a course name.
+
+**Usage:**
+```python
+from scheduler.config import Course
+cid: Course = "CS 101"
+```
 """
 
 type Faculty = Annotated[
@@ -119,12 +161,24 @@ type Faculty = Annotated[
 
 """
 Faculty is a faculty name.
+
+**Usage:**
+```python
+from scheduler.config import Faculty
+name: Faculty = "Dr. Smith"
+```
 """
 
 
 class StrictBaseModel(BaseModel):
     """
     Base class for all models which need strict validation.
+
+    **Usage:**
+    ```python
+    class MyConfig(StrictBaseModel):
+        ...
+    ```
 
     **Fields:**
     - model_config: Configuration for the model
@@ -167,6 +221,11 @@ class StrictBaseModel(BaseModel):
 class TimeBlock(StrictBaseModel):
     """
     Represents a time block within a day.
+
+    **Usage:**
+    ```python
+    TimeBlock(start="09:00", spacing=60, end="17:00")
+    ```
     """
 
     start: TimeString = Field(description="Start time of the time block", json_schema_extra={"example": "10:00"})
@@ -186,7 +245,15 @@ class TimeBlock(StrictBaseModel):
 
     @model_validator(mode="after")
     def _validate_end_after_start(self):
-        """Validate that the end time is after the start time."""
+        """
+        Validate that the end time is after the start time.
+
+        **Usage:**
+        ```python
+        TimeBlock(start="09:00", spacing=60, end="17:00")
+        # end must be after start
+        ```
+        """
         start_minutes = int(self.start.split(":")[0]) * 60 + int(self.start.split(":")[1])
         end_minutes = int(self.end.split(":")[0]) * 60 + int(self.end.split(":")[1])
         if end_minutes <= start_minutes:
@@ -197,6 +264,11 @@ class TimeBlock(StrictBaseModel):
 class TimeRange(StrictBaseModel):
     """
     A time range with start and end times, ensuring start < end.
+
+    **Usage:**
+    ```python
+    TimeRange(start="09:00", end="17:00")
+    ```
     """
 
     start: TimeString = Field(description="Start time of the time range", json_schema_extra={"example": "10:00"})
@@ -210,7 +282,15 @@ class TimeRange(StrictBaseModel):
 
     @model_validator(mode="after")
     def _validate_end_after_start(self):
-        """Validate that the end time is after the start time."""
+        """
+        Validate that the end time is after the start time.
+
+        **Usage:**
+        ```python
+        TimeRange(start="09:00", end="17:00")
+        # end must be after start
+        ```
+        """
         start_minutes = int(self.start.split(":")[0]) * 60 + int(self.start.split(":")[1])
         end_minutes = int(self.end.split(":")[0]) * 60 + int(self.end.split(":")[1])
         if end_minutes <= start_minutes:
@@ -224,6 +304,11 @@ class TimeRange(StrictBaseModel):
     def from_string(cls, time_range_str: TimeRangeString) -> "TimeRange":
         """
         Create TimeRange from string format "HH:MM-HH:MM"
+
+        **Usage:**
+        ```python
+        TimeRange.from_string("10:00-12:00")
+        ```
         """
         start, end = time_range_str.split("-")
         return cls(start=start, end=end)
@@ -232,6 +317,11 @@ class TimeRange(StrictBaseModel):
 class Meeting(StrictBaseModel):
     """
     Represents a single meeting instance.
+
+    **Usage:**
+    ```python
+    Meeting(day="MON", duration=90, lab=False)
+    ```
     """
 
     day: Day = Field(description="Day of the week", json_schema_extra={"example": "MON"})
@@ -258,6 +348,11 @@ class Meeting(StrictBaseModel):
 class ClassPattern(StrictBaseModel):
     """
     Represents a class pattern.
+
+    **Usage:**
+    ```python
+    ClassPattern(credits=3, meetings=[...])
+    ```
     """
 
     credits: int = Field(description="Number of credit hours", json_schema_extra={"example": 3})
@@ -286,7 +381,14 @@ class ClassPattern(StrictBaseModel):
     @field_validator("meetings", mode="after")
     @classmethod
     def _validate_meetings(cls, v: list[Meeting], info: ValidationInfo):
-        """Validate meeting list is not empty and has reasonable structure."""
+        """
+        Validate meeting list is not empty and has reasonable structure.
+
+        **Usage:**
+        ```python
+        ClassPattern(credits=3, meetings=[Meeting(day="MON", duration=90, lab=False)])
+        ```
+        """
         if not v:
             raise ValueError("At least one meeting is required")
 
@@ -302,6 +404,11 @@ class ClassPattern(StrictBaseModel):
 class TimeSlotConfig(StrictBaseModel):
     """
     Represents a time slot configuration.
+
+    **Usage:**
+    ```python
+    TimeSlotConfig(times={...}, classes=[...])
+    ```
     """
 
     times: dict[Day, list[TimeBlock]] = Field(description="Dictionary mapping day names to time blocks")
@@ -338,6 +445,11 @@ class TimeSlotConfig(StrictBaseModel):
     def validate(self):
         """
         Validate that time slot config is consistent and complete.
+
+        **Usage:**
+        ```python
+        TimeSlotConfig.model_validate({...})
+        ```
         """
         errors = []
 
@@ -371,6 +483,11 @@ class TimeSlotConfig(StrictBaseModel):
 class CourseConfig(StrictBaseModel):
     """
     Represents a course configuration.
+
+    **Usage:**
+    ```python
+    CourseConfig(course_id="CS 101", credits=3, room=[...], lab=[...], conflicts=[], faculty=[])
+    ```
     """
 
     course_id: Course = Field(description="Unique identifier for the course", json_schema_extra={"example": "CS 101"})
@@ -407,6 +524,11 @@ class CourseConfig(StrictBaseModel):
 class FacultyConfig(StrictBaseModel):
     """
     Represents a faculty configuration.
+
+    **Usage:**
+    ```python
+    FacultyConfig(name="Dr. Smith", maximum_credits=12, minimum_credits=3, ...)
+    ```
     """
 
     name: Faculty = Field(description='Faculty member"s name', json_schema_extra={"example": "Dr. Smith"})
@@ -496,6 +618,11 @@ class FacultyConfig(StrictBaseModel):
     def _convert_time_strings(cls, v):
         """
         Convert time strings to `TimeRange` objects
+
+        **Usage:**
+        ```python
+        FacultyConfig.model_validate({..., "times": {"MON": ["10:00-12:00"]}})
+        ```
         """
         if isinstance(v, dict):
             converted = {}
@@ -520,6 +647,11 @@ class FacultyConfig(StrictBaseModel):
     def validate(self):
         """
         Validate the model state.
+
+        **Usage:**
+        ```python
+        FacultyConfig.model_validate({...})
+        ```
         """
         if self.minimum_credits > self.maximum_credits:
             raise ValueError(
@@ -544,6 +676,11 @@ class FacultyConfig(StrictBaseModel):
 class SchedulerConfig(StrictBaseModel):
     """
     Represents a scheduler configuration.
+
+    **Usage:**
+    ```python
+    SchedulerConfig(rooms=[...], labs=[...], courses=[...], faculty=[...])
+    ```
     """
 
     rooms: list[Room] = Field(description="List of available room names", json_schema_extra={"example": ["Room 101"]})
@@ -681,6 +818,11 @@ class SchedulerConfig(StrictBaseModel):
         """
         Validate that all names are unique within their respective lists
         (except courses which can have duplicates).
+
+        **Usage:**
+        ```python
+        scheduler_config._validate_uniqueness()
+        ```
         """
         # Check room uniqueness
         if len(self.rooms) != len(set(self.rooms)):
@@ -703,42 +845,89 @@ class OptimizerFlags(StrEnum):
     FACULTY_COURSE = "faculty_course"
     """
     Optimize faculty course assignments using preferences
+
+    **Usage:**
+    ```python
+    OptimizerFlags.FACULTY_COURSE
+    ["FACULTY_COURSE"]  # accepted in CombinedConfig JSON
+    ```
     """
 
     FACULTY_ROOM = "faculty_room"
     """
     Optimize faculty room assignments using preferences
+
+    **Usage:**
+    ```python
+    OptimizerFlags.FACULTY_ROOM
+    ["FACULTY_ROOM"]  # accepted in CombinedConfig JSON
+    ```
     """
 
     FACULTY_LAB = "faculty_lab"
     """
     Optimize faculty lab assignments using preferences
+
+    **Usage:**
+    ```python
+    OptimizerFlags.FACULTY_LAB
+    ["FACULTY_LAB"]  # accepted in CombinedConfig JSON
+    ```
     """
 
     SAME_ROOM = "same_room"
     """
     Force same room usage for courses taught by the same faculty
+
+    **Usage:**
+    ```python
+    OptimizerFlags.SAME_ROOM
+    ["SAME_ROOM"]  # accepted in CombinedConfig JSON
+    ```
     """
 
     SAME_LAB = "same_lab"
     """
     Force same lab usage for courses taught by the same faculty
+
+    **Usage:**
+    ```python
+    OptimizerFlags.SAME_LAB
+    ["SAME_LAB"]  # accepted in CombinedConfig JSON
+    ```
     """
 
     PACK_ROOMS = "pack_rooms"
     """
     Optimize packing of rooms for courses taught
+
+    **Usage:**
+    ```python
+    OptimizerFlags.PACK_ROOMS
+    ["PACK_ROOMS"]  # accepted in CombinedConfig JSON
+    ```
     """
 
     PACK_LABS = "pack_labs"
     """
     Optimize packing of labs for courses taught
+
+    **Usage:**
+    ```python
+    OptimizerFlags.PACK_LABS
+    ["PACK_LABS"]  # accepted in CombinedConfig JSON
+    ```
     """
 
 
 class CombinedConfig(StrictBaseModel):
     """
     Represents a combined configuration.
+
+    **Usage:**
+    ```python
+    CombinedConfig(config=..., time_slot_config=..., limit=10)
+    ```
     """
 
     config: SchedulerConfig = Field(
@@ -826,6 +1015,11 @@ class CombinedConfig(StrictBaseModel):
     def _convert_optimizer_flags(cls, v):
         """
         Convert optimizer flags to OptimizerFlags objects
+
+        **Usage:**
+        ```python
+        CombinedConfig(..., optimizer_flags=["faculty_course"])
+        ```
         """
         if isinstance(v, list):
             return [OptimizerFlags(flag) if isinstance(flag, str) else flag for flag in v]

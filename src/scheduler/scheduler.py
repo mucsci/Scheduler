@@ -36,6 +36,12 @@ def load_config_from_file[T: BaseModel](
     """
     Load scheduler configuration from a JSON file.
 
+    **Usage:**
+    ```python
+    from scheduler import CombinedConfig, load_config_from_file
+    cfg = load_config_from_file(CombinedConfig, "config.json")
+    ```
+
     **Args:**
     - config_cls: The class of the configuration to load
     - filename: Path to the file (str or pathlib.Path)
@@ -57,6 +63,11 @@ def get_faculty_availability(
 ) -> list[TimeInstance]:
     """
     Calculate the availability of a faculty as a list of `TimeInstance` objects.
+
+    **Usage:**
+    ```python
+    slots = get_faculty_availability(faculty_config)
+    ```
 
     **Args:**
     - faculty_config: The configuration of the faculty
@@ -90,7 +101,14 @@ def get_faculty_availability(
 
 @dataclass
 class _FunctionConstraints:
-    """Structured data for function constraints and their references."""
+    """
+    Structured data for function constraints and their references.
+
+    **Usage:**
+    ```python
+    # Built by Scheduler._build_function_constraints
+    ```
+    """
 
     constraints: list[z3.BoolRef]
     overlaps: z3.FuncDeclRef
@@ -102,7 +120,14 @@ class _FunctionConstraints:
 
 @dataclass
 class _Z3SortsAndConstants:
-    """Structured data for Z3 sorts and their corresponding constant mappings."""
+    """
+    Structured data for Z3 sorts and their corresponding constant mappings.
+
+    **Usage:**
+    ```python
+    # Built by Scheduler._create_z3_enumsorts
+    ```
+    """
 
     time_slot_sort: z3.SortRef
     time_slot_constants: frozenbidict[TimeSlot, z3.ExprRef]
@@ -117,10 +142,23 @@ class _Z3SortsAndConstants:
 class Scheduler:
     """
     Scheduler class for generating schedules.
+
+    **Usage:**
+    ```python
+    sched = Scheduler(full_config)
+    next(sched.get_models())
+    ```
     """
 
     def _initialize_faculty_data(self, config) -> None:
-        """Initialize faculty-related data structures and preferences."""
+        """
+        Initialize faculty-related data structures and preferences.
+
+        **Usage:**
+        ```python
+        self._initialize_faculty_data(config)
+        ```
+        """
         for faculty_data in config.faculty:
             faculty_name = faculty_data.name
             self._faculty.add(faculty_name)
@@ -137,7 +175,14 @@ class Scheduler:
             self._faculty_availability[faculty_name] = get_faculty_availability(faculty_data)
 
     def _initialize_courses(self, config) -> tuple[list[Course], set[int]]:
-        """Initialize courses and return them along with required credits."""
+        """
+        Initialize courses and return them along with required credits.
+
+        **Usage:**
+        ```python
+        courses, credits = self._initialize_courses(config)
+        ```
+        """
         courses: list[Course] = []
         required_credits = set()
         course_counts: dict[str, int] = defaultdict(int)
@@ -165,7 +210,14 @@ class Scheduler:
         return courses, required_credits
 
     def _initialize_time_slots(self, time_slot_config, required_credits: set[int]) -> None:
-        """Initialize time slots and create ranges for different credit levels."""
+        """
+        Initialize time slots and create ranges for different credit levels.
+
+        **Usage:**
+        ```python
+        self._initialize_time_slots(time_slot_config, required_credits)
+        ```
+        """
         self._time_slot_generator = TimeSlotGenerator(time_slot_config)
         self._ranges: dict[int, tuple[int, int]] = {}
         self._slots: list[TimeSlot] = []
@@ -176,7 +228,14 @@ class Scheduler:
             self._ranges[creds] = (low, len(self._slots) - 1)
 
     def _create_z3_enumsorts(self) -> _Z3SortsAndConstants:
-        """Create Z3 EnumSorts for time slots, faculty, rooms, and labs."""
+        """
+        Create Z3 EnumSorts for time slots, faculty, rooms, and labs.
+
+        **Usage:**
+        ```python
+        z3_data = self._create_z3_enumsorts()
+        ```
+        """
 
         def sanitize(name):
             return name.replace(" ", "_")
@@ -221,7 +280,14 @@ class Scheduler:
         )
 
     def _create_course_variables(self, z3_data: _Z3SortsAndConstants) -> None:
-        """Create Z3 variables for each course."""
+        """
+        Create Z3 variables for each course.
+
+        **Usage:**
+        ```python
+        self._create_course_variables(z3_data)
+        ```
+        """
         for course in self._courses:
             course.time = z3.Const(f"{str(course)}_time", z3_data.time_slot_sort)
             course.faculty = z3.Const(f"{str(course)}_faculty", z3_data.faculty_sort)
@@ -231,6 +297,11 @@ class Scheduler:
     def __init__(self, full_config: CombinedConfig):
         """
         Initializes the scheduler with all the necessary constraints and variables.
+
+        **Usage:**
+        ```python
+        Scheduler(full_config)
+        ```
 
         **Args:**
         - full_config: `CombinedConfig` object containing all the configuration
@@ -304,7 +375,14 @@ class Scheduler:
 
     @cache
     def _simplify(self, x: z3.ExprRef) -> z3.BoolRef:
-        """Cached simplification to avoid redundant computation"""
+        """
+        Cached simplification to avoid redundant computation
+
+        **Usage:**
+        ```python
+        self._simplify(z3_expr)
+        ```
+        """
         return cast(z3.BoolRef, z3.simplify(x, cache_all=True, local_ctx=True))
 
     @cache
@@ -424,6 +502,11 @@ class Scheduler:
         """
         Create Z3 function definitions and their constraints.
 
+        **Usage:**
+        ```python
+        self._build_function_constraints(z3_data)
+        ```
+
         **Args:**
         - z3_data: `_Z3SortsAndConstants` object containing the Z3 sorts and constants
 
@@ -458,6 +541,11 @@ class Scheduler:
     def _build_faculty_constraints(self, z3_data: _Z3SortsAndConstants) -> list[z3.BoolRef]:
         """
         Create constraints for faculty credit limits and unique course limits.
+
+        **Usage:**
+        ```python
+        self._build_faculty_constraints(z3_data)
+        ```
 
         **Args:**
         - z3_data: `_Z3SortsAndConstants` object containing the Z3 sorts and constants
@@ -584,6 +672,11 @@ class Scheduler:
         """
         Create individual course constraints.
 
+        **Usage:**
+        ```python
+        self._build_course_constraints(overlaps, faculty_available, z3_data)
+        ```
+
         **Args:**
         - overlaps: `z3.FuncDeclRef` function for checking time overlaps
         - faculty_available: `z3.FuncDeclRef` function for checking faculty availability
@@ -659,6 +752,11 @@ class Scheduler:
     ) -> list[z3.BoolRef]:
         """
         Create resource sharing and faculty scheduling constraints.
+
+        **Usage:**
+        ```python
+        self._build_resource_constraints(overlaps, lab_overlaps, lecture_next_to, lab_next_to, z3_data)
+        ```
 
         **Args:**
         - overlaps: `z3.FuncDeclRef` function for checking time overlaps
@@ -754,6 +852,11 @@ class Scheduler:
         """
         Combine all constraints and apply simplification.
 
+        **Usage:**
+        ```python
+        self._aggregate_constraints(function_c, faculty_c, course_c, resource_c)
+        ```
+
         **Args:**
         - function_constraints: `list[z3.BoolRef]` containing the function constraints
         - faculty_constraints: `list[z3.BoolRef]` containing the faculty constraints
@@ -783,6 +886,11 @@ class Scheduler:
     def _get_schedule(self, model: z3.ModelRef) -> list["CourseInstance"]:
         """
         Internal method to convert a Z3 model to a schedule of `CourseInstance` objects.
+
+        **Usage:**
+        ```python
+        schedule = self._get_schedule(model)
+        ```
 
         **Args:**
         - model: The Z3 model containing assignments
@@ -817,6 +925,11 @@ class Scheduler:
     def _update(self, s: z3.Optimize):
         """
         Update the Z3 solver with the new constraints.
+
+        **Usage:**
+        ```python
+        self._update(optimize_solver)
+        ```
 
         **Args:**
         - s: `z3.Optimize` object containing the Z3 solver
@@ -857,6 +970,12 @@ class Scheduler:
     def get_models(self) -> Generator[list[CourseInstance], None, None]:
         """
         Generate schedules one-at-a-time using the Z3 solver.
+
+        **Usage:**
+        ```python
+        for schedule in sched.get_models():
+            ...
+        ```
 
         **Returns:**
         Generator of lists of `CourseInstance` objects representing complete schedules

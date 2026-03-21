@@ -7,11 +7,22 @@ class CSVWriter:
 
     This class provides a context manager interface for writing course schedules
     to CSV format, either to a file or stdout.
+
+    **Usage:**
+    ```python
+    with CSVWriter("out.csv") as w:
+        w.add_schedule(model)
+    ```
     """
 
     def __init__(self, filename: str | None = None):
         """
         Initialize the CSVWriter.
+
+        **Usage:**
+        ```python
+        CSVWriter("out.csv")
+        ```
 
         **Args:**
         - filename: The name of the file to write CSV data to, or None for stdout
@@ -23,6 +34,11 @@ class CSVWriter:
         """
         Enter the context manager.
 
+        **Usage:**
+        ```python
+        with CSVWriter(None) as w:
+        ```
+
         **Returns:**
         The CSVWriter instance
         """
@@ -31,6 +47,11 @@ class CSVWriter:
     def add_schedule(self, schedule: list[CourseInstance]) -> None:
         """
         Add a schedule to be written.
+
+        **Usage:**
+        ```python
+        writer.add_schedule(schedule)
+        ```
 
         **Args:**
         - schedule: List of CourseInstance objects representing a complete schedule
@@ -44,6 +65,11 @@ class CSVWriter:
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         """
         Exit the context manager and write all accumulated schedules.
+
+        **Usage:**
+        ```python
+        # Flushes accumulated rows to disk
+        ```
 
         **Args:**
         - exc_type: Exception type if an exception occurred

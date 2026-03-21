@@ -10,11 +10,22 @@ class JSONWriter:
 
     This class provides a context manager interface for writing course schedules
     to JSON format, either to a file or stdout.
+
+    **Usage:**
+    ```python
+    with JSONWriter("out.json") as w:
+        w.add_schedule(model)
+    ```
     """
 
     def __init__(self, filename: str | None = None):
         """
         Initialize the JSONWriter.
+
+        **Usage:**
+        ```python
+        JSONWriter("out.json")
+        ```
 
         **Args:**
         - filename: The name of the file to write the JSON to
@@ -26,6 +37,11 @@ class JSONWriter:
         """
         Enter the context manager.
 
+        **Usage:**
+        ```python
+        with JSONWriter(None) as w:
+        ```
+
         **Returns:**
         The JSONWriter instance
         """
@@ -34,6 +50,11 @@ class JSONWriter:
     def add_schedule(self, schedule: list[CourseInstance]) -> None:
         """
         Add a schedule to be written to the JSON file.
+
+        **Usage:**
+        ```python
+        writer.add_schedule(schedule)
+        ```
 
         **Args:**
         - schedule: The schedule to be written
@@ -49,6 +70,11 @@ class JSONWriter:
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         """
         Exit the context manager and write all accumulated schedules as one JSON array.
+
+        **Usage:**
+        ```python
+        # Writes JSON array of schedules
+        ```
 
         **Args:**
         - exc_type: Exception type if an exception occurred

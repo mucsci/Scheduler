@@ -11,6 +11,12 @@ def configure_logging() -> None:
     Called by the scheduler CLI and scheduler-server at startup. Not invoked
     on library import, so applications that embed the scheduler control their
     own logging configuration.
+
+    **Usage:**
+    ```python
+    from scheduler.logging import configure_logging
+    configure_logging()
+    ```
     """
     logging.basicConfig(
         level=os.getenv("LOGLEVEL", "INFO").upper(),

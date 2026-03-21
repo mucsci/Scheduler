@@ -8,6 +8,11 @@ from .day import Day
 class Duration(BaseModel):
     """
     A duration of a time slot in minutes.
+
+    **Usage:**
+    ```python
+    Duration(duration=90)
+    ```
     """
 
     model_config = ConfigDict(extra="forbid", strict=True)
@@ -24,6 +29,11 @@ class Duration(BaseModel):
     def _serialize_model(self) -> int:
         """
         Serialize the duration to an integer
+
+        **Usage:**
+        ```python
+        d.model_dump()
+        ```
         """
         return self.value
 
@@ -31,6 +41,11 @@ class Duration(BaseModel):
     def value(self) -> int:
         """
         The value of the duration in minutes since midnight
+
+        **Usage:**
+        ```python
+        d.value
+        ```
         """
         return self.duration
 
@@ -69,6 +84,11 @@ class Duration(BaseModel):
 class TimePoint(BaseModel):
     """
     A time point in minutes since midnight.
+
+    **Usage:**
+    ```python
+    TimePoint.make_from(10, 30)
+    ```
     """
 
     model_config = ConfigDict(extra="forbid", strict=True)
@@ -85,6 +105,11 @@ class TimePoint(BaseModel):
     def _serialize_model(self) -> int:
         """
         Serialize the time point to an integer
+
+        **Usage:**
+        ```python
+        d.model_dump()
+        ```
         """
         return self.value
 
@@ -92,6 +117,11 @@ class TimePoint(BaseModel):
     def make_from(hr: int, min: int) -> "TimePoint":
         """
         Make a time point from an hour and minute
+
+        **Usage:**
+        ```python
+        TimePoint.make_from(9, 45)
+        ```
         """
         return TimePoint(timepoint=(60 * hr + min))
 
@@ -99,6 +129,11 @@ class TimePoint(BaseModel):
     def hour(self):
         """
         The hour of the time point
+
+        **Usage:**
+        ```python
+        tp.hour
+        ```
         """
         return self.timepoint // 60
 
@@ -106,6 +141,11 @@ class TimePoint(BaseModel):
     def minute(self):
         """
         The minute of the time point
+
+        **Usage:**
+        ```python
+        tp.minute
+        ```
         """
         return self.timepoint % 60
 
@@ -113,6 +153,11 @@ class TimePoint(BaseModel):
     def value(self) -> int:
         """
         The value of the time point in minutes since midnight
+
+        **Usage:**
+        ```python
+        d.value
+        ```
         """
         return self.timepoint
 
@@ -157,6 +202,11 @@ class TimePoint(BaseModel):
 class TimeInstance(BaseModel):
     """
     A time instance with a day, start time, and duration.
+
+    **Usage:**
+    ```python
+    TimeInstance(day=Day.MON, start=tp, duration=Duration(duration=90))
+    ```
     """
 
     model_config = ConfigDict(extra="forbid", strict=True)
@@ -183,6 +233,11 @@ class TimeInstance(BaseModel):
     def stop(self) -> TimePoint:
         """
         The stop time of the time instance
+
+        **Usage:**
+        ```python
+        end = inst.stop
+        ```
         """
         return TimePoint(timepoint=(self.start.value + self.duration.value))
 
@@ -193,6 +248,11 @@ class TimeInstance(BaseModel):
 class TimeSlot(BaseModel):
     """
     A time slot with a list of time instances and a lab index.
+
+    **Usage:**
+    ```python
+    TimeSlot(times=[...], lab_index=0)
+    ```
     """
 
     model_config = ConfigDict(extra="forbid", strict=True)
@@ -218,12 +278,22 @@ class TimeSlot(BaseModel):
     def __hash__(self) -> int:
         """
         Hash the time slot by its string representation
+
+        **Usage:**
+        ```python
+        hash(slot)
+        ```
         """
         return hash(str(self))
 
     def lab_time(self) -> TimeInstance | None:
         """
         Returns the time instance corresponding to the lab time slot
+
+        **Usage:**
+        ```python
+        slot.lab_time()
+        ```
 
         **Returns:**
         The time instance of the lab
@@ -237,6 +307,11 @@ class TimeSlot(BaseModel):
         """
         Check if the time slot has a lab
 
+        **Usage:**
+        ```python
+        slot.has_lab()
+        ```
+
         **Returns:**
         True if the time slot has a lab.
         False otherwise
@@ -247,6 +322,11 @@ class TimeSlot(BaseModel):
     def _diff_between_slots(t1: TimeInstance, t2: TimeInstance) -> Duration:
         """
         Calculate the minimum time difference between two time instances.
+
+        **Usage:**
+        ```python
+        TimeSlot._diff_between_slots(t1, t2)
+        ```
 
         **Args:**
         - t1: First time instance
@@ -263,6 +343,11 @@ class TimeSlot(BaseModel):
     def lab_next_to(self, other: "TimeSlot") -> bool:
         """
         Check if the time slot has a lab that is next to another time slot
+
+        **Usage:**
+        ```python
+        a.lab_next_to(b)
+        ```
 
         **Returns:**
         True if the time slot has a lab that is next to another time slot.
@@ -284,6 +369,11 @@ class TimeSlot(BaseModel):
         """
         Check if a time slot is logically next to another
 
+        **Usage:**
+        ```python
+        a.lecture_next_to(b)
+        ```
+
         **Returns:**
         True if the time slot is logically next to another.
         False otherwise
@@ -298,6 +388,11 @@ class TimeSlot(BaseModel):
         """
         Check if a time slot has any overlap with another time slot
 
+        **Usage:**
+        ```python
+        a.overlaps(b)
+        ```
+
         **Returns:**
         True if the time slot has any overlap with another time slot.
         False otherwise
@@ -307,6 +402,11 @@ class TimeSlot(BaseModel):
     def lab_overlaps(self, other: "TimeSlot") -> bool:
         """
         Check if a course's lab time slot has any overlap with another course's lab time slot
+
+        **Usage:**
+        ```python
+        a.lab_overlaps(b)
+        ```
 
         **Returns:**
         True if the course's lab time slot has any overlap with another course's lab time slot.
@@ -323,6 +423,11 @@ class TimeSlot(BaseModel):
         """
         Internal utility function that returns true if two time slot instances overlap at any point.
 
+        **Usage:**
+        ```python
+        TimeSlot._overlaps(a, b)
+        ```
+
         **Args:**
         - a: First time instance
         - b: Second time instance
@@ -335,6 +440,11 @@ class TimeSlot(BaseModel):
     def in_time_ranges(self, ranges: list[TimeInstance]) -> bool:
         """
         Check if a time slot fits into a list of time ranges
+
+        **Usage:**
+        ```python
+        slot.in_time_ranges(availability_instances)
+        ```
 
         **Returns:**
         True if the time slot fits into the list of time ranges

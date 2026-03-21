@@ -13,11 +13,22 @@ class TimeSlotGenerator:
     This class generates all possible time slot combinations for courses
     based on the provided TimeSlotConfig, ensuring valid scheduling patterns
     and constraints are met.
+
+    **Usage:**
+    ```python
+    gen = TimeSlotGenerator(time_slot_config)
+    gen.time_slots(3)
+    ```
     """
 
     def __init__(self, config: TimeSlotConfig):
         """
         Initialize the TimeSlotGenerator.
+
+        **Usage:**
+        ```python
+        TimeSlotGenerator(time_slot_config)
+        ```
 
         **Args:**
         - config: The TimeSlotConfig containing time blocks and class patterns
@@ -25,7 +36,14 @@ class TimeSlotGenerator:
         self.config = config
 
     def _parse_time(self, time_str: str) -> int:
-        """Convert time string (HH:MM) to minutes since midnight."""
+        """
+        Convert time string (HH:MM) to minutes since midnight.
+
+        **Usage:**
+        ```python
+        self._parse_time("10:30")
+        ```
+        """
         hour, minute = map(int, time_str.split(":"))
         return hour * 60 + minute
 
@@ -36,7 +54,14 @@ class TimeSlotGenerator:
         time_blocks: list[TimeBlock],
         start_time: str | None = None,
     ) -> list[TimeInstance]:
-        """Generate all possible time slots for a given day and duration."""
+        """
+        Generate all possible time slots for a given day and duration.
+
+        **Usage:**
+        ```python
+        self._generate_day_slots("MON", 90, time_blocks, start_time=None)
+        ```
+        """
         day_slots = []
         for block in time_blocks:
             block_start = self._parse_time(block.start)
@@ -66,6 +91,11 @@ class TimeSlotGenerator:
         1. No overlapping meetings on the same day
         2. Sufficient overlap between different days
         Returns True if the combination is valid.
+
+        **Usage:**
+        ```python
+        self._validate_time_combination(instances)
+        ```
         """
         for i, t1 in enumerate(time_combination):
             for j, t2 in enumerate(time_combination):
@@ -90,7 +120,14 @@ class TimeSlotGenerator:
         return True
 
     def _has_matching_start_times(self, time_combination: list[TimeInstance]) -> bool:
-        """Check if at least two meetings start at the same time."""
+        """
+        Check if at least two meetings start at the same time.
+
+        **Usage:**
+        ```python
+        self._has_matching_start_times(instances)
+        ```
+        """
         if len(time_combination) < 2:
             return True
         start_times = Counter(t.start.timepoint for t in time_combination)
@@ -100,6 +137,11 @@ class TimeSlotGenerator:
     def time_slots(self, credits: int) -> list[TimeSlot]:
         """
         Generate all possible time slots for a given credit level.
+
+        **Usage:**
+        ```python
+        generator.time_slots(credits=3)
+        ```
 
         **Args:**
         - credits: The course credit count to generate time slots for
