@@ -51,7 +51,7 @@ class CourseInstanceJSON(TypedDict):
 
     times: list[TimeInstanceJSON]
     """
-    List of time instances (e.g., [{"day": 0, "start": 0, "duration": 120}])
+    List of time instances (e.g., `[{"day": 0, "start": 0, "duration": 120}]`)
     """
 
     lab_index: NotRequired[int | None]
