@@ -1,5 +1,6 @@
 import itertools
 import json
+import os
 import time
 from collections import defaultdict
 from collections.abc import Callable, Generator
@@ -30,20 +31,21 @@ from .time_slot_generator import TimeSlotGenerator
 
 def load_config_from_file[T: BaseModel](
     config_cls: type[T],
-    filename: str,
+    filename: str | os.PathLike[str],
 ) -> T:
     """
     Load scheduler configuration from a JSON file.
 
     **Args:**
     - config_cls: The class of the configuration to load
-    - filename: The name of the file to load the configuration from
+    - filename: Path to the file (str or pathlib.Path)
 
     **Returns:**
     The loaded configuration
 
     **Example:**
     >>> load_config_from_file(CombinedConfig, "config.json")
+    >>> load_config_from_file(CombinedConfig, Path("config.json"))
     """
     with open(filename, encoding="utf-8") as f:
         data = json.load(f)
@@ -63,7 +65,7 @@ def get_faculty_availability(
     The availability of the faculty as a list of `TimeInstance` objects
     """
     days: list[Day] = [Day.MON, Day.TUE, Day.WED, Day.THU, Day.FRI]
-    result: list[TimeInstance] = list()
+    result: list[TimeInstance] = []
     for day in days:
         day_name = day.name
         times = faculty_config.times.get(day_name, [])
@@ -165,8 +167,8 @@ class Scheduler:
     def _initialize_time_slots(self, time_slot_config, required_credits: set[int]) -> None:
         """Initialize time slots and create ranges for different credit levels."""
         self._time_slot_generator = TimeSlotGenerator(time_slot_config)
-        self._ranges: dict[int, tuple[int, int]] = dict()
-        self._slots: list[TimeSlot] = list()
+        self._ranges: dict[int, tuple[int, int]] = {}
+        self._slots: list[TimeSlot] = []
 
         for creds in sorted(required_credits):
             low = len(self._slots)
@@ -249,15 +251,15 @@ class Scheduler:
 
         # Initialize data structures
         self._faculty: set[str] = set()
-        self._faculty_maximum_credits: dict[str, int] = dict()
-        self._faculty_maximum_days: dict[str, int] = dict()
-        self._faculty_minimum_credits: dict[str, int] = dict()
-        self._faculty_unique_course_limits: dict[str, int] = dict()
-        self._faculty_course_preferences: dict[str, dict[str, int]] = dict()
-        self._faculty_room_preferences: dict[str, dict[str, int]] = dict()
-        self._faculty_lab_preferences: dict[str, dict[str, int]] = dict()
-        self._faculty_mandatory_days: dict[str, set[Day]] = dict()
-        self._faculty_availability: dict[str, list[TimeInstance]] = dict()
+        self._faculty_maximum_credits: dict[str, int] = {}
+        self._faculty_maximum_days: dict[str, int] = {}
+        self._faculty_minimum_credits: dict[str, int] = {}
+        self._faculty_unique_course_limits: dict[str, int] = {}
+        self._faculty_course_preferences: dict[str, dict[str, int]] = {}
+        self._faculty_room_preferences: dict[str, dict[str, int]] = {}
+        self._faculty_lab_preferences: dict[str, dict[str, int]] = {}
+        self._faculty_mandatory_days: dict[str, set[Day]] = {}
+        self._faculty_availability: dict[str, list[TimeInstance]] = {}
         self._initialize_faculty_data(config)
 
         # Initialize courses and time slots

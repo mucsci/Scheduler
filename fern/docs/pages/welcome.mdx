@@ -1,0 +1,71 @@
+---
+title: Welcome
+description: Get started with the Course Constraint Scheduler — installation, CLI, and where to learn more.
+---
+
+The **Course Constraint Scheduler** is a constraint satisfaction solver for academic course schedules. It models faculty, rooms, labs, time patterns, and preferences, then uses the Z3 theorem prover to produce feasible schedules.
+
+## Install
+
+Requires **Python 3.12+**.
+
+```bash
+pip install course-constraint-scheduler
+```
+
+With [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv add course-constraint-scheduler
+```
+
+## Command line
+
+Generate schedules from a JSON configuration file:
+
+```bash
+scheduler path/to/config.json --limit 10 --format json --output schedules
+```
+
+Interactive mode (fewer options):
+
+```bash
+scheduler path/to/config.json --limit 5
+```
+
+Use `scheduler --help` for all flags.
+
+## REST server
+
+Run the HTTP API (see **REST API** in the sidebar):
+
+```bash
+scheduler-server --port 8000 --host 0.0.0.0 --log-level info
+```
+
+Interactive OpenAPI UI: `http://localhost:8000/docs/`
+
+## Python library
+
+```python
+from scheduler import Scheduler, load_config_from_file
+from scheduler.config import CombinedConfig
+
+config = load_config_from_file(CombinedConfig, "config.json")
+scheduler = Scheduler(config)
+for schedule in scheduler.get_models():
+    for course in schedule:
+        print(course.as_csv())
+```
+
+More detail: **Python API → Using the library** and **Reference**.
+
+## Example configuration
+
+The repository includes [`example.json`](https://github.com/mucsci/scheduler/blob/main/example.json) and a minimal fixture under `tests/fixtures/minimal_config.json`.
+
+## Next steps
+
+- **Configuration** — JSON format for rooms, courses, faculty, time slots, limits, and optimizer flags.
+- **REST API** — session-based HTTP API for web integrations.
+- **Development** — extending constraints, config, tests, and contributions.

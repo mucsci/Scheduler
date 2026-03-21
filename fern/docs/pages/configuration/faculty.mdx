@@ -1,0 +1,64 @@
+---
+title: Faculty
+description: Faculty workload, availability, day caps, and preference maps under config.faculty.
+---
+
+Each object in **`config.faculty`** describes one instructor and their rules.
+
+## Example
+
+```json
+{
+  "name": "Dr. Smith",
+  "maximum_credits": 12,
+  "minimum_credits": 6,
+  "unique_course_limit": 3,
+  "maximum_days": 4,
+  "mandatory_days": ["MON", "WED"],
+  "times": {
+    "MON": ["09:00-17:00"],
+    "TUE": ["09:00-17:00"],
+    "WED": ["09:00-17:00"],
+    "THU": ["09:00-17:00"],
+    "FRI": ["09:00-17:00"]
+  },
+  "course_preferences": { "CS101": 10, "CS102": 5 },
+  "room_preferences": { "Room A": 10, "Room B": 7 },
+  "lab_preferences": { "Lab 1": 8 }
+}
+```
+
+## Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | Unique display id; referenced from courses. |
+| `maximum_credits` | Yes | Upper bound on total credits taught. |
+| `minimum_credits` | Yes | Lower bound on total credits taught. |
+| `unique_course_limit` | Yes | Max number of distinct courses they may teach. |
+| `maximum_days` | No | Max distinct weekdays they teach (default 5). |
+| `mandatory_days` | No | Weekdays on which they must teach at least once (default none). |
+| `times` | Yes | Map day → list of `HH:MM-HH:MM` availability ranges (non-empty per listed day). |
+| `course_preferences` | No | Map `course_id` → score `0`–`10`. |
+| `room_preferences` | No | Map room name → score `0`–`10`. |
+| `lab_preferences` | No | Map lab name → score `0`–`10`. |
+
+## Validation rules
+
+- `minimum_credits` ≤ `maximum_credits`.
+- `mandatory_days` must be a subset of days that appear in `times`.
+- `maximum_days` ≥ number of `mandatory_days`.
+- Preference keys must reference existing courses / rooms / labs.
+- Faculty `name` values must be unique.
+
+## Time format
+
+- 24-hour `HH:MM-HH:MM`.
+- Multiple ranges per day are allowed, e.g. `["09:00-12:00", "14:00-17:00"]`.
+
+## Preference scale
+
+- **0** — no preference (default if omitted).
+- **1–3** — low, **4–6** — medium, **7–8** — high, **9–10** — very high.
+
+Preferences interact with **optimizer flags** (see **Optimizer flags**).

@@ -1,0 +1,27 @@
+---
+title: Adding constraints
+description: Where Z3 constraints are built in scheduler.py and how they compose.
+---
+
+Hard scheduling rules are expressed as Z3 boolean formulas in **`src/scheduler/scheduler.py`** on the **`Scheduler`** class.
+
+## Lifecycle
+
+1. **`__init__`** loads configuration, builds internal **`Course`** / time-slot structures, creates Z3 sorts and per-course variables, then assembles constraints.
+2. **`_build_function_constraints`** — Declares abstract functions over time slots (`overlaps`, `lab_overlaps`, `lecture_next_to`, `faculty_available`, `lab_next_to`) and wires them to concrete slot facts.
+3. **`_build_faculty_constraints`** — Credit totals, unique-course caps, optional max/mandatory days, availability.
+4. **`_build_course_constraints`** — Per-course room/lab choice, time choice, faculty choice, conflict exclusions, faculty availability linkage.
+5. **`_build_resource_constraints`** — No double-booking of rooms/labs/faculty; section adjacency rules for same vs different courses.
+6. **`_aggregate_constraints`** — Combines lists and attaches the optimizer (soft goals) from **`optimizer_flags`**.
+
+## Adding a new hard constraint
+
+1. Decide whether it is **local** (one course) or **cross-course** / **global**.
+2. Add a **`_build_*`** helper or extend an existing one, returning additional **`z3.BoolRef`** terms.
+3. Fold the result into **`_aggregate_constraints`** (or the appropriate caller) so every `check()` / `get_models()` sees it.
+4. Add **tests** under `tests/` with small configs that pass/fail as expected.
+5. If users must configure it, extend **`CombinedConfig`** / sub-models in **`config.py`** (see **Adding configuration options**).
+
+## Performance
+
+Constraint count grows with courses × slots × faculty. Prefer batched implications (the file already batches several patterns) over naive pairwise loops when you touch large loops.

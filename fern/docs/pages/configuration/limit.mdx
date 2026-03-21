@@ -1,0 +1,22 @@
+---
+title: Schedule limit
+description: Top-level limit — maximum schedules to generate in the Python API, CLI, and REST session.
+---
+
+**`limit`** is a positive integer on the root JSON object.
+
+## Meaning
+
+- **Maximum number of distinct schedules** the engine will emit for that configuration.
+- Default in the schema is **`10`** if omitted (see `CombinedConfig` in code).
+
+## Where it applies
+
+- **Python** — Stops iterating once you have `limit` models (or unsat / no more models).
+- **CLI** — `--limit` can override; align it with your JSON if you use both.
+- **REST API** — Session stores up to `limit` schedules via `.../next` and `generate_all`; `.../count` compares progress to `limit`.
+
+## Practices
+
+- Lower **`limit`** for faster turnaround while prototyping.
+- Raise it only when you need a large solution set; memory and time grow with problem size and count.

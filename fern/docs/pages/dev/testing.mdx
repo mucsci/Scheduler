@@ -1,0 +1,42 @@
+---
+title: Testing
+description: pytest layout, coverage, and slow markers for the scheduler codebase.
+---
+
+## Run tests
+
+From the repository root with dev dependencies:
+
+```bash
+uv sync
+uv run pytest
+```
+
+## Layout
+
+- **`tests/`** — Pytest modules mirroring features (config, scheduler, server, etc.).
+- **`tests/conftest.py`** — Shared fixtures and hooks.
+- **`tests/fixtures/`** — JSON configs such as **`minimal_config.json`**.
+
+## Coverage
+
+`pyproject.toml` enables **`--cov=scheduler`** with a **75%** minimum line coverage (`--cov-fail-under=75`). Keep new code exercised.
+
+## Markers
+
+**`@pytest.mark.slow`** — Reserved for tests that load large configs (e.g. full `example.json`) or long solver runs. Run the fast subset:
+
+```bash
+uv run pytest -m "not slow"
+```
+
+## CI parity
+
+Install **prek** hooks to mirror CI locally:
+
+```bash
+uv run prek install
+uv run prek run --all-files
+```
+
+Also run **`ruff`** and **`ty`** as in **`CONTRIBUTING.md`**.

@@ -1,0 +1,51 @@
+{
+  "config": {
+    "rooms": ["R1"],
+    "labs": ["L1"],
+    "courses": [
+      {
+        "course_id": "CS101",
+        "credits": 4,
+        "room": ["R1"],
+        "lab": ["L1"],
+        "conflicts": [],
+        "faculty": ["F1"]
+      }
+    ],
+    "faculty": [
+      {
+        "name": "F1",
+        "maximum_credits": 4,
+        "minimum_credits": 4,
+        "unique_course_limit": 1,
+        "times": {
+          "MON": ["08:00-20:00"],
+          "TUE": ["08:00-20:00"],
+          "WED": ["08:00-20:00"],
+          "THU": ["08:00-20:00"],
+          "FRI": ["08:00-20:00"]
+        }
+      }
+    ]
+  },
+  "time_slot_config": {
+    "times": {
+      "MON": [{ "start": "08:00", "spacing": 60, "end": "20:00" }],
+      "TUE": [{ "start": "08:00", "spacing": 60, "end": "20:00" }],
+      "WED": [{ "start": "08:00", "spacing": 60, "end": "20:00" }],
+      "THU": [{ "start": "08:00", "spacing": 60, "end": "20:00" }],
+      "FRI": [{ "start": "08:00", "spacing": 60, "end": "20:00" }]
+    },
+    "classes": [
+      {
+        "credits": 4,
+        "meetings": [
+          { "day": "MON", "duration": 110, "lab": false },
+          { "day": "WED", "duration": 110, "lab": false }
+        ]
+      }
+    ]
+  },
+  "limit": 1,
+  "optimizer_flags": []
+}

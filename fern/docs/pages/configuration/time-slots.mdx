@@ -1,0 +1,78 @@
+---
+title: Time slots
+description: time_slot_config.times grids and classes patterns that define legal meeting shapes per credit hour.
+---
+
+**`time_slot_config`** has two parts:
+
+1. **`times`** — For each weekday, one or more blocks `{ start, spacing, end }` that define discrete start times (spacing in minutes).
+2. **`classes`** — Allowed **meeting patterns** per credit value: lists of `{ day, duration, lab }` meetings.
+
+The solver only assigns courses to slots that match a **class pattern** whose `credits` equals the course’s credits.
+
+## Time blocks
+
+```json
+{
+  "times": {
+    "MON": [
+      { "start": "09:00", "spacing": 60, "end": "17:00" }
+    ],
+    "TUE": [
+      { "start": "08:00", "spacing": 60, "end": "16:00" }
+    ]
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `start` | First slot start (`HH:MM`). |
+| `spacing` | Minutes between consecutive starts. |
+| `end` | End of the block; last start must still fit a full meeting. |
+
+**Rules:** `end` must be after `start`; spacing is a positive integer.
+
+## Class patterns
+
+```json
+{
+  "credits": 3,
+  "meetings": [
+    { "day": "MON", "duration": 150, "lab": false }
+  ],
+  "disabled": false
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `credits` | Credit hours for this shape; must match courses using it. |
+| `meetings` | Non-empty; each meeting has `day`, `duration` (minutes), optional `lab` (default false). |
+| `disabled` | If true, pattern is ignored (default false). |
+| `start_time` | Optional fixed start `HH:MM` for tighter placement. |
+
+**Rules:**
+
+- No duplicate `day` in the same pattern’s `meetings`.
+- `day` ∈ `MON` … `FRI`.
+- Durations are positive integers.
+
+## Multi-day example
+
+```json
+{
+  "credits": 4,
+  "meetings": [
+    { "day": "MON", "duration": 75, "lab": false },
+    { "day": "WED", "duration": 75, "lab": false },
+    { "day": "FRI", "duration": 150, "lab": true }
+  ]
+}
+```
+
+## Practices
+
+- Align **durations** and **spacing** with your registrar’s standard lengths (e.g. 50, 75, 150 minutes).
+- Every **credit** value that appears on a course must have at least one enabled **class** pattern.
+- Use `disabled` to retire patterns without deleting them.

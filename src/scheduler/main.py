@@ -1,7 +1,7 @@
 import click
 
 from .config import CombinedConfig, OptimizerFlags
-from .logging import logger
+from .logging import configure_logging, logger
 from .scheduler import Scheduler, load_config_from_file
 from .writers import CSVWriter, JSONWriter
 
@@ -49,6 +49,7 @@ def main(
     optimizer_flags: list[OptimizerFlags],
 ):
     """Generate course schedules using constraint satisfaction solving."""
+    configure_logging()
 
     full_config = load_config_from_file(CombinedConfig, config)
     if limit is not None:

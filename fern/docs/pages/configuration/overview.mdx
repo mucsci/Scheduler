@@ -1,0 +1,114 @@
+---
+title: Configuration overview and schema
+description: Top-level JSON structure, validation, type aliases, and machine-readable schema for CombinedConfig.
+---
+
+The Course Constraint Scheduler uses a **JSON** configuration that defines the scheduling problem. Everything is validated with **Pydantic** (`strict=True`, `extra="forbid"`), so typos and unknown keys fail fast with clear errors.
+
+## Top-level structure
+
+1. **`config`** — Rooms, labs, courses, faculty.
+2. **`time_slot_config`** — Grid of time blocks and credit-hour **class patterns** (meeting shapes).
+3. **`limit`** — Maximum number of schedules to generate (default `10`). See **Schedule limit**.
+4. **`optimizer_flags`** — Optional soft-optimization hints. See **Optimizer flags**.
+
+## Validation behavior
+
+- **Cross-references** — Course rooms/labs/faculty/conflicts must name entities that exist in `config`.
+- **Business rules** — e.g. faculty min/max credits, mandatory days, no self-conflicts.
+- **Strict types** — Times and ranges use fixed string patterns (see below).
+
+## Type aliases (conceptual)
+
+These are enforced in JSON via patterns and constraints:
+
+| Name | Meaning |
+|------|---------|
+| `TimeString` | `HH:MM` (24-hour, `00:00`–`23:59`) |
+| `TimeRangeString` | `HH:MM-HH:MM` |
+| `Preference` | Integer `0`–`10` |
+| `Day` | `MON`, `TUE`, `WED`, `THU`, or `FRI` |
+| Room / lab / course / faculty ids | Strings; rooms/labs/faculty names must be unique where required |
+
+## JSON Schema
+
+A generated **JSON Schema** for the full document (`CombinedConfig`) is committed at:
+
+`fern/docs/assets/combined-config.schema.json`
+
+You can also fetch it from GitHub:
+[combined-config.schema.json (main)](https://github.com/mucsci/scheduler/raw/main/fern/docs/assets/combined-config.schema.json)
+
+The **REST API** `POST /submit` body matches this shape (same model as `CombinedConfig`).
+
+## Full example
+
+```json
+{
+  "config": {
+    "rooms": ["Room A", "Room B", "Room C"],
+    "labs": ["Lab 1", "Lab 2"],
+    "courses": [
+      {
+        "course_id": "CS101",
+        "credits": 3,
+        "room": ["Room A", "Room B"],
+        "lab": ["Lab 1"],
+        "conflicts": ["CS102"],
+        "faculty": ["Dr. Smith", "Dr. Johnson"]
+      },
+      {
+        "course_id": "CS102",
+        "credits": 4,
+        "room": ["Room B", "Room C"],
+        "lab": ["Lab 2"],
+        "conflicts": ["CS101"],
+        "faculty": ["Dr. Johnson", "Dr. Brown"]
+      }
+    ],
+    "faculty": [
+      {
+        "name": "Dr. Smith",
+        "maximum_credits": 12,
+        "minimum_credits": 6,
+        "unique_course_limit": 3,
+        "maximum_days": 4,
+        "mandatory_days": ["MON", "WED"],
+        "times": {
+          "MON": ["09:00-17:00"],
+          "TUE": ["09:00-17:00"],
+          "WED": ["09:00-17:00"],
+          "THU": ["09:00-17:00"],
+          "FRI": ["09:00-17:00"]
+        },
+        "course_preferences": { "CS101": 10, "CS102": 5 },
+        "room_preferences": { "Room A": 10, "Room B": 7, "Room C": 3 },
+        "lab_preferences": { "Lab 1": 8, "Lab 2": 5 }
+      }
+    ]
+  },
+  "time_slot_config": {
+    "times": {
+      "MON": [{ "start": "09:00", "spacing": 60, "end": "17:00" }],
+      "TUE": [{ "start": "09:00", "spacing": 60, "end": "17:00" }]
+    },
+    "classes": [
+      {
+        "credits": 3,
+        "meetings": [{ "day": "MON", "duration": 150, "lab": false }]
+      },
+      {
+        "credits": 4,
+        "meetings": [
+          { "day": "TUE", "duration": 150, "lab": true },
+          { "day": "THU", "duration": 150, "lab": false }
+        ]
+      }
+    ]
+  },
+  "limit": 10,
+  "optimizer_flags": ["faculty_course", "pack_rooms", "same_room"]
+}
+```
+
+Continue with **Rooms and labs**, **Courses**, **Faculty**, and **Time slots** for field-level detail.

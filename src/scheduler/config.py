@@ -184,25 +184,14 @@ class TimeBlock(StrictBaseModel):
     End time of the time block
     """
 
-    @field_validator("start", "end")
-    @classmethod
-    def _validate_end_after_start(cls, v, info: ValidationInfo):
-        """
-        Validate that the end time is after the start time
-        """
-        # Only validate when both fields are available
-        if "start" not in info.data or "end" not in info.data:
-            return v
-
-        start_time = info.data["start"]
-        end_time = info.data["end"]
-        # Convert time strings to minutes for comparison
-        start_minutes = int(start_time.split(":")[0]) * 60 + int(start_time.split(":")[1])
-        end_minutes = int(end_time.split(":")[0]) * 60 + int(end_time.split(":")[1])
-
+    @model_validator(mode="after")
+    def _validate_end_after_start(self):
+        """Validate that the end time is after the start time."""
+        start_minutes = int(self.start.split(":")[0]) * 60 + int(self.start.split(":")[1])
+        end_minutes = int(self.end.split(":")[0]) * 60 + int(self.end.split(":")[1])
         if end_minutes <= start_minutes:
             raise ValueError("End time must be after start time")
-        return v
+        return self
 
 
 class TimeRange(StrictBaseModel):
@@ -219,25 +208,14 @@ class TimeRange(StrictBaseModel):
     End time of the time range
     """
 
-    @field_validator("start", "end")
-    @classmethod
-    def _validate_end_after_start(cls, v, info: ValidationInfo):
-        """
-        Validate that the end time is after the start time
-        """
-        # Only validate when both fields are available
-        if "start" not in info.data or "end" not in info.data:
-            return v
-
-        start_time = info.data["start"]
-        end_time = info.data["end"]
-        # Convert time strings to minutes for comparison
-        start_minutes = int(start_time.split(":")[0]) * 60 + int(start_time.split(":")[1])
-        end_minutes = int(end_time.split(":")[0]) * 60 + int(end_time.split(":")[1])
-
+    @model_validator(mode="after")
+    def _validate_end_after_start(self):
+        """Validate that the end time is after the start time."""
+        start_minutes = int(self.start.split(":")[0]) * 60 + int(self.start.split(":")[1])
+        end_minutes = int(self.end.split(":")[0]) * 60 + int(self.end.split(":")[1])
         if end_minutes <= start_minutes:
             raise ValueError("End time must be after start time")
-        return v
+        return self
 
     def __str__(self) -> str:
         return f"{self.start}-{self.end}"

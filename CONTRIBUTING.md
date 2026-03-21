@@ -60,11 +60,8 @@ source .venv/bin/activate  # On macOS/Linux
 # OR
 .venv\Scripts\activate     # On Windows
 
-# Install dependencies
+# Install dependencies and the package (dev group is included by default; see tool.uv in pyproject.toml)
 uv sync
-
-# Install package in editable mode
-uv pip install -e .
 ```
 
 **Alternative (if uv is not available):**
@@ -83,12 +80,27 @@ pip install -e .
 ### 3. Install Development Dependencies
 
 ```bash
-# Using uv (recommended)
+# Using uv (recommended): `uv sync` installs the dev group by default
+uv sync
+
+# If you disabled default-groups, install dev explicitly:
 uv sync --group dev
 
-# Using pip
-pip install -e ".[dev]"
+# Using pip: there is no `[project.optional-dependencies]` dev extra; use uv, or install
+# tools from the dev list in pyproject.toml manually after `pip install -e .`
 ```
+
+### Git hooks (prek)
+
+After `uv sync`, install hooks so the same checks as CI run on each commit:
+
+```bash
+uv run prek install
+# If you previously used pre-commit and need to replace its hook script:
+uv run prek install -f
+```
+
+Configuration lives in `.pre-commit-config.yaml` (prek is compatible with this format).
 
 ### 4. Verify Installation
 
@@ -100,7 +112,7 @@ python -m scheduler.main --help
 python -m scheduler.server --help
 
 # Run tests
-pytest
+uv run pytest
 ```
 
 ## Project Structure
@@ -125,10 +137,22 @@ src/scheduler/
 │   └── csv_writer.py       # CSV output writer
 └── time_slot_generator.py  # Time slot generation utilities
 
-docs/                       # Documentation
-├── configuration.md        # Configuration file format
-├── python_api.md           # Python API
-└── rest_api.md             # REST API
+fern/                       # Fern documentation site (published to Fern Cloud)
+├── docs.yml                # Site config, navigation, branding
+├── generators.yml          # OpenAPI spec registration
+├── openapi.json            # Generated from FastAPI (do not edit by hand)
+├── fern.config.json        # Fern org + CLI version
+└── docs/
+    ├── pages/              # MDX guides (configuration, Python, dev, …)
+    └── assets/             # Logos, favicon, combined-config.schema.json
+
+docs/
+└── configuration.md        # Redirect pointer to published docs
+
+scripts/
+├── export_openapi.py       # Refresh fern/openapi.json
+├── export_config_schema.py # Refresh JSON Schema asset
+└── gen_python_api_mdx.py   # Refresh Python API reference from docstrings
 ```
 
 ## Development Workflow
@@ -153,11 +177,17 @@ git checkout -b feature/your-feature-name
 ### 3. Test Your Changes
 
 ```bash
+# Run tests
+uv run pytest
+
 # Run linting
-ruff check
+uv run ruff check .
 
 # Run type checking
-ty check
+uv run ty check . --ignore unresolved-import
+
+# Or run the full hook suite (matches CI)
+uv run prek run --all-files
 ```
 
 ### 4. Commit Your Changes
@@ -223,17 +253,17 @@ from .config import SchedulerConfig
 ```python
 def generate_schedule(config: SchedulerConfig) -> List[CourseInstance]:
     """Generate a course schedule based on configuration.
-    
+
     **Args:**
     - config: The scheduler configuration containing courses, faculty, and constraints.
-    
+
     **Returns:**
     A list of course instances representing the generated schedule.
-    
+
     **Raises:**
     - ValueError: If the configuration is invalid.
     - RuntimeError: If no valid schedule can be generated.
-    
+
     **Example:**
         >>> config = load_config_from_file("config.json")
         >>> schedule = generate_schedule(config, limit=5)
@@ -283,14 +313,15 @@ if not faculty_available:
 - Update REST API documentation for new endpoints
 - Include request/response examples
 - Document error codes and messages
-- Update OpenAPI schema if applicable
+- Regenerate **`fern/openapi.json`** with `uv run python scripts/export_openapi.py` when `server.py` or shared models change
+- Regenerate **`fern/docs/pages/python/reference.mdx`** with `uv run python scripts/gen_python_api_mdx.py` when public docstrings change
 
 ### User Documentation
 
+- Update **Fern** pages under **`fern/docs/pages/`** (configuration, welcome, development)
 - Update README.md for new features
-- Add configuration examples
-- Update troubleshooting guides
-- Include performance considerations
+- Regenerate **`fern/docs/assets/combined-config.schema.json`** with `uv run python scripts/export_config_schema.py` when `CombinedConfig` changes
+- Preview locally: `npm install -g fern-api` then `fern docs dev` (after the generate scripts above)
 
 ## Submitting Changes
 
@@ -298,8 +329,9 @@ if not faculty_available:
 
 Before submitting a pull request, ensure:
 
-- [ ] Code passes linting (`ruff check`)
-- [ ] Type checking passes (`ty check`)
+- [ ] Code passes linting (`uv run ruff check .`)
+- [ ] Type checking passes (`uv run ty check . --ignore unresolved-import`)
+- [ ] Tests pass (`uv run pytest`)
 - [ ] Documentation is updated
 - [ ] Breaking changes are documented
 - [ ] Commit messages follow conventional format

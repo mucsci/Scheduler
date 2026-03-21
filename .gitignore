@@ -1,5 +1,9 @@
 .venv
 
+.env
+.env.*
+!.env.example
+
 **/__pycache__
 **/*.pyc
 **/*egg-info*
@@ -7,10 +11,14 @@
 dist/
 .ruff_cache/
 
+.coverage
+htmlcov/
+
 **/*~
 **/#*#
 
 **/*.json
 !example.json
+!tests/fixtures/**/*.json
 
 **/.DS_Store

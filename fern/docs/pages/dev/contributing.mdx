@@ -1,0 +1,35 @@
+---
+title: Contributing
+description: Branch workflow, style, and full contributor guide on GitHub.
+---
+
+Thank you for helping improve the Course Constraint Scheduler.
+
+## Quick checklist
+
+- Branch from **`main`**, keep commits focused.
+- Run **`uv run pytest`**, **`uv run ruff check .`**, and type checks as described below.
+- Update **Fern docs** under **`fern/docs/pages/`** when behavior or configuration changes.
+- Regenerate artifacts when needed before pushing doc-sensitive PRs:
+  - `uv run python scripts/export_openapi.py`
+  - `uv run python scripts/export_config_schema.py`
+  - `uv run python scripts/gen_python_api_mdx.py`
+
+## Full guide
+
+The canonical contributor documentation (code style, hooks, commit messages, release notes) lives in the repository:
+
+**[CONTRIBUTING.md on GitHub](https://github.com/mucsci/scheduler/blob/main/CONTRIBUTING.md)**
+
+## Documentation site
+
+This site is built with **Fern**. Local preview:
+
+```bash
+npm install -g fern-api
+fern docs dev
+```
+
+(from the repository root, with the `fern/` directory present)
+
+Publishing to production uses **`fern generate --docs`** in CI with a **`FERN_TOKEN`** secret (see maintainers).

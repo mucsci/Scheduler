@@ -9,12 +9,12 @@
                 padding: 10px;
                 background-color: #f5f5f5;
             }
-            
+
             h1 {
                 font-size: 1.5em;
                 text-align: center;
             }
-            
+
             #main-form {
                 display: flex;
                 flex-wrap: wrap;
@@ -24,7 +24,7 @@
                 padding: 0;
                 justify-content: center;
             }
-            
+
             #status-dot {
                 display: inline-block;
                 width: 14px;
@@ -33,25 +33,25 @@
                 background: #bbb;
                 margin-left: 2px;
             }
-            
+
             #nav-controls {
                 display: none;
                 width: 100%;
                 text-align: center;
             }
-            
+
             #nav-controls.visible {
                 display: flex;
                 justify-content: center;
                 align-items: center;
                 gap: 10px;
             }
-            
+
             button:disabled {
                 opacity: 0.5;
                 cursor: not-allowed;
             }
-            
+
             @media not print {
                 .gap {
                     margin-top: 20px;
@@ -66,7 +66,7 @@
                     justify-content: space-around;
                     flex: 0 0 600px;
                 }
-                
+
                 .grid > div {
                     flex: 0 0 600px;
                     margin: 0;
@@ -75,18 +75,18 @@
                     border-radius: 8px;
                 }
             }
-            
+
             @media print {
                 .container {
                     display: none !important;
                 }
-                
+
                 .grid > div {
                     page-break-after: always;
                     break-after: page;
                 }
             }
-            
+
             #content {
                 display: none;
             }
@@ -118,7 +118,7 @@
             </div>
             <div id="faculty" class="gap grid"></div>
         </div>
-        
+
         <script src="https://d3js.org/d3.v7.min.js"></script>
         <script type="text/javascript">
             // Layout constants
@@ -127,23 +127,23 @@
             const LEFT_MARGIN = 45;
             const TEXT_OFFSET = 50;
             const SVG_PADDING = 2;
-            
+
             let currentSessionId = null;
             let currentIndex = -1;
             let totalGenerated = 0;
             let scheduleLimit = 10;
             let cleanupTriggered = false;
             let cachedCountData = null; // Cache for count data
-            
+
             // Utility functions
             function showError(message) {
                 alert(`Error: ${message}`);
             }
-            
+
             function getBaseUrl() {
                 return document.getElementById('server-url').value.replace(/\/$/, '');
             }
-            
+
             // API functions
             async function cancelExistingSession() {
                 if (currentSessionId && !cleanupTriggered) {
@@ -159,7 +159,7 @@
                     }
                 }
             }
-            
+
             async function checkServerStatus() {
                 const dot = document.getElementById('status-dot');
                 dot.style.background = '#bbb'; // gray (checking)
@@ -175,22 +175,22 @@
                     dot.style.background = '#e74c3c'; // red
                 }
             }
-            
+
             async function submitConfiguration() {
                 const fileInput = document.getElementById('config-file');
-                
+
                 if (!fileInput.files[0]) {
                     showError('Please select a configuration file');
                     return;
                 }
-                
+
                 // Cancel existing session before submitting new configuration
                 await cancelExistingSession();
-                
+
                 try {
                     const fileContent = await fileInput.files[0].text();
                     const configData = JSON.parse(fileContent);
-                    
+
                     const url = getBaseUrl();
                     const response = await fetch(`${url}/submit`, {
                         method: 'POST',
@@ -199,7 +199,7 @@
                         },
                         body: JSON.stringify(configData)
                     });
-                    
+
                     if (response.ok) {
                         const result = await response.json();
                         currentSessionId = result.schedule_id;
@@ -208,11 +208,11 @@
                         totalGenerated = 0;
                         cleanupTriggered = false;
                         cachedCountData = null; // Reset cached data
-                        
+
                         document.getElementById('nav-controls').classList.add('visible');
                         updateNavigation();
                         startCountPolling();
-                        
+
                         // Automatically trigger generate all after session creation
                         await generateAllSchedules();
                     } else {
@@ -225,10 +225,10 @@
                     hideContent();
                 }
             }
-            
+
             async function navigateSchedule(direction) {
                 if (!currentSessionId) return;
-                
+
                 // Use cached count data if available, otherwise fetch it
                 let countData = cachedCountData;
                 if (!countData) {
@@ -238,30 +238,30 @@
                         return;
                     }
                 }
-                
+
                 const newIndex = currentIndex + direction;
-                
+
                 // Check bounds
                 if (newIndex < 0 || newIndex >= countData.current_count) {
                     return;
                 }
-                
+
                 await loadScheduleByIndex(newIndex);
             }
-            
+
             // Replace the separate navigation functions with calls to the generic one
             const nextSchedule = () => navigateSchedule(1);
             const previousSchedule = () => navigateSchedule(-1);
-            
+
             async function loadScheduleByIndex(index) {
                 if (!currentSessionId || index < 0) return;
-                
+
                 try {
                     const url = getBaseUrl();
                     const response = await fetch(`${url}/schedules/${currentSessionId}/index/${index}`, {
                         method: 'GET'
                     });
-                    
+
                     if (response.ok) {
                         const result = await response.json();
                         displaySchedule(result.schedule);
@@ -274,16 +274,16 @@
                     showError(`[ERROR] Error: ${error.message}`);
                 }
             }
-            
+
             async function generateAllSchedules() {
                 if (!currentSessionId) return;
-                
+
                 try {
                     const url = getBaseUrl();
                     const response = await fetch(`${url}/schedules/${currentSessionId}/generate_all`, {
                         method: 'POST'
                     });
-                    
+
                     if (response.ok) {
                         const result = await response.json();
                         // Start polling for count updates
@@ -296,16 +296,16 @@
                     showError(`[ERROR] Error: ${error.message}`);
                 }
             }
-            
+
             async function getScheduleCount() {
                 if (!currentSessionId) return null;
-                
+
                 try {
                     const url = getBaseUrl();
                     const response = await fetch(`${url}/schedules/${currentSessionId}/count`, {
                         method: 'GET'
                     });
-                    
+
                     if (response.ok) {
                         const result = await response.json();
                         cachedCountData = result; // Cache the result
@@ -316,22 +316,22 @@
                 }
                 return null;
             }
-            
+
             let countPollingInterval = null;
-            
+
             function startCountPolling() {
                 // Clear any existing polling
                 if (countPollingInterval) {
                     clearInterval(countPollingInterval);
                 }
-                
+
                 // Poll every 2 seconds
                 countPollingInterval = setInterval(async () => {
                     const countData = await getScheduleCount();
                     if (countData) {
                         totalGenerated = countData.current_count;
                         updateNavigation(countData); // Pass the fresh data
-                        
+
                         // Stop polsling if generation is complete
                         if (countData.is_complete) {
                             clearInterval(countPollingInterval);
@@ -340,12 +340,12 @@
                     }
                 }, 1000);
             }
-            
+
             function updateNavigation(countData = null) {
                 // If countData is provided, use it; otherwise use cached data
                 const data = countData || cachedCountData;
                 if (!data) return;
-                
+
                 const prevBtn = document.getElementById('prev');
                 const nextBtn = document.getElementById('next');
                 const currSpan = document.getElementById('curr');
@@ -355,7 +355,7 @@
                 prevBtn.disabled = currentIndex <= 0;
                 nextBtn.disabled = currentIndex + 1 >= totalGenerated;
             }
-            
+
             // Schedule display functions (adapted from original)
             const getHashCode = (str) => {
                 let h1 = 0x10293847;
@@ -369,19 +369,19 @@
                 h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
                 h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
                 h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-                
+
                 return 4294967296 * (2097151 & h2) + (h1 >>> 0);
             };
-            
+
             const intToHSL = (val) => {
                 const shortened = Math.imul(val, Math.imul(val, val)) % 360;
                 return "hsla(" + shortened + ",100%,30%,20%)";
             };
-            
+
             function map_course(c) {
                 const result = [];
                 const {course, faculty, room, times, lab, lab_index} = c;
-                
+
                 for (const t in times) {
                     const entry = {...times[t]};
                     entry['name'] = course;
@@ -389,7 +389,7 @@
                     entry['faculty'] = faculty;
                     result.push(entry);
                 }
-                
+
                 if (lab) {
                     const entry = {...times[lab_index]};
                     entry['name'] = course;
@@ -397,37 +397,37 @@
                     entry['faculty'] = faculty;
                     result.push(entry);
                 }
-                
+
                 return result;
             }
-            
+
             function displaySchedule(scheduleData) {
                 // Show the content div when displaying schedules
                 document.getElementById('content').style.display = 'block';
                 displayRoomSchedule(scheduleData);
                 displayFacultySchedule(scheduleData);
             }
-            
+
             function hideContent() {
                 document.getElementById('content').style.display = 'none';
             }
-            
+
             function displayRoomSchedule(scheduleData) {
                 const scheduleContainer = document.getElementById('schedule');
                 scheduleContainer.innerHTML = '';
-                
+
                 // Hide content if no schedule data
                 if (!scheduleData || scheduleData.length === 0) {
                     hideContent();
                     return;
                 }
-                
+
                 const the_data = scheduleData.flatMap(map_course);
-                
+
                 // Extract unique locations
                 const rooms = new Set();
                 const labs = new Set();
-                
+
                 for (const c of scheduleData) {
                     if (c.room) {
                         rooms.add(c.room);
@@ -436,29 +436,29 @@
                         labs.add(c.lab);
                     }
                 }
-                
+
                 const locations = Array.from(rooms).sort().concat(Array.from(labs).sort());
-                
+
                 for (const room of locations) {
                     const div = d3.select("#schedule")
                         .append("div")
                         .style("padding", "5px")
                         .style("background", "white")
                         .style("width", (LEFT_MARGIN + (5 * DAY_WIDTH)) + "px");
-                    
+
                     div.append("h2")
                         .text(room)
                         .style("margin-top", "0")
                         .style("margin-bottom", "8px")
                         .style("margin-left", "5px")
                         .style("text-align", "center");
-                    
+
                     const days = div.append("div");
-                    
+
                     days.append('div')
                         .style('width', '40px')
                         .style("display", "inline-block");
-                    
+
                     const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
                     for (const i in DAYS) {
                         days.append('span')
@@ -468,36 +468,36 @@
                             .style("display", "inline-block")
                             .style("text-align", "center");
                     }
-                    
+
                     // Compute time range for this room
                     const filtered = the_data.filter(x => x.room == room);
                     let minHour = 24;
                     let maxHour = 0;
-                    
+
                     for (const classData of filtered) {
                         const startHour = Math.floor(classData.start / 60);
                         const endHour = Math.ceil((classData.start + classData.duration) / 60);
-                        
+
                         minHour = Math.min(minHour, startHour);
                         maxHour = Math.max(maxHour, endHour);
                     }
-                    
+
                     if (minHour === 24 || maxHour === 0) {
                         minHour = 8;
                         maxHour = 17;
                     }
-                    
+
                     const TIMES = [];
                     for (let hour = minHour; hour <= maxHour; hour++) {
                         TIMES.push(hour);
                     }
-                    
+
                     const svgHeight = (maxHour - minHour) * 60 + (2 * SVG_PADDING);
-                    
+
                     const svg = div.append("svg")
                         .attr("width", LEFT_MARGIN + (5 * DAY_WIDTH))
                         .attr("height", svgHeight);
-                    
+
                     svg.selectAll('line')
                         .data(TIMES)
                         .enter()
@@ -506,7 +506,7 @@
                         .style("stroke-width", 1)
                         .attr('x1', 0).attr('y1', d => (d - minHour) * 60 + SVG_PADDING)
                         .attr('x2', LEFT_MARGIN + (5 * DAY_WIDTH)).attr('y2', d => (d - minHour) * 60 + SVG_PADDING);
-                    
+
                     svg.selectAll('text')
                         .data(TIMES)
                         .enter()
@@ -519,7 +519,7 @@
                             return h + ":00" + ap;
                         })
                         .style("font-size", "10px");
-                    
+
                     svg.selectAll('rect')
                         .data(filtered)
                         .enter()
@@ -530,12 +530,12 @@
                         .attr('height', d => d.duration)
                         .style('fill', d => intToHSL(getHashCode(d.faculty)))
                         .style('stroke', 'black');
-                    
+
                     const group = svg.selectAll('g')
                         .data(filtered)
                         .enter()
                         .append('g');
-                    
+
                     group.append('text')
                         .attr('dy', 12)
                         .attr('x', d => (d.day - 1) * DAY_WIDTH + TEXT_OFFSET + DAY_PADDING)
@@ -543,14 +543,14 @@
                         .text(d => d.name)
                         .style('font-weight', 700)
                         .style("font-size", "12px");
-                    
+
                     group.append('text')
                         .attr('dy', 12)
                         .attr('x', d => (d.day - 1) * DAY_WIDTH + TEXT_OFFSET + DAY_PADDING)
                         .attr('y', d => d.start - minHour * 60 + SVG_PADDING + 15)
                         .text(d => d.faculty)
                         .style("font-size", "10px");
-                    
+
                     group.append('text')
                         .attr('dy', 12)
                         .attr('x', d => (d.day - 1) * DAY_WIDTH + TEXT_OFFSET + DAY_PADDING)
@@ -568,11 +568,11 @@
                         .style("font-size", "10px");
                 }
             }
-            
+
             function displayFacultySchedule(scheduleData) {
                 const facultyContainer = document.getElementById('faculty');
                 facultyContainer.innerHTML = '';
-                
+
                 // Extract unique faculty members
                 const facultyMembers = new Set();
                 for (const c of scheduleData) {
@@ -580,29 +580,29 @@
                         facultyMembers.add(c.faculty);
                     }
                 }
-                
+
                 const facultyList = Array.from(facultyMembers).sort();
-                
+
                 for (const faculty of facultyList) {
                     const div = d3.select("#faculty")
                         .append("div")
                         .style("padding", "5px")
                         .style("background", "white")
                         .style("width", (LEFT_MARGIN + (5 * DAY_WIDTH)) + "px");
-                    
+
                     div.append("h2")
                         .text(faculty)
                         .style("margin-top", "0")
                         .style("margin-bottom", "8px")
                         .style("margin-left", "5px")
                         .style("text-align", "center");
-                    
+
                     const days = div.append("div");
-                    
+
                     days.append('div')
                         .style('width', '40px')
                         .style("display", "inline-block");
-                    
+
                     const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
                     for (const i in DAYS) {
                         days.append('span')
@@ -612,50 +612,50 @@
                             .style("display", "inline-block")
                             .style("text-align", "center");
                     }
-                    
+
                     // Compute time range for this faculty member
                     let minHour = 24;
                     let maxHour = 0;
-                    
+
                     for (const c of scheduleData) {
                         if (c.faculty === faculty) {
                             for (const t in c.times) {
                                 const classData = c.times[t];
                                 const startHour = Math.floor(classData.start / 60);
                                 const endHour = Math.ceil((classData.start + classData.duration) / 60);
-                                
+
                                 minHour = Math.min(minHour, startHour);
                                 maxHour = Math.max(maxHour, endHour);
                             }
-                            
+
                             // Check lab time if it exists
                             if (c.lab && c.lab_index !== undefined) {
                                 const labData = c.times[c.lab_index];
                                 const startHour = Math.floor(labData.start / 60);
                                 const endHour = Math.ceil((labData.start + labData.duration) / 60);
-                                
+
                                 minHour = Math.min(minHour, startHour);
                                 maxHour = Math.max(maxHour, endHour);
                             }
                         }
                     }
-                    
+
                     if (minHour === 24 || maxHour === 0) {
                         minHour = 8;
                         maxHour = 17;
                     }
-                    
+
                     const TIMES = [];
                     for (let hour = minHour; hour <= maxHour; hour++) {
                         TIMES.push(hour);
                     }
-                    
+
                     const svgHeight = (maxHour - minHour) * 60 + (2 * SVG_PADDING);
-                    
+
                     const svg = div.append("svg")
                         .attr("width", LEFT_MARGIN + (5 * DAY_WIDTH))
                         .attr("height", svgHeight);
-                    
+
                     svg.selectAll('line')
                         .data(TIMES)
                         .enter()
@@ -664,7 +664,7 @@
                         .style("stroke-width", 1)
                         .attr('x1', 0).attr('y1', d => (d - minHour) * 60 + SVG_PADDING)
                         .attr('x2', LEFT_MARGIN + (5 * DAY_WIDTH)).attr('y2', d => (d - minHour) * 60 + SVG_PADDING);
-                    
+
                     svg.selectAll('text')
                         .data(TIMES)
                         .enter()
@@ -677,7 +677,7 @@
                             return h + ":00" + ap;
                         })
                         .style("font-size", "10px");
-                    
+
                     // Create data for this faculty member's classes
                     const facultyData = [];
                     for (const c of scheduleData) {
@@ -686,19 +686,19 @@
                                 const entry = {...c.times[t]};
                                 entry['name'] = c.course;
                                 entry['faculty'] = c.faculty;
-                                
+
                                 // Consolidate room and lab information
                                 if (c.lab && t == c.lab_index) {
                                     entry['room'] = `${c.room} (${c.lab})`;
                                 } else {
                                     entry['room'] = c.room;
                                 }
-                                
+
                                 facultyData.push(entry);
                             }
                         }
                     }
-                    
+
                     svg.selectAll('rect')
                         .data(facultyData)
                         .enter()
@@ -709,12 +709,12 @@
                         .attr('height', d => d.duration)
                         .style('fill', d => intToHSL(getHashCode(d.faculty)))
                         .style('stroke', 'black');
-                    
+
                     const group = svg.selectAll('g')
                         .data(facultyData)
                         .enter()
                         .append('g');
-                    
+
                     group.append('text')
                         .attr('dy', 12)
                         .attr('x', d => (d.day - 1) * DAY_WIDTH + TEXT_OFFSET + DAY_PADDING)
@@ -722,14 +722,14 @@
                         .text(d => d.name)
                         .style('font-weight', 700)
                         .style("font-size", "12px");
-                    
+
                     group.append('text')
                         .attr('dy', 12)
                         .attr('x', d => (d.day - 1) * DAY_WIDTH + TEXT_OFFSET + DAY_PADDING)
                         .attr('y', d => d.start - minHour * 60 + SVG_PADDING + 15)
                         .text(d => d.room)
                         .style("font-size", "10px");
-                    
+
                     group.append('text')
                         .attr('dy', 12)
                         .attr('x', d => (d.day - 1) * DAY_WIDTH + TEXT_OFFSET + DAY_PADDING)
@@ -747,12 +747,12 @@
                         .style("font-size", "10px");
                 }
             }
-            
+
             // Initialize
             document.addEventListener('DOMContentLoaded', function() {
                 // Set default values
                 document.getElementById('server-url').value = 'http://localhost:8000';
-                
+
                 // Add event listener to delete session when page is closed
                 window.addEventListener('beforeunload', function() {
                     if (currentSessionId && !cleanupTriggered) {
@@ -761,7 +761,7 @@
                         navigator.sendBeacon(`${url}/schedules/${currentSessionId}/cleanup`);
                     }
                 });
-                
+
                 // Add event listener to automatically check server status when URL changes
                 let statusCheckTimeout;
                 document.getElementById('server-url').addEventListener('input', function() {
@@ -770,10 +770,10 @@
                     // Set new timeout to check status after user stops typing
                     statusCheckTimeout = setTimeout(checkServerStatus, 500);
                 });
-                
+
                 // Check initial status
                 checkServerStatus();
             });
         </script>
     </body>
-</html> 
+</html>

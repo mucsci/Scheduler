@@ -1,0 +1,30 @@
+---
+title: Rooms and labs
+description: The config.rooms and config.labs lists and how courses reference them.
+---
+
+Under **`config`**, **`rooms`** and **`labs`** name the physical resources the solver may assign.
+
+## Shape
+
+```json
+{
+  "rooms": ["Room A", "Room B", "Room C"],
+  "labs": ["Lab 1", "Lab 2"]
+}
+```
+
+- **`rooms`** — Non-empty list of unique room names (strings).
+- **`labs`** — List of unique lab names (strings); may be empty if you have no labs.
+
+Every room and lab name used in **courses** or **faculty preferences** must appear in these lists.
+
+## Course usage
+
+Each course lists acceptable **rooms** and **labs** (see **Courses**). The solver picks one room and one lab assignment per course instance subject to availability and constraints.
+
+## Practices
+
+- Use stable, human-readable names; they appear in output and APIs.
+- If a course has no lab requirement, its `lab` list can be empty.
+- Keep the global lists aligned with your registrar or facilities data to avoid validation errors on unknown names.

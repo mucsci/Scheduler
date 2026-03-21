@@ -69,6 +69,7 @@ for schedule in scheduler.get_models():
         print(f"{course.as_csv()}")
 ```
 
+**Note on naming:** `scheduler.config` defines `Course` as a **course-id string** type alias (used in JSON config). `scheduler.models` defines a `Course` **class** representing a course with credits and meetings. Schedules from `get_models()` yield `CourseInstance` objects whose `.course` attribute is the models `Course`; use `.course.course_id` to get the config-style course id.
 
 ### REST API
 
@@ -90,31 +91,35 @@ curl -X GET "http://localhost:8000/schedules/{schedule_id}/count"
 
 ## Documentation
 
-First, ensure the scheduler is installed via the [Installation](#installation) section above.
+**Published docs (configuration, Python API, REST API, development):**
+[https://mucsci-scheduler.docs.buildwithfern.com](https://mucsci-scheduler.docs.buildwithfern.com)
 
-### Python API Documentation
+CI publishes this site on pushes to `main` that touch `fern/`, `scripts/`, or `src/scheduler/` (see `.github/workflows/docs.yml`). The repository needs a **`FERN_TOKEN`** Actions secret from the Fern CLI (`fern token`) or dashboard.
 
-To view the Python API documentation:
-
-```console
-pip install pdoc
-pdoc scheduler
-```
-
-### REST API Documentation
-
-To access the REST API documentation:
+### Local REST API (OpenAPI UI)
 
 ```console
 scheduler-server
 # open http://localhost:8000/docs/ in a web browser
 ```
 
-### Configuration Guide
+The `/submit` request body matches `CombinedConfig` (same JSON as the CLI and Python API).
 
-It is recommended to launch the REST API documentation and look at the Schema for `/submit`
+### Local Fern preview
 
-Alternatively, you can visit [./docs/configuration.md](./docs/configuration.md) to see the documentation related to the configuration file format and examples.
+With [Node.js](https://nodejs.org/) and dev dependencies installed:
+
+```console
+npm install -g fern-api
+uv run python scripts/export_openapi.py
+uv run python scripts/export_config_schema.py
+uv run python scripts/gen_python_api_mdx.py
+fern docs dev
+```
+
+### Configuration quick link
+
+A short pointer to the new docs location: [docs/configuration.md](./docs/configuration.md).
 
 ## Configuration
 
@@ -215,19 +220,26 @@ The scheduler is built with a modular architecture:
 git clone <repository-url>
 cd course-constraint-scheduler
 
-# Install development dependencies
-pip install -e ".[dev]"
+# Install dependencies (includes dev tools via uv default-groups; see pyproject.toml)
+uv sync
 
 # Run tests
-pytest
+uv run pytest
 
 # Run linting
-ruff check src/
+uv run ruff check .
 ```
+
+Using **pip** without optional extras: dev dependencies are declared under `[dependency-groups]` in `pyproject.toml`. Either use **uv** as above, or add a matching `[project.optional-dependencies]` `dev` group if you need `pip install -e ".[dev]"`.
+
+### Logging
+
+The scheduler does not configure logging on import. The CLI (`scheduler`) and HTTP server (`scheduler-server`) call `configure_logging()` at startup. When embedding the scheduler as a library, configure logging in your application (e.g. `logging.basicConfig(...)`) before using the scheduler.
 
 ### Project Structure
 
 ```
+tests/                     # Pytest suite
 src/scheduler/
 ├── __init__.py              # Main package exports with all types
 ├── config.py                # Configuration models with strict validation and type definitions
