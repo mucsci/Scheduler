@@ -47,7 +47,7 @@ const getHashCode = (str) => {
     h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
     h2  = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
     h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
-  
+
     return 4294967296 * (2097151 & h2) + (h1 >>> 0);
 };
 
@@ -83,7 +83,7 @@ function load_index(index) {
     curr_index = index;
 
     d3.select('#schedule').html("");
-    
+
     const the_data = root_json[index].flatMap(map_course);
 
     for (const room of locations) {
@@ -95,7 +95,7 @@ function load_index(index) {
             .text(room);
 
         const days = div.append("div");
-        
+
         days.append('div')
             .style('width', '40px')
             .style("display", "inline-block");
@@ -108,16 +108,16 @@ function load_index(index) {
                 .style("display", "inline-block")
                 .style("text-align", "center");
         }
-            
+
         const svg = div.append("svg")
             .attr("width", 800)
             .attr("height", 720);
-        
+
         div.append("p")
             .style("page-break-after", "always");
-        
+
         const TIMES = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
-        
+
         svg.selectAll('line')
             .data(TIMES)
             .enter()
@@ -138,7 +138,7 @@ function load_index(index) {
                 return h + ":00 " + ap;
             })
             .style("font-size", "10px");
-        
+
         const filtered = the_data.filter(x => x.room == room);
         svg.selectAll('rect')
             .data(filtered)

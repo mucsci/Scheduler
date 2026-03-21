@@ -1,4 +1,5 @@
 import asyncio
+import os
 import uuid
 from collections.abc import Generator
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -11,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from .config import CombinedConfig
-from .logging import logger
+from .logging import configure_logging, logger
 from .scheduler import CourseInstance, Scheduler
 
 # Lock for generator initialization
@@ -237,10 +238,10 @@ async def ensure_generator_initialized(session_id: str, session: ScheduleSession
             logger.debug(f"Initialized generator for session {session_id}")
         except asyncio.CancelledError:
             logger.warning(f"Generator initialization was cancelled for session {session_id}")
-            raise HTTPException(status_code=408, detail="Request timeout")
+            raise HTTPException(status_code=408, detail="Request timeout") from None
         except Exception as e:
             logger.error(f"Failed to initialize generator for session {session_id}: {e}")
-            raise HTTPException(status_code=500, detail=f"Generator initialization failed: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Generator initialization failed: {str(e)}") from e
 
 
 @asynccontextmanager
@@ -261,13 +262,23 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Add CORS middleware
+# CORS: browsers reject allow_origins=["*"] with allow_credentials=True.
+# Use CORS_ORIGINS env (comma-separated) for explicit origins + credentials;
+# when unset, allow all origins without credentials (suitable for local dev).
+_cors_origins_env = os.getenv("CORS_ORIGINS", "").strip()
+if _cors_origins_env:
+    _cors_origins = [o.strip() for o in _cors_origins_env.split(",") if o.strip()]
+    _cors_credentials = True
+else:
+    _cors_origins = ["*"]
+    _cors_credentials = False
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
-    allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_origins=_cors_origins,
+    allow_credentials=_cors_credentials,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -280,7 +291,7 @@ async def submit_schedule(request: SubmitRequest):
             scheduler_future = z3_executor.submit(Scheduler, request)
         except Exception as e:
             logger.error(f"Failed to create scheduler: {e}")
-            raise HTTPException(status_code=500, detail=f"Scheduler creation failed: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Scheduler creation failed: {str(e)}") from e
 
         # Generate unique ID for this session
         schedule_id = str(uuid.uuid4())
@@ -303,7 +314,7 @@ async def submit_schedule(request: SubmitRequest):
         raise
     except Exception as e:
         logger.error(f"Error creating schedule session: {e}")
-        raise HTTPException(status_code=400, detail=f"Invalid configuration: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Invalid configuration: {str(e)}") from e
 
 
 @app.get("/schedules/{schedule_id}/details", response_model=ScheduleDetailsResponse)
@@ -343,20 +354,20 @@ async def get_next_schedule(schedule_id: str):
         try:
             assert session.generator is not None
             generator = session.generator
-            model = await asyncio.wrap_future(z3_executor.submit(lambda: next(generator)))
+            model = await asyncio.wrap_future(z3_executor.submit(lambda g=generator: next(g)))
         except asyncio.CancelledError:
             logger.warning(f"Schedule generation was cancelled for session {schedule_id}")
-            raise HTTPException(status_code=408, detail="Request timeout")
+            raise HTTPException(status_code=408, detail="Request timeout") from None
         except StopIteration:
             logger.info(f"No more schedules available for session {schedule_id}")
-            raise HTTPException(status_code=400, detail="No more schedules available")
+            raise HTTPException(status_code=400, detail="No more schedules available") from None
         except Exception as e:
             # Check if this is a StopIteration that was wrapped by the thread pool
             if "StopIteration" in str(e):
                 logger.info(f"No more schedules available for session {schedule_id}")
-                raise HTTPException(status_code=400, detail="No more schedules available")
+                raise HTTPException(status_code=400, detail="No more schedules available") from e
             logger.error(f"Failed to generate schedule for session {schedule_id}: {e}")
-            raise HTTPException(status_code=500, detail=f"Schedule generation failed: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Schedule generation failed: {str(e)}") from e
 
         # Convert model to JSON format with transformation
         schedule_data = [course_instance.model_dump(by_alias=True, exclude_none=True) for course_instance in model]
@@ -379,7 +390,7 @@ async def get_next_schedule(schedule_id: str):
         raise
     except Exception as e:
         logger.error(f"Error generating next schedule for {schedule_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Error generating schedule: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error generating schedule: {str(e)}") from e
 
 
 @app.post("/schedules/{schedule_id}/generate_all", response_model=GenerateAllResponse)
@@ -406,7 +417,7 @@ async def generate_all_schedules(schedule_id: str):
             remaining = session.full_config.limit - len(session.generated_schedules)
             logger.info(f"Starting background generation of {remaining} schedules for session {schedule_id}")
 
-            for i in range(remaining):
+            for _i in range(remaining):
                 try:
                     current_task = asyncio.current_task()
                     # Check if we've been cancelled
@@ -416,7 +427,7 @@ async def generate_all_schedules(schedule_id: str):
 
                     assert session.generator is not None
                     generator = session.generator
-                    model = await asyncio.wrap_future(z3_executor.submit(lambda: next(generator)))
+                    model = await asyncio.wrap_future(z3_executor.submit(lambda g=generator: next(g)))
 
                     # Convert model to JSON format with transformation
                     schedule_data = []
@@ -536,6 +547,8 @@ async def health_check():
 @click.option("--workers", "-w", default=16, help="Number of worker threads", type=int)
 def main(port: int, log_level: str, host: str, workers: int):
     """Run the Course Scheduler HTTP API server."""
+    configure_logging()
+
     import uvicorn
 
     # Update thread pool size if different from default

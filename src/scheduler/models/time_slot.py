@@ -288,8 +288,8 @@ class TimeSlot(BaseModel):
         True if the time slot is logically next to another.
         False otherwise
         """
-        for i1, t1 in enumerate(self.times):
-            for i2, t2 in enumerate(other.times):
+        for _i1, t1 in enumerate(self.times):
+            for _i2, t2 in enumerate(other.times):
                 if TimeSlot._diff_between_slots(t1, t2) <= self.max_time_gap:
                     return True
         return False
@@ -350,7 +350,7 @@ class TimeSlot(BaseModel):
         )
 
     def __repr__(self) -> str:
-        return str(list(repr(t) for t in self.times))
+        return str([repr(t) for t in self.times])
 
     def __str__(self) -> str:
         return ",".join(f"{str(t)}{'^' if i == self.lab_index else ''}" for i, t in enumerate(self.times))

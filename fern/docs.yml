@@ -1,0 +1,75 @@
+# yaml-language-server: $schema=https://schema.buildwithfern.dev/docs-yml.json
+
+instances:
+  - url: mucsci-scheduler.docs.buildwithfern.com
+
+title: Course Constraint Scheduler
+
+layout:
+  searchbar-placement: header
+  page-width: full
+
+navbar-links:
+  - type: github
+    value: https://github.com/mucsci/scheduler
+
+colors:
+  accent-primary:
+    dark: "#60a5fa"
+    light: "#2563eb"
+  background:
+    dark: "#0f1117"
+    light: "#ffffff"
+
+theme:
+  page-actions: toolbar
+
+logo:
+  dark: docs/assets/logo-dark.svg
+  light: docs/assets/logo.svg
+  height: 28
+
+favicon: docs/assets/favicon.svg
+
+css: docs/styles.css
+
+navigation:
+  - section: Introduction
+    contents:
+      - page: Welcome
+        path: docs/pages/welcome.mdx
+  - section: Configuration
+    contents:
+      - page: Overview and schema
+        path: docs/pages/configuration/overview.mdx
+      - page: Rooms and labs
+        path: docs/pages/configuration/rooms-labs.mdx
+      - page: Courses
+        path: docs/pages/configuration/courses.mdx
+      - page: Faculty
+        path: docs/pages/configuration/faculty.mdx
+      - page: Time slots
+        path: docs/pages/configuration/time-slots.mdx
+      - page: Optimizer flags
+        path: docs/pages/configuration/optimizer-flags.mdx
+      - page: Schedule limit
+        path: docs/pages/configuration/limit.mdx
+      - page: Troubleshooting
+        path: docs/pages/configuration/troubleshooting.mdx
+  - section: Python API
+    contents:
+      - page: Using the library
+        path: docs/pages/python/overview.mdx
+      - page: Reference
+        path: docs/pages/python/reference.mdx
+  - api: REST API
+  - section: Development
+    contents:
+      - page: Adding constraints
+        path: docs/pages/dev/constraints.mdx
+      - page: Adding configuration options
+        path: docs/pages/dev/config-options.mdx
+      - page: Testing
+        path: docs/pages/dev/testing.mdx
+      - page: Contributing
+        path: docs/pages/dev/contributing.mdx

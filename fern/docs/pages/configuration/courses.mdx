@@ -1,0 +1,42 @@
+---
+title: Courses
+description: Course entries under config.courses — credits, rooms, labs, conflicts, and faculty.
+---
+
+Each object in **`config.courses`** describes one course section family the solver may schedule.
+
+## Example
+
+```json
+{
+  "course_id": "CS101",
+  "credits": 3,
+  "room": ["Room A", "Room B"],
+  "lab": ["Lab 1"],
+  "conflicts": ["CS102"],
+  "faculty": ["Dr. Smith", "Dr. Johnson"]
+}
+```
+
+## Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `course_id` | Yes | Unique string id for the course. |
+| `credits` | Yes | Positive integer; must match an allowed pattern in `time_slot_config.classes`. |
+| `room` | Yes | Non-empty list of allowed **room** names (subset of `config.rooms`). |
+| `lab` | No | List of allowed **lab** names (subset of `config.labs`); may be empty. |
+| `conflicts` | No | Other `course_id` values that must not overlap in time with this course. |
+| `faculty` | Yes | Non-empty list of faculty names (subset of `config.faculty` names). |
+
+## Validation rules
+
+- Room, lab, and faculty names must exist in the corresponding global lists.
+- Every `conflicts` entry must be a valid `course_id` of another course (not yourself).
+- A course cannot list itself in `conflicts`.
+
+## Practices
+
+- Use consistent `course_id` naming (e.g. subject + number).
+- Multiple rooms/labs give the solver flexibility and often improve feasibility.
+- Model real registration conflicts explicitly in `conflicts`.

@@ -1,11 +1,28 @@
 repos:
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v6.0.0
+  hooks:
+    - id: trailing-whitespace
+    - id: end-of-file-fixer
+    - id: check-yaml
+    - id: check-json
+    - id: check-toml
+    - id: check-merge-conflict
+    - id: detect-private-key
+    - id: mixed-line-ending
+    - id: check-added-large-files
+      args: [--maxkb=500]
+    - id: check-ast
+      types: [python]
+    - id: debug-statements
+      types: [python]
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.12.12
+  rev: v0.15.7
   hooks:
     # Run the linter.
     - id: ruff-check
-      types_or: [ python, pyi ]
+      types_or: [ python, pyi, pyproject ]
       args: [ --fix ]
     # Run the formatter.
     - id: ruff-format
@@ -14,5 +31,6 @@ repos:
   hooks:
     - id: ty
       name: ty check
-      entry: uvx ty check . --ignore unresolved-import
-      language: python
+      entry: uv run ty check . --ignore unresolved-import
+      language: system
+      pass_filenames: false

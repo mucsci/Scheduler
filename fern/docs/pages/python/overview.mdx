@@ -1,0 +1,53 @@
+---
+title: Using the Python library
+description: Load CombinedConfig, run Scheduler, and export schedules — plus important type naming notes.
+---
+
+## Install
+
+Use the same package as the CLI (see **Introduction → Welcome**):
+
+```bash
+pip install course-constraint-scheduler
+```
+
+## Minimal flow
+
+```python
+from scheduler import Scheduler, load_config_from_file
+from scheduler.config import CombinedConfig
+
+config = load_config_from_file(CombinedConfig, "config.json")
+scheduler = Scheduler(config)
+
+for schedule in scheduler.get_models():
+    for course_instance in schedule:
+        print(course_instance.as_csv())
+```
+
+- **`load_config_from_file`** — JSON from disk into any Pydantic model (usually `CombinedConfig`).
+- **`Scheduler`** — Builds the Z3 problem once; **`get_models()`** is a generator yielding each feasible schedule as a list of **`CourseInstance`** objects.
+
+## Writers
+
+JSON and CSV serializers live under **`scheduler.writers`** (`json_writer`, `csv_writer`). Use them when you need file output beyond ad hoc printing.
+
+## Naming: two different `Course` concepts
+
+- **`scheduler.config`** exports a **`Course` type alias** — a **string** course id used in JSON (`course_id`, preferences, conflicts).
+- **`scheduler.models`** defines a **`Course` class** — meeting structure with credits and `course_id`.
+
+Objects from **`get_models()`** are **`CourseInstance`**; the embedded model course is **`.course`**. Use **`.course.course_id`** when you need the config-style id string.
+
+## Full API surface
+
+See **Reference** for auto-generated pages from package docstrings (all public modules under `scheduler`).
+
+## Local regeneration
+
+After changing docstrings, refresh the reference page before `fern docs dev`:
+
+```bash
+uv sync
+uv run python scripts/gen_python_api_mdx.py
+```

@@ -1,0 +1,144 @@
+---
+title: Troubleshooting
+description: Validation errors, performance, and incremental debugging for JSON configurations.
+---
+
+## Required sections
+
+These must be present and non-empty where noted:
+
+- `config.rooms`, `config.courses`, `config.faculty`
+- `time_slot_config.times`, `time_slot_config.classes`
+
+## Common validation errors
+
+**Missing field**
+
+```
+ValidationError: 1 validation error for SchedulerConfig
+rooms: field required
+```
+
+**Bad time range string**
+
+```
+ValidationError: ... FacultyConfig
+times -> MON -> 0: invalid time format; expected HH:MM-HH:MM
+```
+
+**Broken cross-reference**
+
+```
+ValidationError: ... CourseConfig
+faculty -> 0: "Dr. Unknown" is not in faculty list
+```
+
+**Business rules**
+
+```
+ValidationError: Configuration validation errors:
+  - Faculty "Dr. Smith" has minimum credits (8) greater than maximum credits (6)
+  - Course "CS101" cannot conflict with itself
+  - Courses without faculty assignments: ["CS102"]
+```
+
+**Time block**
+
+```
+ValidationError: ... TimeBlock
+end: End time must be after start time
+```
+
+## Performance
+
+Rough expectations (hardware-dependent):
+
+- **Small** — Few courses and faculty: often sub-second to seconds.
+- **Medium** — Tens of courses: seconds to minutes.
+- **Large** — Many courses and faculty: minutes possible.
+
+**Ideas to speed up or shrink search**
+
+- Tighten faculty `times` windows.
+- Reduce optional room/lab choices if not needed.
+- Fewer `optimizer_flags` while debugging.
+- Lower **`limit`**.
+
+## No schedules
+
+- Check faculty availability vs. generated time grid.
+- Check room/lab lists vs. course requirements.
+- Ensure `conflicts` do not make the instance unsatisfiable.
+
+## Debug logging
+
+```python
+import logging
+logging.basicConfig(level=logging.DEBUG)
+```
+
+## Incremental authoring
+
+1. Start from a minimal config (see repository `tests/fixtures/minimal_config.json`).
+2. Add courses one at a time and re-validate.
+3. Add faculty and time patterns before enabling optimizations.
+
+## Best practices summary
+
+1. Grow complexity gradually.
+2. Rely on validation messages — they are meant to be actionable.
+3. Document institutional rules in `conflicts`, `mandatory_days`, and availability.
+4. Match **credits** on courses to **class patterns** exactly.
+
+### Basic template
+
+```json
+{
+  "config": {
+    "rooms": ["Room 1", "Room 2"],
+    "labs": ["Lab 1"],
+    "courses": [
+      {
+        "course_id": "COURSE101",
+        "credits": 3,
+        "room": ["Room 1", "Room 2"],
+        "lab": ["Lab 1"],
+        "conflicts": [],
+        "faculty": ["Faculty1"]
+      }
+    ],
+    "faculty": [
+      {
+        "name": "Faculty1",
+        "maximum_credits": 12,
+        "minimum_credits": 6,
+        "unique_course_limit": 3,
+        "times": {
+          "MON": ["09:00-17:00"],
+          "TUE": ["09:00-17:00"],
+          "WED": ["09:00-17:00"],
+          "THU": ["09:00-17:00"],
+          "FRI": ["09:00-17:00"]
+        }
+      }
+    ]
+  },
+  "time_slot_config": {
+    "times": {
+      "MON": [{ "start": "09:00", "spacing": 60, "end": "17:00" }],
+      "TUE": [{ "start": "09:00", "spacing": 60, "end": "17:00" }],
+      "WED": [{ "start": "09:00", "spacing": 60, "end": "17:00" }],
+      "THU": [{ "start": "09:00", "spacing": 60, "end": "17:00" }],
+      "FRI": [{ "start": "09:00", "spacing": 60, "end": "17:00" }]
+    },
+    "classes": [
+      {
+        "credits": 3,
+        "meetings": [{ "day": "MON", "duration": 150, "lab": false }]
+      }
+    ]
+  },
+  "limit": 10,
+  "optimizer_flags": ["faculty_course"]
+}
+```

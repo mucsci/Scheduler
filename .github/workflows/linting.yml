@@ -5,6 +5,8 @@ on:
     branches:
       - main
   pull_request:
+    branches:
+      - main
 
 jobs:
   lint:
@@ -12,7 +14,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
-        
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -22,10 +24,27 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Install the project
-        run: uv sync --locked --all-extras --dev
+        run: uv sync --locked --group dev
 
-      - name: Run Ruff check
-        run: uv run ruff check . --output-format=github
+      - name: Run prek (lint, format, typecheck, file checks)
+        run: uv run prek run --all-files
 
-      - name: Run Ty check
-        run: uv run ty check .
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install the project
+        run: uv sync --locked --group dev
+
+      - name: Run tests
+        run: uv run pytest

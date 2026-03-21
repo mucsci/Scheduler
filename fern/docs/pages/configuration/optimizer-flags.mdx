@@ -1,0 +1,37 @@
+---
+title: Optimizer flags
+description: Optional optimizer_flags that steer soft objectives on top of hard constraints.
+---
+
+**`optimizer_flags`** is an optional top-level array of string flags. Omit it or use `[]` for no extra optimization beyond feasibility.
+
+## Example
+
+```json
+{
+  "optimizer_flags": [
+    "faculty_course",
+    "faculty_room",
+    "pack_rooms",
+    "same_room"
+  ]
+}
+```
+
+## Available flags
+
+| Flag | Role |
+|------|------|
+| `faculty_course` | Prefer faculty–course assignment by course preferences. |
+| `faculty_room` | Prefer faculty–room preferences. |
+| `faculty_lab` | Prefer faculty–lab preferences. |
+| `same_room` | Prefer keeping a course in one room when possible. |
+| `same_lab` | Prefer keeping a course in one lab when possible. |
+| `pack_rooms` | Prefer fewer distinct rooms overall. |
+| `pack_labs` | Prefer fewer distinct labs overall. |
+
+## Practices
+
+- Start with `faculty_course` and add resource flags as needed.
+- More flags can **increase** solve time; tune for your instance size.
+- Hard constraints (availability, conflicts, etc.) are always enforced; flags affect **preferences**, not feasibility.
