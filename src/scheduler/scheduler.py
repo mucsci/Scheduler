@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from functools import cache
 from typing import cast
 
-import z3  # type: ignore
+import z3
 from bidict import frozenbidict
 from pydantic import BaseModel
 
@@ -607,10 +607,7 @@ class Scheduler:
                             )
                         )
                     # ensure that each faculty is assigned <= unique course limit
-                    limit = cast(
-                        z3.BoolRef,
-                        self._simplify(z3.Sum([z3.If(tc, 1, 0) for tc in teaches_course]) <= unique_limit),
-                    )
+                    limit = self._simplify(z3.Sum([z3.If(tc, 1, 0) for tc in teaches_course]) <= unique_limit)
                     faculty_constraints.append(limit)
 
             # Track whether the faculty teaches on a given day
@@ -623,43 +620,27 @@ class Scheduler:
                         slot_matches = [course.time == slot_const for slot_const in slot_constants]
                         if slot_matches:
                             course_day_assignments.append(
-                                cast(
-                                    z3.BoolRef,
-                                    self._simplify(
-                                        z3.And(
-                                            course.faculty == faculty_constant,
-                                            z3.Or(slot_matches),
-                                        )
-                                    ),
+                                self._simplify(
+                                    z3.And(
+                                        course.faculty == faculty_constant,
+                                        z3.Or(slot_matches),
+                                    )
                                 )
                             )
                 if course_day_assignments:
-                    day_indicator_map[day] = cast(
-                        z3.BoolRef,
-                        self._simplify(z3.Or(course_day_assignments)),
-                    )
+                    day_indicator_map[day] = self._simplify(z3.Or(course_day_assignments))
                 else:
                     day_indicator_map[day] = z3.BoolVal(False, ctx=self._ctx)
 
             # Maximum-day constraint
             day_sum_terms = [z3.If(indicator, 1, 0) for indicator in day_indicator_map.values()]
             day_sum = z3.Sum(day_sum_terms) if day_sum_terms else z3.IntVal(0, ctx=self._ctx)
-            faculty_constraints.append(
-                cast(
-                    z3.BoolRef,
-                    self._simplify(day_sum <= max_days),
-                )
-            )
+            faculty_constraints.append(self._simplify(day_sum <= max_days))
 
             # Mandatory-day constraints
             for mandatory_day in mandatory_days:
                 indicator = day_indicator_map.get(mandatory_day, z3.BoolVal(False, ctx=self._ctx))
-                faculty_constraints.append(
-                    cast(
-                        z3.BoolRef,
-                        self._simplify(indicator),
-                    )
-                )
+                faculty_constraints.append(self._simplify(indicator))
 
         return faculty_constraints
 

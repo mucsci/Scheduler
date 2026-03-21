@@ -45,7 +45,7 @@ skills/            # task playbooks (SKILL.md per subfolder) for assistants and 
 
 1. **`Course` naming**: `scheduler.config` uses `Course` as a **course-id string** type in JSON config. `scheduler.models` defines a **`Course` class** (credits, meetings, etc.). `CourseInstance.course` is the model; use **`.course.course_id`** for the config-style id. (See README “Note on naming”.)
 2. **Generated artifacts**: After changing **`server.py`** or API-facing models, refresh **`fern/openapi.json`**. After **`CombinedConfig`** / config models change, refresh **`fern/docs/assets/combined-config.schema.json`**. After public **docstrings** change, refresh **`fern/docs/pages/python/reference.mdx`** — see CONTRIBUTING.
-3. **Style**: **Ruff** is authoritative (`pyproject.toml`: line length **120**, `py312`). CONTRIBUTING’s “88 / Black” note is outdated relative to the repo config — follow **`pyproject.toml`**.
+3. **Style**: **Ruff** is authoritative (`pyproject.toml`: line length **120**, `py312`). CONTRIBUTING matches this; when in doubt follow **`pyproject.toml`**.
 
 ## Skills
 

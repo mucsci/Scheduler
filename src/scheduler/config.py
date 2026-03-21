@@ -454,13 +454,14 @@ class TimeSlotConfig(StrictBaseModel):
         errors = []
 
         # Check that all days in time_slot_config are valid
-        valid_days = {"MON", "TUE", "WED", "THU", "FRI"}
+        weekdays: tuple[Day, ...] = ("MON", "TUE", "WED", "THU", "FRI")
+        valid_days = frozenset(weekdays)
         for day in self.times:
             if day not in valid_days:
                 errors.append(f"Invalid day '{day}' in time slot configuration")
 
         # Check that there are time blocks for each day
-        for day in valid_days:
+        for day in weekdays:
             if day not in self.times or not self.times[day]:
                 errors.append(f"No time blocks defined for {day}")
 

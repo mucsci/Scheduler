@@ -72,9 +72,10 @@ source .venv/bin/activate  # On macOS/Linux
 # OR
 .venv\Scripts\activate     # On Windows
 
-# Install dependencies
-pip install -r requirements.txt
+# Install the package (editable). There is no checked-in requirements.txt.
 pip install -e .
+# Dev tools (pytest, ruff, ty, …) are listed under [dependency-groups] dev in pyproject.toml;
+# install the ones you need with pip, or prefer uv sync.
 ```
 
 ### 3. Install Development Dependencies
@@ -225,7 +226,7 @@ We follow [PEP 8](https://pep8.org/) with some modifications enforced by our lin
 
 **Key Standards:**
 - Use 4 spaces for indentation (no tabs)
-- Maximum line length: 88 characters (enforced by Black)
+- Maximum line length: **120** characters (enforced by **Ruff** format; see `[tool.ruff]` in `pyproject.toml`)
 - Use descriptive variable and function names
 - Add type hints for all function parameters and return values
 - Use f-strings for string formatting (Python 3.6+)

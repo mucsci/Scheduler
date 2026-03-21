@@ -8,6 +8,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import pytest
+from _pytest.outcomes import Skipped
 from fastapi.testclient import TestClient
 
 from scheduler import CombinedConfig, Scheduler, load_config_from_file
@@ -98,7 +99,7 @@ def test_unsatisfiable_config_yields_no_models(unsatisfiable_combined_config: Co
 @pytest.mark.slow
 def test_example_json_produces_schedules(example_json_path: Path) -> None:
     if not example_json_path.is_file():
-        pytest.skip("example.json not present")
+        raise Skipped("example.json not present")
     cfg = load_config_from_file(CombinedConfig, str(example_json_path))
     sched = Scheduler(cfg)
     model = next(sched.get_models(), None)

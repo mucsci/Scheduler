@@ -42,11 +42,11 @@ dev = [
   "httpx~=0.28",
   "prek~=0.3",
   "pytest-cov~=6.0",
-    "ruff~=0.12",
-    "pytest~=8.0",
+  "ruff~=0.15",
+  "pytest~=8.0",
   "twine~=6.2",
   "ty~=0.0",
-  "pydoc-markdown>=4.8.2",
+  "pydoc-markdown~=4.8",
 ]
 
 [tool.uv]
@@ -88,6 +88,9 @@ line-ending = "auto"
 
 [tool.ty.rules]
 possibly-unresolved-reference = "warn"
+# Z3 / Starlette stubs and intentional test assignments produce noise at default severity.
+redundant-cast = "ignore"
+unused-type-ignore-comment = "ignore"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

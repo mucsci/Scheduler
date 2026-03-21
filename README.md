@@ -89,6 +89,16 @@ curl -X POST "http://localhost:8000/schedules/{schedule_id}/next"
 curl -X GET "http://localhost:8000/schedules/{schedule_id}/count"
 ```
 
+### Server deployment and security
+
+The REST API is convenient for local use and trusted integrations. For production or internet-facing deployments:
+
+- **No built-in authentication** — use a reverse proxy, API gateway, or private network; do not expose the process directly without controls you trust.
+- **In-memory sessions** — active schedule sessions are lost on restart and are not shared across multiple server processes.
+- **CORS** — set the `CORS_ORIGINS` environment variable to a comma-separated list of allowed origins when browsers must send credentials. If unset, the server allows all origins without credentials (typical for local development).
+
+See [SECURITY.md](SECURITY.md) for how to report vulnerabilities.
+
 ## Documentation
 
 **Published docs (configuration, Python API, REST API, development):**

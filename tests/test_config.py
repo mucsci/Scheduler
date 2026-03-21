@@ -1,7 +1,9 @@
 """Tests for Pydantic configuration models (target: full coverage of config.py)."""
 
 import json
+from collections.abc import Callable
 from pathlib import Path
+from typing import cast
 
 import pytest
 from pydantic import ValidationError
@@ -10,6 +12,7 @@ from scheduler.config import (
     ClassPattern,
     CombinedConfig,
     CourseConfig,
+    Day,
     FacultyConfig,
     Meeting,
     OptimizerFlags,
@@ -20,6 +23,11 @@ from scheduler.config import (
     TimeSlotConfig,
 )
 from scheduler.scheduler import load_config_from_file
+
+
+def _faculty_times(raw: dict[str, list[str | TimeRange]]) -> dict[Day, list[TimeRange]]:
+    """Pydantic coerces time-range strings; ty needs an explicit cast for test literals."""
+    return cast(dict[Day, list[TimeRange]], raw)
 
 
 class SampleStrict(StrictBaseModel):
@@ -155,13 +163,13 @@ def test_time_slot_config_invalid_day_via_validate() -> None:
     """Hit defensive branch when ``times`` contains a non-weekday key (e.g. via ``model_construct``)."""
     b = [TimeBlock(start="08:00", spacing=60, end="20:00")]
     cfg = TimeSlotConfig.model_construct(
-        times={"BAD": b, "MON": b, "TUE": b, "WED": b, "THU": b, "FRI": b},
+        times=cast(dict[Day, list[TimeBlock]], {"BAD": b, "MON": b, "TUE": b, "WED": b, "THU": b, "FRI": b}),
         classes=[ClassPattern(credits=3, meetings=[Meeting(day="MON", duration=50)])],
         max_time_gap=30,
         min_time_overlap=45,
     )
     with pytest.raises(ValueError, match="Invalid day"):
-        cfg.validate()
+        cast(Callable[[], None], cfg.validate)()
 
 
 def test_time_slot_config_invalid_day_key() -> None:
@@ -202,7 +210,7 @@ def test_faculty_config_times_from_strings() -> None:
         maximum_credits=12,
         minimum_credits=3,
         unique_course_limit=2,
-        times={"MON": ["09:00-12:00", "14:00-17:00"], "TUE": ["10:00-11:00"]},
+        times=_faculty_times({"MON": ["09:00-12:00", "14:00-17:00"], "TUE": ["10:00-11:00"]}),
     )
     assert f.times["MON"][0].start == "09:00"
     assert f.times["MON"][0].end == "12:00"
@@ -219,7 +227,7 @@ def test_faculty_config_times_passthrough_time_range_objects() -> None:
         maximum_credits=6,
         minimum_credits=0,
         unique_course_limit=1,
-        times={"MON": [tr]},
+        times=_faculty_times({"MON": [tr]}),
     )
     assert f.times["MON"][0] is tr
 
@@ -230,7 +238,7 @@ def test_faculty_config_mandatory_days_list_to_set() -> None:
         maximum_credits=12,
         minimum_credits=0,
         unique_course_limit=1,
-        times={"MON": ["09:00-17:00"], "WED": ["09:00-17:00"]},
+        times=_faculty_times({"MON": ["09:00-17:00"], "WED": ["09:00-17:00"]}),
         mandatory_days={"MON", "WED"},
     )
     assert f.mandatory_days == {"MON", "WED"}
@@ -270,7 +278,7 @@ def test_faculty_config_mandatory_days_already_set() -> None:
         maximum_credits=12,
         minimum_credits=0,
         unique_course_limit=1,
-        times={"MON": ["09:00-17:00"], "WED": ["09:00-17:00"]},
+        times=_faculty_times({"MON": ["09:00-17:00"], "WED": ["09:00-17:00"]}),
         mandatory_days={"MON"},
     )
     assert f.mandatory_days == {"MON"}
@@ -283,7 +291,7 @@ def test_faculty_config_min_gt_max() -> None:
             maximum_credits=3,
             minimum_credits=10,
             unique_course_limit=1,
-            times={"MON": ["09:00-17:00"]},
+            times=_faculty_times({"MON": ["09:00-17:00"]}),
         )
 
 
@@ -295,7 +303,7 @@ def test_faculty_config_maximum_days_lt_mandatory() -> None:
             minimum_credits=0,
             unique_course_limit=3,
             maximum_days=1,
-            times={"MON": ["09:00-17:00"], "WED": ["09:00-17:00"]},
+            times=_faculty_times({"MON": ["09:00-17:00"], "WED": ["09:00-17:00"]}),
             mandatory_days={"MON", "WED"},
         )
 
@@ -307,7 +315,7 @@ def test_faculty_config_mandatory_not_in_times() -> None:
             maximum_credits=12,
             minimum_credits=0,
             unique_course_limit=1,
-            times={"TUE": ["09:00-17:00"]},
+            times=_faculty_times({"TUE": ["09:00-17:00"]}),
             mandatory_days={"MON"},
         )
 
@@ -318,7 +326,7 @@ def test_faculty_preferences_optional() -> None:
         maximum_credits=6,
         minimum_credits=0,
         unique_course_limit=1,
-        times={"MON": ["09:00-17:00"]},
+        times=_faculty_times({"MON": ["09:00-17:00"]}),
         course_preferences={"CS101": 5},
         room_preferences={"RoomA": 10},
         lab_preferences={"Lab1": 0},
@@ -349,7 +357,7 @@ def _minimal_scheduler_kwargs():
                 maximum_credits=12,
                 minimum_credits=3,
                 unique_course_limit=1,
-                times={"MON": ["09:00-17:00"]},
+                times=_faculty_times({"MON": ["09:00-17:00"]}),
             )
         ],
     }
@@ -381,14 +389,14 @@ def test_scheduler_config_duplicate_faculty() -> None:
             maximum_credits=12,
             minimum_credits=0,
             unique_course_limit=1,
-            times={"MON": ["09:00-17:00"]},
+            times=_faculty_times({"MON": ["09:00-17:00"]}),
         ),
         FacultyConfig(
             name="F1",
             maximum_credits=6,
             minimum_credits=0,
             unique_course_limit=1,
-            times={"TUE": ["09:00-17:00"]},
+            times=_faculty_times({"TUE": ["09:00-17:00"]}),
         ),
     ]
     with pytest.raises(ValidationError, match="Duplicate faculty"):
@@ -483,7 +491,7 @@ def test_scheduler_config_invalid_faculty_course_pref() -> None:
             maximum_credits=12,
             minimum_credits=0,
             unique_course_limit=1,
-            times={"MON": ["09:00-17:00"]},
+            times=_faculty_times({"MON": ["09:00-17:00"]}),
             course_preferences={"BAD": 5},
         )
     ]
@@ -499,7 +507,7 @@ def test_scheduler_config_invalid_faculty_room_pref() -> None:
             maximum_credits=12,
             minimum_credits=0,
             unique_course_limit=1,
-            times={"MON": ["09:00-17:00"]},
+            times=_faculty_times({"MON": ["09:00-17:00"]}),
             room_preferences={"X": 1},
         )
     ]
@@ -515,7 +523,7 @@ def test_scheduler_config_invalid_faculty_lab_pref() -> None:
             maximum_credits=12,
             minimum_credits=0,
             unique_course_limit=1,
-            times={"MON": ["09:00-17:00"]},
+            times=_faculty_times({"MON": ["09:00-17:00"]}),
             lab_preferences={"Y": 1},
         )
     ]
@@ -615,7 +623,7 @@ def test_preference_valid(p: int) -> None:
         maximum_credits=1,
         minimum_credits=0,
         unique_course_limit=1,
-        times={"MON": ["09:00-10:00"]},
+        times=_faculty_times({"MON": ["09:00-10:00"]}),
         course_preferences={"CS101": p},
     )
 
@@ -628,7 +636,7 @@ def test_preference_invalid(p: int) -> None:
             maximum_credits=1,
             minimum_credits=0,
             unique_course_limit=1,
-            times={"MON": ["09:00-10:00"]},
+            times=_faculty_times({"MON": ["09:00-10:00"]}),
             course_preferences={"CS101": p},  # type: ignore[arg-type]
         )
 

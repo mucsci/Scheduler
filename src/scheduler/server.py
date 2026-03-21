@@ -5,6 +5,7 @@ from collections.abc import Generator
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from typing import Any, cast
 
 import click
 from fastapi import BackgroundTasks, FastAPI, HTTPException
@@ -373,7 +374,7 @@ else:
     _cors_credentials = False
 
 app.add_middleware(
-    CORSMiddleware,
+    cast(Any, CORSMiddleware),
     allow_origins=_cors_origins,
     allow_credentials=_cors_credentials,
     allow_methods=["*"],
