@@ -107,10 +107,10 @@ Configuration lives in `.pre-commit-config.yaml` (prek is compatible with this f
 
 ```bash
 # Test the scheduler
-python -m scheduler.main --help
+uv run python -m scheduler.main --help
 
 # Test the server
-python -m scheduler.server --help
+uv run python -m scheduler.server --help
 
 # Run tests
 uv run pytest
@@ -266,7 +266,8 @@ def generate_schedule(config: SchedulerConfig) -> List[CourseInstance]:
     - RuntimeError: If no valid schedule can be generated.
 
     **Example:**
-        >>> config = load_config_from_file("config.json")
+        >>> from scheduler.config import CombinedConfig
+        >>> config = load_config_from_file(CombinedConfig, "config.json")
         >>> schedule = generate_schedule(config, limit=5)
         >>> print(f"Generated {len(schedule)} courses")
     """
@@ -322,6 +323,7 @@ if not faculty_available:
 - Update **Fern** pages under **`fern/docs/pages/`** (configuration, welcome, development)
 - Update README.md for new features
 - Regenerate **`fern/docs/assets/combined-config.schema.json`** with `uv run python scripts/export_config_schema.py` when `CombinedConfig` changes
+- Keep generated Fern artifacts committed when they are used by docs publishing (`fern/openapi.json`, `fern/docs/assets/combined-config.schema.json`, `fern/docs/pages/python/reference.mdx`)
 - Preview locally: `npm install -g fern-api` then `fern docs dev` (after the generate scripts above)
 
 ## Submitting Changes
@@ -389,7 +391,7 @@ We use [Semantic Versioning](https://semver.org/):
 ### Release Steps
 
 1. **Update Version**: Update version in `pyproject.toml`
-2. **Changelog**: Update `CHANGELOG.md` with new changes
+2. **Release Notes**: Prepare release notes in the GitHub release description (or update `CHANGELOG.md` if your release includes one)
 3. **Tag Release**: Create git tag for the version
 4. **Build Package**: Build and test the package
 5. **Publish**: Publish to PyPI

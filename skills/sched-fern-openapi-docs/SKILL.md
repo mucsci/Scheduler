@@ -22,6 +22,12 @@ description: >-
 | `CombinedConfig` / config schema | `uv run python scripts/export_config_schema.py` |
 | Public API docstrings | `uv run python scripts/gen_python_api_mdx.py` |
 
+Quick decision guide:
+
+- Editing **`src/scheduler/server.py`** -> run `export_openapi.py`
+- Editing **`src/scheduler/config.py`** or related config models -> run `export_config_schema.py`
+- Editing public package docstrings under `src/scheduler/` -> run `gen_python_api_mdx.py`
+
 ## Authoring
 
 - **Guides / prose**: `fern/docs/pages/` (MDX), navigation in `fern/docs.yml`.
@@ -34,3 +40,8 @@ After regenerating as needed: install Fern CLI (`npm install -g fern-api`), then
 ## CI
 
 Docs deployment is in `.github/workflows/docs.yml` — keep generated artifacts committed when CI or publishers expect them.
+
+Cross-skill references:
+
+- [sched-maintain-scripts](../sched-maintain-scripts/SKILL.md) for script maintenance details
+- [sched-fastapi-server](../sched-fastapi-server/SKILL.md) for route/model change workflow

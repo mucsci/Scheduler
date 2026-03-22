@@ -10,7 +10,10 @@ description: >-
 
 ## Workflows
 
-- **`.github/workflows/linting.yml`**: `uv sync --locked --group dev`, then `uv run prek run --all-files` and `uv run pytest`.
+- **`.github/workflows/linting.yml`**:
+  - `lint` job: `uv sync --locked --group dev` then `uv run prek run --all-files`
+  - `test` job: `uv sync --locked --group dev` then `uv run pytest`
+  - Both jobs run on Python `3.12` and `3.13`
 - **`.github/workflows/docs.yml`**: Fern docs build/deploy (see file for triggers and secrets).
 - **`.github/workflows/publish.yml`**: Package publish pipeline.
 
@@ -23,6 +26,8 @@ uv sync --locked --group dev
 uv run prek run --all-files
 uv run pytest
 ```
+
+For quality tooling details, see [sched-ruff-ty-prek](../sched-ruff-ty-prek/SKILL.md).
 
 ## Dependabot
 

@@ -1,0 +1,1930 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Course Scheduler API",
+    "description": "HTTP API for generating course schedules using constraint satisfaction solving",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/submit": {
+      "post": {
+        "summary": "Submit Schedule",
+        "description": "Submit a new schedule generation request.\n\n**Usage:**\n```python\nhttpx.post(\"http://localhost:8000/submit\", json=body)\n```",
+        "operationId": "submit_schedule_submit_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CombinedConfig"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubmitResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedules/{schedule_id}/details": {
+      "get": {
+        "summary": "Get Schedule Details",
+        "description": "Get details about a schedule session.\n\n**Usage:**\n```python\nhttpx.get(f\"http://localhost:8000/schedules/{sid}/details\")\n```",
+        "operationId": "get_schedule_details_schedules__schedule_id__details_get",
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Schedule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleDetailsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedules/{schedule_id}/next": {
+      "post": {
+        "summary": "Get Next Schedule",
+        "description": "Get the next generated schedule.\n\n**Usage:**\n```python\nhttpx.post(f\"http://localhost:8000/schedules/{sid}/next\")\n```",
+        "operationId": "get_next_schedule_schedules__schedule_id__next_post",
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Schedule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedules/{schedule_id}/generate_all": {
+      "post": {
+        "summary": "Generate All Schedules",
+        "description": "Generate all remaining schedules for a session asynchronously.\n\n**Usage:**\n```python\nhttpx.post(f\"http://localhost:8000/schedules/{sid}/generate_all\")\n```",
+        "operationId": "generate_all_schedules_schedules__schedule_id__generate_all_post",
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Schedule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GenerateAllResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedules/{schedule_id}/count": {
+      "get": {
+        "summary": "Get Schedule Count",
+        "description": "Get the current count of generated schedules for a session.\n\n**Usage:**\n```python\nhttpx.get(f\"http://localhost:8000/schedules/{sid}/count\")\n```",
+        "operationId": "get_schedule_count_schedules__schedule_id__count_get",
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Schedule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleCountResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedules/{schedule_id}/index/{index}": {
+      "get": {
+        "summary": "Get Schedule By Index",
+        "description": "Get a previously generated schedule by index.\n\n**Usage:**\n```python\nhttpx.get(f\"http://localhost:8000/schedules/{sid}/index/0\")\n```",
+        "operationId": "get_schedule_by_index_schedules__schedule_id__index__index__get",
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Schedule Id"
+            }
+          },
+          {
+            "name": "index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Index"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedules/{schedule_id}/delete": {
+      "delete": {
+        "summary": "Delete Schedule Session",
+        "description": "Delete a schedule session.\n\n**Usage:**\n```python\nhttpx.delete(f\"http://localhost:8000/schedules/{sid}/delete\")\n```",
+        "operationId": "delete_schedule_session_schedules__schedule_id__delete_delete",
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Schedule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedules/{schedule_id}/cleanup": {
+      "post": {
+        "summary": "Cleanup Schedule Session",
+        "description": "Immediate cleanup of a schedule session.\n\n**Usage:**\n```python\nhttpx.post(f\"http://localhost:8000/schedules/{sid}/cleanup\")\n```",
+        "operationId": "cleanup_schedule_session_schedules__schedule_id__cleanup_post",
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Schedule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Health check endpoint.\n\n**Usage:**\n```python\nhttpx.get(\"http://localhost:8000/health\")\n```",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthCheck"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ClassPattern-Input": {
+        "properties": {
+          "credits": {
+            "type": "integer",
+            "title": "Credits",
+            "description": "Number of credit hours",
+            "example": 3
+          },
+          "meetings": {
+            "items": {
+              "$ref": "#/components/schemas/Meeting"
+            },
+            "type": "array",
+            "title": "Meetings",
+            "description": "List of meeting times",
+            "example": [
+              {
+                "day": "MON",
+                "duration": 150,
+                "lab": false
+              }
+            ]
+          },
+          "disabled": {
+            "type": "boolean",
+            "title": "Disabled",
+            "description": "Whether the pattern is disabled",
+            "default": false
+          },
+          "start_time": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimeString"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Specific start time constraint"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "credits",
+          "meetings"
+        ],
+        "title": "ClassPattern",
+        "description": "Represents a class pattern.\n\n**Usage:**\n```python\nClassPattern(credits=3, meetings=[...])\n```"
+      },
+      "ClassPattern-Output": {
+        "properties": {
+          "credits": {
+            "type": "integer",
+            "title": "Credits",
+            "description": "Number of credit hours",
+            "example": 3
+          },
+          "meetings": {
+            "items": {
+              "$ref": "#/components/schemas/Meeting"
+            },
+            "type": "array",
+            "title": "Meetings",
+            "description": "List of meeting times",
+            "example": [
+              {
+                "day": "MON",
+                "duration": 150,
+                "lab": false
+              }
+            ]
+          },
+          "disabled": {
+            "type": "boolean",
+            "title": "Disabled",
+            "description": "Whether the pattern is disabled",
+            "default": false
+          },
+          "start_time": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimeString"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Specific start time constraint"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "credits",
+          "meetings"
+        ],
+        "title": "ClassPattern",
+        "description": "Represents a class pattern.\n\n**Usage:**\n```python\nClassPattern(credits=3, meetings=[...])\n```"
+      },
+      "CombinedConfig": {
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/SchedulerConfig-Input",
+            "description": "Scheduler configuration",
+            "example": {
+              "courses": [
+                {
+                  "conflicts": [],
+                  "course_id": "CS 101",
+                  "credits": 3,
+                  "faculty": [
+                    "Dr. Smith"
+                  ],
+                  "lab": [
+                    "Lab 101"
+                  ],
+                  "room": [
+                    "Room 101"
+                  ]
+                }
+              ],
+              "faculty": [
+                {
+                  "course_preferences": {
+                    "CS 101": 5
+                  },
+                  "lab_preferences": {
+                    "Lab 101": 5
+                  },
+                  "maximum_credits": 12,
+                  "minimum_credits": 3,
+                  "name": "Dr. Smith",
+                  "room_preferences": {
+                    "Room 101": 5
+                  },
+                  "times": {
+                    "MON": [
+                      "10:00-12:00"
+                    ],
+                    "TUE": [
+                      "10:00-12:00"
+                    ]
+                  },
+                  "unique_course_limit": 3
+                }
+              ],
+              "labs": [
+                "Lab 101"
+              ],
+              "rooms": [
+                "Room 101"
+              ]
+            }
+          },
+          "time_slot_config": {
+            "$ref": "#/components/schemas/TimeSlotConfig-Input",
+            "description": "Time slot configuration",
+            "example": {
+              "classes": [
+                {
+                  "credits": 3,
+                  "meetings": [
+                    {
+                      "day": "MON",
+                      "duration": 150,
+                      "lab": false
+                    }
+                  ]
+                }
+              ],
+              "times": {
+                "FRI": [
+                  {
+                    "end": "12:00",
+                    "spacing": 60,
+                    "start": "10:00"
+                  }
+                ],
+                "MON": [
+                  {
+                    "end": "12:00",
+                    "spacing": 60,
+                    "start": "10:00"
+                  }
+                ],
+                "THU": [
+                  {
+                    "end": "12:00",
+                    "spacing": 60,
+                    "start": "10:00"
+                  }
+                ],
+                "TUE": [
+                  {
+                    "end": "12:00",
+                    "spacing": 60,
+                    "start": "10:00"
+                  }
+                ],
+                "WED": [
+                  {
+                    "end": "12:00",
+                    "spacing": 60,
+                    "start": "10:00"
+                  }
+                ]
+              }
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Limit",
+            "description": "Maximum number of schedules to generate",
+            "default": 10,
+            "example": 10
+          },
+          "optimizer_flags": {
+            "items": {
+              "$ref": "#/components/schemas/OptimizerFlags"
+            },
+            "type": "array",
+            "title": "Optimizer Flags",
+            "description": "List of optimizer flags",
+            "example": [
+              "faculty_course",
+              "faculty_room",
+              "faculty_lab",
+              "same_room",
+              "same_lab",
+              "pack_rooms",
+              "pack_labs"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "config",
+          "time_slot_config"
+        ],
+        "title": "CombinedConfig",
+        "description": "Represents a combined configuration.\n\n**Usage:**\n```python\nCombinedConfig(config=..., time_slot_config=..., limit=10)\n```"
+      },
+      "Course": {
+        "type": "string",
+        "description": "Course name",
+        "example": "CS 101"
+      },
+      "CourseConfig-Input": {
+        "properties": {
+          "course_id": {
+            "$ref": "#/components/schemas/Course",
+            "description": "Unique identifier for the course",
+            "example": "CS 101"
+          },
+          "credits": {
+            "type": "integer",
+            "title": "Credits",
+            "description": "Number of credit hours",
+            "example": 3
+          },
+          "room": {
+            "items": {
+              "$ref": "#/components/schemas/Room"
+            },
+            "type": "array",
+            "title": "Room",
+            "description": "List of acceptable room names",
+            "example": [
+              "Room 101"
+            ]
+          },
+          "lab": {
+            "items": {
+              "$ref": "#/components/schemas/Lab"
+            },
+            "type": "array",
+            "title": "Lab",
+            "description": "List of acceptable lab names",
+            "example": [
+              "Lab 101"
+            ]
+          },
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/Course"
+            },
+            "type": "array",
+            "title": "Conflicts",
+            "description": "List of course IDs that cannot be scheduled simultaneously"
+          },
+          "faculty": {
+            "items": {
+              "$ref": "#/components/schemas/Faculty"
+            },
+            "type": "array",
+            "title": "Faculty",
+            "description": "List of faculty names",
+            "example": [
+              "Dr. Smith"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "course_id",
+          "credits",
+          "room",
+          "lab",
+          "conflicts",
+          "faculty"
+        ],
+        "title": "CourseConfig",
+        "description": "Represents a course configuration.\n\n**Usage:**\n```python\nCourseConfig(course_id=\"CS 101\", credits=3, room=[...], lab=[...], conflicts=[], faculty=[])\n```"
+      },
+      "CourseConfig-Output": {
+        "properties": {
+          "course_id": {
+            "$ref": "#/components/schemas/Course",
+            "description": "Unique identifier for the course"
+          },
+          "credits": {
+            "type": "integer",
+            "title": "Credits",
+            "description": "Number of credit hours",
+            "example": 3
+          },
+          "room": {
+            "items": {
+              "$ref": "#/components/schemas/Room"
+            },
+            "type": "array",
+            "title": "Room",
+            "description": "List of acceptable room names",
+            "example": [
+              "Room 101"
+            ]
+          },
+          "lab": {
+            "items": {
+              "$ref": "#/components/schemas/Lab"
+            },
+            "type": "array",
+            "title": "Lab",
+            "description": "List of acceptable lab names",
+            "example": [
+              "Lab 101"
+            ]
+          },
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/Course"
+            },
+            "type": "array",
+            "title": "Conflicts",
+            "description": "List of course IDs that cannot be scheduled simultaneously"
+          },
+          "faculty": {
+            "items": {
+              "$ref": "#/components/schemas/Faculty"
+            },
+            "type": "array",
+            "title": "Faculty",
+            "description": "List of faculty names",
+            "example": [
+              "Dr. Smith"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "course_id",
+          "credits",
+          "room",
+          "lab",
+          "conflicts",
+          "faculty"
+        ],
+        "title": "CourseConfig",
+        "description": "Represents a course configuration.\n\n**Usage:**\n```python\nCourseConfig(course_id=\"CS 101\", credits=3, room=[...], lab=[...], conflicts=[], faculty=[])\n```"
+      },
+      "CourseInstanceResponse": {
+        "properties": {
+          "course": {
+            "type": "string",
+            "title": "Course",
+            "description": "Course id with section, e.g. `\"CS101.01\"`."
+          },
+          "faculty": {
+            "type": "string",
+            "title": "Faculty"
+          },
+          "times": {
+            "items": {
+              "$ref": "#/components/schemas/TimeInstanceResponse"
+            },
+            "type": "array",
+            "title": "Times"
+          },
+          "room": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Room",
+            "description": "Assigned room when present."
+          },
+          "lab": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lab",
+            "description": "Assigned lab when present."
+          },
+          "lab_index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lab Index",
+            "description": "When `lab` is set, index into `times` for the lab meeting."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "course",
+          "faculty",
+          "times"
+        ],
+        "title": "CourseInstanceResponse",
+        "description": "One course row in a generated schedule (`CourseInstance.model_dump` JSON shape)."
+      },
+      "Day": {
+        "type": "string",
+        "enum": [
+          "MON",
+          "TUE",
+          "WED",
+          "THU",
+          "FRI"
+        ],
+        "description": "Day of the week",
+        "example": "MON"
+      },
+      "Faculty": {
+        "type": "string",
+        "description": "Faculty name",
+        "example": "Dr. Smith"
+      },
+      "FacultyConfig-Input": {
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/Faculty",
+            "description": "Faculty member\"s name"
+          },
+          "maximum_credits": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Maximum Credits",
+            "description": "Maximum credit hours they can teach",
+            "example": 12
+          },
+          "maximum_days": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Maximum Days",
+            "description": "Maximum number of days they are willing to teach (0-5, optional)",
+            "default": 5,
+            "example": 3
+          },
+          "minimum_credits": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Minimum Credits",
+            "description": "Minimum credit hours they must teach",
+            "example": 3
+          },
+          "unique_course_limit": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Unique Course Limit",
+            "description": "Maximum number of different courses they can teach",
+            "example": 3
+          },
+          "times": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/TimeRange-Input"
+              },
+              "type": "array"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Day"
+            },
+            "type": "object",
+            "title": "Times",
+            "description": "Dictionary mapping day names to time ranges",
+            "example": {
+              "MON": [
+                "10:00-12:00"
+              ],
+              "TUE": [
+                "10:00-12:00"
+              ]
+            }
+          },
+          "course_preferences": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Preference"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Course"
+            },
+            "type": "object",
+            "title": "Course Preferences",
+            "description": "Dictionary mapping course IDs to preference scores",
+            "example": {
+              "CS 101": 5
+            }
+          },
+          "room_preferences": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Preference"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Room"
+            },
+            "type": "object",
+            "title": "Room Preferences",
+            "description": "Dictionary mapping room IDs to preference scores",
+            "example": {
+              "Room 101": 5
+            }
+          },
+          "lab_preferences": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Preference"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Lab"
+            },
+            "type": "object",
+            "title": "Lab Preferences",
+            "description": "Dictionary mapping lab IDs to preference scores",
+            "example": {
+              "Lab 101": 5
+            }
+          },
+          "mandatory_days": {
+            "items": {
+              "$ref": "#/components/schemas/Day"
+            },
+            "type": "array",
+            "uniqueItems": true,
+            "title": "Mandatory Days",
+            "description": "Set of days the faculty must teach on",
+            "example": [
+              "MON",
+              "WED"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "maximum_credits",
+          "minimum_credits",
+          "unique_course_limit",
+          "times"
+        ],
+        "title": "FacultyConfig",
+        "description": "Represents a faculty configuration.\n\n**Usage:**\n```python\nFacultyConfig(name=\"Dr. Smith\", maximum_credits=12, minimum_credits=3, ...)\n```"
+      },
+      "FacultyConfig-Output": {
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/Faculty",
+            "description": "Faculty member\"s name"
+          },
+          "maximum_credits": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Maximum Credits",
+            "description": "Maximum credit hours they can teach",
+            "example": 12
+          },
+          "maximum_days": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 0.0,
+            "title": "Maximum Days",
+            "description": "Maximum number of days they are willing to teach (0-5, optional)",
+            "default": 5,
+            "example": 3
+          },
+          "minimum_credits": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Minimum Credits",
+            "description": "Minimum credit hours they must teach",
+            "example": 3
+          },
+          "unique_course_limit": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Unique Course Limit",
+            "description": "Maximum number of different courses they can teach",
+            "example": 3
+          },
+          "times": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/TimeRange-Output"
+              },
+              "type": "array"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Day"
+            },
+            "type": "object",
+            "title": "Times",
+            "description": "Dictionary mapping day names to time ranges",
+            "example": {
+              "MON": [
+                "10:00-12:00"
+              ],
+              "TUE": [
+                "10:00-12:00"
+              ]
+            }
+          },
+          "course_preferences": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Preference"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Course"
+            },
+            "type": "object",
+            "title": "Course Preferences",
+            "description": "Dictionary mapping course IDs to preference scores",
+            "example": {
+              "CS 101": 5
+            }
+          },
+          "room_preferences": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Preference"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Room"
+            },
+            "type": "object",
+            "title": "Room Preferences",
+            "description": "Dictionary mapping room IDs to preference scores",
+            "example": {
+              "Room 101": 5
+            }
+          },
+          "lab_preferences": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Preference"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Lab"
+            },
+            "type": "object",
+            "title": "Lab Preferences",
+            "description": "Dictionary mapping lab IDs to preference scores",
+            "example": {
+              "Lab 101": 5
+            }
+          },
+          "mandatory_days": {
+            "items": {
+              "$ref": "#/components/schemas/Day"
+            },
+            "type": "array",
+            "uniqueItems": true,
+            "title": "Mandatory Days",
+            "description": "Set of days the faculty must teach on",
+            "example": [
+              "MON",
+              "WED"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "maximum_credits",
+          "minimum_credits",
+          "unique_course_limit",
+          "times"
+        ],
+        "title": "FacultyConfig",
+        "description": "Represents a faculty configuration.\n\n**Usage:**\n```python\nFacultyConfig(name=\"Dr. Smith\", maximum_credits=12, minimum_credits=3, ...)\n```"
+      },
+      "GenerateAllResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "current_count": {
+            "type": "integer",
+            "title": "Current Count"
+          },
+          "target_count": {
+            "type": "integer",
+            "title": "Target Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message",
+          "current_count",
+          "target_count"
+        ],
+        "title": "GenerateAllResponse",
+        "description": "Response model for generate-all schedule requests.\n\n**Usage:**\n```python\nGenerateAllResponse(message='...', current_count=1, target_count=10)\n```\n\n**Fields:**\n- message: Status message about the generation process\n- current_count: Number of schedules already generated\n- target_count: Target number of schedules to generate"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HealthCheck": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "active_sessions": {
+            "type": "integer",
+            "title": "Active Sessions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "active_sessions"
+        ],
+        "title": "HealthCheck",
+        "description": "Health check response model.\n\n**Usage:**\n```python\nHealthCheck(status=\"healthy\", active_sessions=0)\n```\n\n**Fields:**\n- status: Health status of the service\n- active_sessions: Number of active schedule generation sessions"
+      },
+      "Lab": {
+        "type": "string",
+        "description": "Lab name",
+        "example": "Lab 101"
+      },
+      "Meeting": {
+        "properties": {
+          "day": {
+            "$ref": "#/components/schemas/Day"
+          },
+          "start_time": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimeString"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Specific start time constraint"
+          },
+          "duration": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Duration",
+            "description": "Duration of the meeting in minutes",
+            "example": 150
+          },
+          "lab": {
+            "type": "boolean",
+            "title": "Lab",
+            "description": "Whether the meeting is in a lab",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "day",
+          "duration"
+        ],
+        "title": "Meeting",
+        "description": "Represents a single meeting instance.\n\n**Usage:**\n```python\nMeeting(day=\"MON\", duration=90, lab=False)\n```"
+      },
+      "MessageResponse": {
+        "properties": {
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "title": "MessageResponse",
+        "description": "Generic message response model.\n\n**Usage:**\n```python\nMessageResponse(message=\"ok\")\n```\n\n**Fields:**\n- message: Response message text"
+      },
+      "OptimizerFlags": {
+        "type": "string",
+        "enum": [
+          "faculty_course",
+          "faculty_room",
+          "faculty_lab",
+          "same_room",
+          "same_lab",
+          "pack_rooms",
+          "pack_labs"
+        ],
+        "title": "OptimizerFlags"
+      },
+      "Preference": {
+        "type": "integer",
+        "maximum": 10.0,
+        "minimum": 0.0,
+        "description": "Preference score between 0 and 10",
+        "example": 5
+      },
+      "Room": {
+        "type": "string",
+        "description": "Room name",
+        "example": "Room 101"
+      },
+      "ScheduleCountResponse": {
+        "properties": {
+          "schedule_id": {
+            "type": "string",
+            "title": "Schedule Id"
+          },
+          "current_count": {
+            "type": "integer",
+            "title": "Current Count"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "is_complete": {
+            "type": "boolean",
+            "title": "Is Complete"
+          }
+        },
+        "type": "object",
+        "required": [
+          "schedule_id",
+          "current_count",
+          "limit",
+          "is_complete"
+        ],
+        "title": "ScheduleCountResponse",
+        "description": "Response model for schedule count requests.\n\n**Usage:**\n```python\nScheduleCountResponse(schedule_id='...', current_count=2, limit=10, is_complete=False)\n```\n\n**Fields:**\n- schedule_id: Unique identifier for the schedule session\n- current_count: Number of schedules currently generated\n- limit: Maximum number of schedules to generate\n- is_complete: Whether all schedules have been generated"
+      },
+      "ScheduleDetailsResponse": {
+        "properties": {
+          "config": {
+            "$ref": "#/components/schemas/SchedulerConfig-Output",
+            "description": "Scheduler configuration",
+            "example": {
+              "courses": [
+                {
+                  "conflicts": [],
+                  "course_id": "CS 101",
+                  "credits": 3,
+                  "faculty": [
+                    "Dr. Smith"
+                  ],
+                  "lab": [
+                    "Lab 101"
+                  ],
+                  "room": [
+                    "Room 101"
+                  ]
+                }
+              ],
+              "faculty": [
+                {
+                  "course_preferences": {
+                    "CS 101": 5
+                  },
+                  "lab_preferences": {
+                    "Lab 101": 5
+                  },
+                  "maximum_credits": 12,
+                  "minimum_credits": 3,
+                  "name": "Dr. Smith",
+                  "room_preferences": {
+                    "Room 101": 5
+                  },
+                  "times": {
+                    "MON": [
+                      "10:00-12:00"
+                    ],
+                    "TUE": [
+                      "10:00-12:00"
+                    ]
+                  },
+                  "unique_course_limit": 3
+                }
+              ],
+              "labs": [
+                "Lab 101"
+              ],
+              "rooms": [
+                "Room 101"
+              ]
+            }
+          },
+          "time_slot_config": {
+            "$ref": "#/components/schemas/TimeSlotConfig-Output",
+            "description": "Time slot configuration",
+            "example": {
+              "classes": [
+                {
+                  "credits": 3,
+                  "meetings": [
+                    {
+                      "day": "MON",
+                      "duration": 150,
+                      "lab": false
+                    }
+                  ]
+                }
+              ],
+              "times": {
+                "FRI": [
+                  {
+                    "end": "12:00",
+                    "spacing": 60,
+                    "start": "10:00"
+                  }
+                ],
+                "MON": [
+                  {
+                    "end": "12:00",
+                    "spacing": 60,
+                    "start": "10:00"
+                  }
+                ],
+                "THU": [
+                  {
+                    "end": "12:00",
+                    "spacing": 60,
+                    "start": "10:00"
+                  }
+                ],
+                "TUE": [
+                  {
+                    "end": "12:00",
+                    "spacing": 60,
+                    "start": "10:00"
+                  }
+                ],
+                "WED": [
+                  {
+                    "end": "12:00",
+                    "spacing": 60,
+                    "start": "10:00"
+                  }
+                ]
+              }
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Limit",
+            "description": "Maximum number of schedules to generate",
+            "default": 10,
+            "example": 10
+          },
+          "optimizer_flags": {
+            "items": {
+              "$ref": "#/components/schemas/OptimizerFlags"
+            },
+            "type": "array",
+            "title": "Optimizer Flags",
+            "description": "List of optimizer flags",
+            "example": [
+              "faculty_course",
+              "faculty_room",
+              "faculty_lab",
+              "same_room",
+              "same_lab",
+              "pack_rooms",
+              "pack_labs"
+            ]
+          },
+          "schedule_id": {
+            "type": "string",
+            "title": "Schedule Id"
+          },
+          "total_generated": {
+            "type": "integer",
+            "title": "Total Generated"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "config",
+          "time_slot_config",
+          "schedule_id",
+          "total_generated"
+        ],
+        "title": "ScheduleDetailsResponse",
+        "description": "Response model for schedule details requests.\n\nInherits all fields from CombinedConfig and adds:\n\n**Usage:**\n```python\nScheduleDetailsResponse(schedule_id='...', total_generated=0, **combined.model_dump())\n```\n\n**Fields:**\n- schedule_id: Unique identifier for the schedule session\n- total_generated: Total number of schedules generated"
+      },
+      "ScheduleResponse": {
+        "properties": {
+          "schedule_id": {
+            "type": "string",
+            "title": "Schedule Id"
+          },
+          "schedule": {
+            "items": {
+              "$ref": "#/components/schemas/CourseInstanceResponse"
+            },
+            "type": "array",
+            "title": "Schedule"
+          },
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "total_generated": {
+            "type": "integer",
+            "title": "Total Generated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "schedule_id",
+          "schedule",
+          "index",
+          "total_generated"
+        ],
+        "title": "ScheduleResponse",
+        "description": "Response model for schedule retrieval requests.\n\n**Usage:**\n```python\nScheduleResponse(schedule_id='...', schedule=[...], index=0, total_generated=1)\n```\n\n**Fields:**\n- schedule_id: Unique identifier for the schedule session\n- schedule: Generated schedule as `list[CourseInstanceResponse]` (typed JSON rows)\n- index: Index of this schedule in the generation sequence\n- total_generated: Total number of schedules generated so far"
+      },
+      "SchedulerConfig-Input": {
+        "properties": {
+          "rooms": {
+            "items": {
+              "$ref": "#/components/schemas/Room"
+            },
+            "type": "array",
+            "title": "Rooms",
+            "description": "List of available room names",
+            "example": [
+              "Room 101"
+            ]
+          },
+          "labs": {
+            "items": {
+              "$ref": "#/components/schemas/Lab"
+            },
+            "type": "array",
+            "title": "Labs",
+            "description": "List of available lab names",
+            "example": [
+              "Lab 101"
+            ]
+          },
+          "courses": {
+            "items": {
+              "$ref": "#/components/schemas/CourseConfig-Input"
+            },
+            "type": "array",
+            "title": "Courses",
+            "description": "List of course configurations",
+            "example": [
+              {
+                "conflicts": [
+                  "CS 102"
+                ],
+                "course_id": "CS 101",
+                "credits": 3,
+                "faculty": [
+                  "Dr. Smith"
+                ],
+                "lab": [
+                  "Lab 101"
+                ],
+                "room": [
+                  "Room 101"
+                ]
+              }
+            ]
+          },
+          "faculty": {
+            "items": {
+              "$ref": "#/components/schemas/FacultyConfig-Input"
+            },
+            "type": "array",
+            "title": "Faculty",
+            "description": "List of faculty configurations",
+            "example": [
+              {
+                "course_preferences": {
+                  "CS 101": 5
+                },
+                "lab_preferences": {
+                  "Lab 101": 5
+                },
+                "mandatory_days": [
+                  "MON"
+                ],
+                "maximum_credits": 12,
+                "maximum_days": 3,
+                "minimum_credits": 3,
+                "name": "Dr. Smith",
+                "room_preferences": {
+                  "Room 101": 5
+                },
+                "times": {
+                  "MON": [
+                    "10:00-12:00"
+                  ],
+                  "TUE": [
+                    "10:00-12:00"
+                  ]
+                },
+                "unique_course_limit": 3
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rooms",
+          "labs",
+          "courses",
+          "faculty"
+        ],
+        "title": "SchedulerConfig",
+        "description": "Represents a scheduler configuration.\n\n**Usage:**\n```python\nSchedulerConfig(rooms=[...], labs=[...], courses=[...], faculty=[...])\n```"
+      },
+      "SchedulerConfig-Output": {
+        "properties": {
+          "rooms": {
+            "items": {
+              "$ref": "#/components/schemas/Room"
+            },
+            "type": "array",
+            "title": "Rooms",
+            "description": "List of available room names",
+            "example": [
+              "Room 101"
+            ]
+          },
+          "labs": {
+            "items": {
+              "$ref": "#/components/schemas/Lab"
+            },
+            "type": "array",
+            "title": "Labs",
+            "description": "List of available lab names",
+            "example": [
+              "Lab 101"
+            ]
+          },
+          "courses": {
+            "items": {
+              "$ref": "#/components/schemas/CourseConfig-Output"
+            },
+            "type": "array",
+            "title": "Courses",
+            "description": "List of course configurations",
+            "example": [
+              {
+                "conflicts": [
+                  "CS 102"
+                ],
+                "course_id": "CS 101",
+                "credits": 3,
+                "faculty": [
+                  "Dr. Smith"
+                ],
+                "lab": [
+                  "Lab 101"
+                ],
+                "room": [
+                  "Room 101"
+                ]
+              }
+            ]
+          },
+          "faculty": {
+            "items": {
+              "$ref": "#/components/schemas/FacultyConfig-Output"
+            },
+            "type": "array",
+            "title": "Faculty",
+            "description": "List of faculty configurations",
+            "example": [
+              {
+                "course_preferences": {
+                  "CS 101": 5
+                },
+                "lab_preferences": {
+                  "Lab 101": 5
+                },
+                "mandatory_days": [
+                  "MON"
+                ],
+                "maximum_credits": 12,
+                "maximum_days": 3,
+                "minimum_credits": 3,
+                "name": "Dr. Smith",
+                "room_preferences": {
+                  "Room 101": 5
+                },
+                "times": {
+                  "MON": [
+                    "10:00-12:00"
+                  ],
+                  "TUE": [
+                    "10:00-12:00"
+                  ]
+                },
+                "unique_course_limit": 3
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "rooms",
+          "labs",
+          "courses",
+          "faculty"
+        ],
+        "title": "SchedulerConfig",
+        "description": "Represents a scheduler configuration.\n\n**Usage:**\n```python\nSchedulerConfig(rooms=[...], labs=[...], courses=[...], faculty=[...])\n```"
+      },
+      "SubmitResponse": {
+        "properties": {
+          "schedule_id": {
+            "type": "string",
+            "title": "Schedule Id"
+          },
+          "endpoint": {
+            "type": "string",
+            "title": "Endpoint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "schedule_id",
+          "endpoint"
+        ],
+        "title": "SubmitResponse",
+        "description": "Response model for schedule submission requests.\n\n**Usage:**\n```python\nSubmitResponse(schedule_id=\"...\", endpoint=\"/schedules/...\")\n```\n\n**Fields:**\n- schedule_id: Unique identifier for the generated schedule session\n- endpoint: URL endpoint to access the schedule"
+      },
+      "TimeBlock-Input": {
+        "properties": {
+          "start": {
+            "$ref": "#/components/schemas/TimeString",
+            "description": "Start time of the time block",
+            "example": "10:00"
+          },
+          "spacing": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Spacing",
+            "description": "Time spacing between slots in minutes",
+            "example": 60
+          },
+          "end": {
+            "$ref": "#/components/schemas/TimeString",
+            "description": "End time of the time block",
+            "example": "17:00"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "start",
+          "spacing",
+          "end"
+        ],
+        "title": "TimeBlock",
+        "description": "Represents a time block within a day.\n\n**Usage:**\n```python\nTimeBlock(start=\"09:00\", spacing=60, end=\"17:00\")\n```"
+      },
+      "TimeBlock-Output": {
+        "properties": {
+          "start": {
+            "$ref": "#/components/schemas/TimeString",
+            "description": "Start time of the time block"
+          },
+          "spacing": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Spacing",
+            "description": "Time spacing between slots in minutes",
+            "example": 60
+          },
+          "end": {
+            "$ref": "#/components/schemas/TimeString",
+            "description": "End time of the time block",
+            "example": "17:00"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "start",
+          "spacing",
+          "end"
+        ],
+        "title": "TimeBlock",
+        "description": "Represents a time block within a day.\n\n**Usage:**\n```python\nTimeBlock(start=\"09:00\", spacing=60, end=\"17:00\")\n```"
+      },
+      "TimeInstanceResponse": {
+        "properties": {
+          "day": {
+            "type": "integer",
+            "title": "Day",
+            "description": "Weekday as `Day` enum value (1=Monday \u2026 5=Friday)."
+          },
+          "start": {
+            "type": "integer",
+            "title": "Start",
+            "description": "Start time in minutes since midnight."
+          },
+          "duration": {
+            "type": "integer",
+            "title": "Duration",
+            "description": "Duration in minutes."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "day",
+          "start",
+          "duration"
+        ],
+        "title": "TimeInstanceResponse",
+        "description": "One meeting time block within a scheduled course (JSON shape)."
+      },
+      "TimeRange-Input": {
+        "properties": {
+          "start": {
+            "$ref": "#/components/schemas/TimeString",
+            "description": "Start time of the time range",
+            "example": "10:00"
+          },
+          "end": {
+            "$ref": "#/components/schemas/TimeString",
+            "description": "End time of the time range",
+            "example": "17:00"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "TimeRange",
+        "description": "A time range with start and end times, ensuring start < end.\n\n**Usage:**\n```python\nTimeRange(start=\"09:00\", end=\"17:00\")\n```"
+      },
+      "TimeRange-Output": {
+        "properties": {
+          "start": {
+            "$ref": "#/components/schemas/TimeString",
+            "description": "Start time of the time range"
+          },
+          "end": {
+            "$ref": "#/components/schemas/TimeString",
+            "description": "End time of the time range",
+            "example": "17:00"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "TimeRange",
+        "description": "A time range with start and end times, ensuring start < end.\n\n**Usage:**\n```python\nTimeRange(start=\"09:00\", end=\"17:00\")\n```"
+      },
+      "TimeSlotConfig-Input": {
+        "properties": {
+          "times": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/TimeBlock-Input"
+              },
+              "type": "array"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Day"
+            },
+            "type": "object",
+            "title": "Times",
+            "description": "Dictionary mapping day names to time blocks"
+          },
+          "classes": {
+            "items": {
+              "$ref": "#/components/schemas/ClassPattern-Input"
+            },
+            "type": "array",
+            "title": "Classes",
+            "description": "List of class patterns"
+          },
+          "max_time_gap": {
+            "type": "integer",
+            "minimum": 0.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Max Time Gap",
+            "description": "Maximum time gap between time slots to determine if they are adjacent",
+            "default": 30,
+            "example": 30
+          },
+          "min_time_overlap": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Min Time Overlap",
+            "description": "Minimum overlap between time slots",
+            "default": 45,
+            "example": 45
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "times",
+          "classes"
+        ],
+        "title": "TimeSlotConfig",
+        "description": "Represents a time slot configuration.\n\n**Usage:**\n```python\nTimeSlotConfig(times={...}, classes=[...])\n```"
+      },
+      "TimeSlotConfig-Output": {
+        "properties": {
+          "times": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/TimeBlock-Output"
+              },
+              "type": "array"
+            },
+            "propertyNames": {
+              "$ref": "#/components/schemas/Day"
+            },
+            "type": "object",
+            "title": "Times",
+            "description": "Dictionary mapping day names to time blocks"
+          },
+          "classes": {
+            "items": {
+              "$ref": "#/components/schemas/ClassPattern-Output"
+            },
+            "type": "array",
+            "title": "Classes",
+            "description": "List of class patterns"
+          },
+          "max_time_gap": {
+            "type": "integer",
+            "minimum": 0.0,
+            "exclusiveMinimum": 0.0,
+            "title": "Max Time Gap",
+            "description": "Maximum time gap between time slots to determine if they are adjacent",
+            "default": 30,
+            "example": 30
+          },
+          "min_time_overlap": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Min Time Overlap",
+            "description": "Minimum overlap between time slots",
+            "default": 45,
+            "example": 45
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "times",
+          "classes"
+        ],
+        "title": "TimeSlotConfig",
+        "description": "Represents a time slot configuration.\n\n**Usage:**\n```python\nTimeSlotConfig(times={...}, classes=[...])\n```"
+      },
+      "TimeString": {
+        "type": "string",
+        "pattern": "^([0-1][0-9]|2[0-3]):[0-5][0-9]$",
+        "description": "Time in HH:MM format",
+        "example": "10:00"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

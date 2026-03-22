@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 import sys
@@ -17,6 +18,18 @@ description: Auto-generated from docstrings for the scheduler package.
 
 """
 
+EMPTY_USAGE_PATTERN = re.compile(r"\*\*Usage:\*\*\n\n(?=\*\*(?:Args|Returns|Raises):\*\*)")
+
+
+def strip_empty_usage_sections(text: str) -> str:
+    """Remove empty Usage headings emitted by pydoc-markdown.
+
+    Some docstrings include a usage code block, but pydoc-markdown can reorder
+    recognized sections (`Args`, `Returns`, `Raises`) ahead of that block,
+    leaving a visually empty `**Usage:**` heading in rendered docs.
+    """
+    return EMPTY_USAGE_PATTERN.sub("", text)
+
 
 def main() -> None:
     pydoc = shutil.which("pydoc-markdown")
@@ -31,7 +44,8 @@ def main() -> None:
         text=True,
     )
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    OUT.write_text(FRONTMATTER + proc.stdout, encoding="utf-8")
+    rendered = strip_empty_usage_sections(proc.stdout)
+    OUT.write_text(FRONTMATTER + rendered, encoding="utf-8")
     print(f"Wrote {OUT}")
 
 

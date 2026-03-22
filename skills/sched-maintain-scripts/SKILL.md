@@ -24,3 +24,8 @@ When editing these scripts:
 
 - Keep output paths stable unless **`fern/docs.yml`** / publishers are updated too.
 - Prefer deterministic ordering in generated JSON/MDX when possible to reduce noisy diffs.
+
+Cross-skill references:
+
+- [sched-fern-openapi-docs](../sched-fern-openapi-docs/SKILL.md) for authoring rules and local Fern preview
+- [sched-fastapi-server](../sched-fastapi-server/SKILL.md) when changes originate from route/model updates

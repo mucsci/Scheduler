@@ -35,7 +35,10 @@ uv run prek run --all-files
 
 Install hooks locally after sync: `uv run prek install` (see CONTRIBUTING).
 
+Important: hooks can auto-fix files (for example end-of-file or Ruff fixes). If that happens, run `git add` again before committing.
+
 ## Practices
 
 - Run **ruff** after substantive edits; run **prek** before treating work as done.
+- If hooks modify files during commit, re-stage changes and re-run `git commit`.
 - Do not “fix” `B019` in the two ignored files without maintainer intent.

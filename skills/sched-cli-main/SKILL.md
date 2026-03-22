@@ -22,3 +22,15 @@ description: >-
 - Keep **`--help`** accurate; Click option names stable when possible.
 - If default output or formats change, update **README**, **Fern** pages, and **tests**.
 - Large or slow paths: consider documenting use of **`pytest` markers** for integration tests.
+
+## Validation
+
+```bash
+uv run python -m scheduler.main --help
+uv run pytest
+```
+
+Cross-skill references:
+
+- [sched-output-writers](../sched-output-writers/SKILL.md) for JSON/CSV behavior
+- [sched-testing-pytest](../sched-testing-pytest/SKILL.md) for test strategy

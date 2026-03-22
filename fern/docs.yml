@@ -62,6 +62,10 @@ navigation:
         path: docs/pages/python/overview.mdx
       - page: Reference
         path: docs/pages/python/reference.mdx
+  - section: REST API
+    contents:
+      - page: Integration quickstart
+        path: docs/pages/rest/quickstart.mdx
   - api: REST API
   - section: Development
     contents:

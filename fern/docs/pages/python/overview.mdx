@@ -25,12 +25,25 @@ for schedule in scheduler.get_models():
         print(course_instance.as_csv())
 ```
 
+If you are working from this repository, start with `example.json` for a richer scenario or `tests/fixtures/minimal_config.json` for a smaller fixture.
+
 - **`load_config_from_file`** — JSON from disk into any Pydantic model (usually `CombinedConfig`).
 - **`Scheduler`** — Builds the Z3 problem once; **`get_models()`** is a generator yielding each feasible schedule as a list of **`CourseInstance`** objects.
 
 ## Writers
 
-JSON and CSV serializers live under **`scheduler.writers`** (`json_writer`, `csv_writer`). Use them when you need file output beyond ad hoc printing.
+JSON and CSV serializers live under **`scheduler.writers`**.
+
+```python
+from scheduler.writers import CSVWriter, JSONWriter
+
+with JSONWriter("schedules.json") as json_writer, CSVWriter("schedules.csv") as csv_writer:
+    for schedule in scheduler.get_models():
+        json_writer.add_schedule(schedule)
+        csv_writer.add_schedule(schedule)
+```
+
+Use writers when you need stable machine-readable output files instead of printing rows directly.
 
 ## Naming: two different `Course` concepts
 
