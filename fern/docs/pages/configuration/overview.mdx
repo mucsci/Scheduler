@@ -39,6 +39,12 @@ A generated **JSON Schema** for the full document (`CombinedConfig`) is committe
 You can also fetch it from GitHub:
 [combined-config.schema.json (main)](https://github.com/mucsci/scheduler/raw/main/fern/docs/assets/combined-config.schema.json)
 
+If you changed config models and need to refresh the schema locally:
+
+```bash
+uv run python scripts/export_config_schema.py
+```
+
 The **REST API** `POST /submit` body matches this shape (same model as `CombinedConfig`).
 
 ## Full example

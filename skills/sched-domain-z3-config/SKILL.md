@@ -10,10 +10,10 @@ description: >-
 
 ## Core files
 
-- **`scheduler.py`**: Z3 problem construction, solving, optimization flags.
-- **`config.py`**: Pydantic models, validation, loading (`CombinedConfig`, etc.).
-- **`time_slot_generator.py`**: Time slot generation utilities.
-- **`models/`**: Runtime schedule representations (`CourseInstance`, `TimeSlot`, …).
+- **`src/scheduler/scheduler.py`**: Z3 problem construction, solving, optimization flags.
+- **`src/scheduler/config.py`**: Pydantic models, validation, loading (`CombinedConfig`, etc.).
+- **`src/scheduler/time_slot_generator.py`**: Time slot generation utilities.
+- **`src/scheduler/models/`**: Runtime schedule representations (`CourseInstance`, `TimeSlot`, ...).
 
 ## Naming trap: `Course`
 

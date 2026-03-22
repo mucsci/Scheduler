@@ -1,0 +1,689 @@
+{
+  "$defs": {
+    "ClassPattern": {
+      "additionalProperties": false,
+      "description": "Represents a class pattern.\n\n**Usage:**\n```python\nClassPattern(credits=3, meetings=[...])\n```",
+      "properties": {
+        "credits": {
+          "description": "Number of credit hours",
+          "example": 3,
+          "title": "Credits",
+          "type": "integer"
+        },
+        "meetings": {
+          "description": "List of meeting times",
+          "example": [
+            {
+              "day": "MON",
+              "duration": 150,
+              "lab": false
+            }
+          ],
+          "items": {
+            "$ref": "#/$defs/Meeting"
+          },
+          "title": "Meetings",
+          "type": "array"
+        },
+        "disabled": {
+          "default": false,
+          "description": "Whether the pattern is disabled",
+          "title": "Disabled",
+          "type": "boolean"
+        },
+        "start_time": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TimeString"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Specific start time constraint"
+        }
+      },
+      "required": [
+        "credits",
+        "meetings"
+      ],
+      "title": "ClassPattern",
+      "type": "object"
+    },
+    "Course": {
+      "description": "Course name",
+      "example": "CS 101",
+      "type": "string"
+    },
+    "CourseConfig": {
+      "additionalProperties": false,
+      "description": "Represents a course configuration.\n\n**Usage:**\n```python\nCourseConfig(course_id=\"CS 101\", credits=3, room=[...], lab=[...], conflicts=[], faculty=[])\n```",
+      "properties": {
+        "course_id": {
+          "$ref": "#/$defs/Course",
+          "description": "Unique identifier for the course"
+        },
+        "credits": {
+          "description": "Number of credit hours",
+          "example": 3,
+          "title": "Credits",
+          "type": "integer"
+        },
+        "room": {
+          "description": "List of acceptable room names",
+          "example": [
+            "Room 101"
+          ],
+          "items": {
+            "$ref": "#/$defs/Room"
+          },
+          "title": "Room",
+          "type": "array"
+        },
+        "lab": {
+          "description": "List of acceptable lab names",
+          "example": [
+            "Lab 101"
+          ],
+          "items": {
+            "$ref": "#/$defs/Lab"
+          },
+          "title": "Lab",
+          "type": "array"
+        },
+        "conflicts": {
+          "description": "List of course IDs that cannot be scheduled simultaneously",
+          "items": {
+            "$ref": "#/$defs/Course"
+          },
+          "title": "Conflicts",
+          "type": "array"
+        },
+        "faculty": {
+          "description": "List of faculty names",
+          "example": [
+            "Dr. Smith"
+          ],
+          "items": {
+            "$ref": "#/$defs/Faculty"
+          },
+          "title": "Faculty",
+          "type": "array"
+        }
+      },
+      "required": [
+        "course_id",
+        "credits",
+        "room",
+        "lab",
+        "conflicts",
+        "faculty"
+      ],
+      "title": "CourseConfig",
+      "type": "object"
+    },
+    "Day": {
+      "description": "Day of the week",
+      "enum": [
+        "MON",
+        "TUE",
+        "WED",
+        "THU",
+        "FRI"
+      ],
+      "example": "MON",
+      "type": "string"
+    },
+    "Faculty": {
+      "description": "Faculty name",
+      "example": "Dr. Smith",
+      "type": "string"
+    },
+    "FacultyConfig": {
+      "additionalProperties": false,
+      "description": "Represents a faculty configuration.\n\n**Usage:**\n```python\nFacultyConfig(name=\"Dr. Smith\", maximum_credits=12, minimum_credits=3, ...)\n```",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/Faculty",
+          "description": "Faculty member\"s name"
+        },
+        "maximum_credits": {
+          "description": "Maximum credit hours they can teach",
+          "example": 12,
+          "minimum": 0,
+          "title": "Maximum Credits",
+          "type": "integer"
+        },
+        "maximum_days": {
+          "default": 5,
+          "description": "Maximum number of days they are willing to teach (0-5, optional)",
+          "example": 3,
+          "maximum": 5,
+          "minimum": 0,
+          "title": "Maximum Days",
+          "type": "integer"
+        },
+        "minimum_credits": {
+          "description": "Minimum credit hours they must teach",
+          "example": 3,
+          "minimum": 0,
+          "title": "Minimum Credits",
+          "type": "integer"
+        },
+        "unique_course_limit": {
+          "description": "Maximum number of different courses they can teach",
+          "example": 3,
+          "exclusiveMinimum": 0,
+          "title": "Unique Course Limit",
+          "type": "integer"
+        },
+        "times": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/TimeRange"
+            },
+            "type": "array"
+          },
+          "description": "Dictionary mapping day names to time ranges",
+          "example": {
+            "MON": [
+              "10:00-12:00"
+            ],
+            "TUE": [
+              "10:00-12:00"
+            ]
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/Day"
+          },
+          "title": "Times",
+          "type": "object"
+        },
+        "course_preferences": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Preference"
+          },
+          "description": "Dictionary mapping course IDs to preference scores",
+          "example": {
+            "CS 101": 5
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/Course"
+          },
+          "title": "Course Preferences",
+          "type": "object"
+        },
+        "room_preferences": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Preference"
+          },
+          "description": "Dictionary mapping room IDs to preference scores",
+          "example": {
+            "Room 101": 5
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/Room"
+          },
+          "title": "Room Preferences",
+          "type": "object"
+        },
+        "lab_preferences": {
+          "additionalProperties": {
+            "$ref": "#/$defs/Preference"
+          },
+          "description": "Dictionary mapping lab IDs to preference scores",
+          "example": {
+            "Lab 101": 5
+          },
+          "propertyNames": {
+            "$ref": "#/$defs/Lab"
+          },
+          "title": "Lab Preferences",
+          "type": "object"
+        },
+        "mandatory_days": {
+          "description": "Set of days the faculty must teach on",
+          "example": [
+            "MON",
+            "WED"
+          ],
+          "items": {
+            "$ref": "#/$defs/Day"
+          },
+          "title": "Mandatory Days",
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "name",
+        "maximum_credits",
+        "minimum_credits",
+        "unique_course_limit",
+        "times"
+      ],
+      "title": "FacultyConfig",
+      "type": "object"
+    },
+    "Lab": {
+      "description": "Lab name",
+      "example": "Lab 101",
+      "type": "string"
+    },
+    "Meeting": {
+      "additionalProperties": false,
+      "description": "Represents a single meeting instance.\n\n**Usage:**\n```python\nMeeting(day=\"MON\", duration=90, lab=False)\n```",
+      "properties": {
+        "day": {
+          "$ref": "#/$defs/Day"
+        },
+        "start_time": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TimeString"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Specific start time constraint"
+        },
+        "duration": {
+          "description": "Duration of the meeting in minutes",
+          "example": 150,
+          "exclusiveMinimum": 0,
+          "title": "Duration",
+          "type": "integer"
+        },
+        "lab": {
+          "default": false,
+          "description": "Whether the meeting is in a lab",
+          "title": "Lab",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "day",
+        "duration"
+      ],
+      "title": "Meeting",
+      "type": "object"
+    },
+    "OptimizerFlags": {
+      "enum": [
+        "faculty_course",
+        "faculty_room",
+        "faculty_lab",
+        "same_room",
+        "same_lab",
+        "pack_rooms",
+        "pack_labs"
+      ],
+      "title": "OptimizerFlags",
+      "type": "string"
+    },
+    "Preference": {
+      "description": "Preference score between 0 and 10",
+      "example": 5,
+      "maximum": 10,
+      "minimum": 0,
+      "type": "integer"
+    },
+    "Room": {
+      "description": "Room name",
+      "example": "Room 101",
+      "type": "string"
+    },
+    "SchedulerConfig": {
+      "additionalProperties": false,
+      "description": "Represents a scheduler configuration.\n\n**Usage:**\n```python\nSchedulerConfig(rooms=[...], labs=[...], courses=[...], faculty=[...])\n```",
+      "properties": {
+        "rooms": {
+          "description": "List of available room names",
+          "example": [
+            "Room 101"
+          ],
+          "items": {
+            "$ref": "#/$defs/Room"
+          },
+          "title": "Rooms",
+          "type": "array"
+        },
+        "labs": {
+          "description": "List of available lab names",
+          "example": [
+            "Lab 101"
+          ],
+          "items": {
+            "$ref": "#/$defs/Lab"
+          },
+          "title": "Labs",
+          "type": "array"
+        },
+        "courses": {
+          "description": "List of course configurations",
+          "example": [
+            {
+              "conflicts": [
+                "CS 102"
+              ],
+              "course_id": "CS 101",
+              "credits": 3,
+              "faculty": [
+                "Dr. Smith"
+              ],
+              "lab": [
+                "Lab 101"
+              ],
+              "room": [
+                "Room 101"
+              ]
+            }
+          ],
+          "items": {
+            "$ref": "#/$defs/CourseConfig"
+          },
+          "title": "Courses",
+          "type": "array"
+        },
+        "faculty": {
+          "description": "List of faculty configurations",
+          "example": [
+            {
+              "course_preferences": {
+                "CS 101": 5
+              },
+              "lab_preferences": {
+                "Lab 101": 5
+              },
+              "mandatory_days": [
+                "MON"
+              ],
+              "maximum_credits": 12,
+              "maximum_days": 3,
+              "minimum_credits": 3,
+              "name": "Dr. Smith",
+              "room_preferences": {
+                "Room 101": 5
+              },
+              "times": {
+                "MON": [
+                  "10:00-12:00"
+                ],
+                "TUE": [
+                  "10:00-12:00"
+                ]
+              },
+              "unique_course_limit": 3
+            }
+          ],
+          "items": {
+            "$ref": "#/$defs/FacultyConfig"
+          },
+          "title": "Faculty",
+          "type": "array"
+        }
+      },
+      "required": [
+        "rooms",
+        "labs",
+        "courses",
+        "faculty"
+      ],
+      "title": "SchedulerConfig",
+      "type": "object"
+    },
+    "TimeBlock": {
+      "additionalProperties": false,
+      "description": "Represents a time block within a day.\n\n**Usage:**\n```python\nTimeBlock(start=\"09:00\", spacing=60, end=\"17:00\")\n```",
+      "properties": {
+        "start": {
+          "$ref": "#/$defs/TimeString",
+          "description": "Start time of the time block"
+        },
+        "spacing": {
+          "description": "Time spacing between slots in minutes",
+          "example": 60,
+          "exclusiveMinimum": 0,
+          "title": "Spacing",
+          "type": "integer"
+        },
+        "end": {
+          "$ref": "#/$defs/TimeString",
+          "description": "End time of the time block",
+          "example": "17:00"
+        }
+      },
+      "required": [
+        "start",
+        "spacing",
+        "end"
+      ],
+      "title": "TimeBlock",
+      "type": "object"
+    },
+    "TimeRange": {
+      "additionalProperties": false,
+      "description": "A time range with start and end times, ensuring start < end.\n\n**Usage:**\n```python\nTimeRange(start=\"09:00\", end=\"17:00\")\n```",
+      "properties": {
+        "start": {
+          "$ref": "#/$defs/TimeString",
+          "description": "Start time of the time range"
+        },
+        "end": {
+          "$ref": "#/$defs/TimeString",
+          "description": "End time of the time range",
+          "example": "17:00"
+        }
+      },
+      "required": [
+        "start",
+        "end"
+      ],
+      "title": "TimeRange",
+      "type": "object"
+    },
+    "TimeSlotConfig": {
+      "additionalProperties": false,
+      "description": "Represents a time slot configuration.\n\n**Usage:**\n```python\nTimeSlotConfig(times={...}, classes=[...])\n```",
+      "properties": {
+        "times": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/TimeBlock"
+            },
+            "type": "array"
+          },
+          "description": "Dictionary mapping day names to time blocks",
+          "propertyNames": {
+            "$ref": "#/$defs/Day"
+          },
+          "title": "Times",
+          "type": "object"
+        },
+        "classes": {
+          "description": "List of class patterns",
+          "items": {
+            "$ref": "#/$defs/ClassPattern"
+          },
+          "title": "Classes",
+          "type": "array"
+        },
+        "max_time_gap": {
+          "default": 30,
+          "description": "Maximum time gap between time slots to determine if they are adjacent",
+          "example": 30,
+          "exclusiveMinimum": 0,
+          "minimum": 0,
+          "title": "Max Time Gap",
+          "type": "integer"
+        },
+        "min_time_overlap": {
+          "default": 45,
+          "description": "Minimum overlap between time slots",
+          "example": 45,
+          "exclusiveMinimum": 0,
+          "title": "Min Time Overlap",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "times",
+        "classes"
+      ],
+      "title": "TimeSlotConfig",
+      "type": "object"
+    },
+    "TimeString": {
+      "description": "Time in HH:MM format",
+      "example": "10:00",
+      "pattern": "^([0-1][0-9]|2[0-3]):[0-5][0-9]$",
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "Represents a combined configuration.\n\n**Usage:**\n```python\nCombinedConfig(config=..., time_slot_config=..., limit=10)\n```",
+  "properties": {
+    "config": {
+      "$ref": "#/$defs/SchedulerConfig",
+      "description": "Scheduler configuration",
+      "example": {
+        "courses": [
+          {
+            "conflicts": [],
+            "course_id": "CS 101",
+            "credits": 3,
+            "faculty": [
+              "Dr. Smith"
+            ],
+            "lab": [
+              "Lab 101"
+            ],
+            "room": [
+              "Room 101"
+            ]
+          }
+        ],
+        "faculty": [
+          {
+            "course_preferences": {
+              "CS 101": 5
+            },
+            "lab_preferences": {
+              "Lab 101": 5
+            },
+            "maximum_credits": 12,
+            "minimum_credits": 3,
+            "name": "Dr. Smith",
+            "room_preferences": {
+              "Room 101": 5
+            },
+            "times": {
+              "MON": [
+                "10:00-12:00"
+              ],
+              "TUE": [
+                "10:00-12:00"
+              ]
+            },
+            "unique_course_limit": 3
+          }
+        ],
+        "labs": [
+          "Lab 101"
+        ],
+        "rooms": [
+          "Room 101"
+        ]
+      }
+    },
+    "time_slot_config": {
+      "$ref": "#/$defs/TimeSlotConfig",
+      "description": "Time slot configuration",
+      "example": {
+        "classes": [
+          {
+            "credits": 3,
+            "meetings": [
+              {
+                "day": "MON",
+                "duration": 150,
+                "lab": false
+              }
+            ]
+          }
+        ],
+        "times": {
+          "FRI": [
+            {
+              "end": "12:00",
+              "spacing": 60,
+              "start": "10:00"
+            }
+          ],
+          "MON": [
+            {
+              "end": "12:00",
+              "spacing": 60,
+              "start": "10:00"
+            }
+          ],
+          "THU": [
+            {
+              "end": "12:00",
+              "spacing": 60,
+              "start": "10:00"
+            }
+          ],
+          "TUE": [
+            {
+              "end": "12:00",
+              "spacing": 60,
+              "start": "10:00"
+            }
+          ],
+          "WED": [
+            {
+              "end": "12:00",
+              "spacing": 60,
+              "start": "10:00"
+            }
+          ]
+        }
+      }
+    },
+    "limit": {
+      "default": 10,
+      "description": "Maximum number of schedules to generate",
+      "example": 10,
+      "exclusiveMinimum": 0,
+      "title": "Limit",
+      "type": "integer"
+    },
+    "optimizer_flags": {
+      "description": "List of optimizer flags",
+      "example": [
+        "faculty_course",
+        "faculty_room",
+        "faculty_lab",
+        "same_room",
+        "same_lab",
+        "pack_rooms",
+        "pack_labs"
+      ],
+      "items": {
+        "$ref": "#/$defs/OptimizerFlags"
+      },
+      "title": "Optimizer Flags",
+      "type": "array"
+    }
+  },
+  "required": [
+    "config",
+    "time_slot_config"
+  ],
+  "title": "CombinedConfig",
+  "type": "object"
+}

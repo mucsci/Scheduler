@@ -2,6 +2,18 @@
 
 A powerful constraint satisfaction solver for generating academic course schedules using the Z3 theorem prover.
 
+## Start Here by Audience
+
+- **Coding agents and contributors**: read [AGENT.md](AGENT.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [skills/README.md](skills/README.md).
+- **Python API users**: jump to [Python API](#python-api).
+- **REST API users**: jump to [REST API](#rest-api).
+
+### Naming Cheat Sheet
+
+- **Repository**: `mucsci/scheduler`
+- **Package on PyPI**: `course-constraint-scheduler`
+- **Python import**: `scheduler`
+
 ## Overview
 
 The Course Constraint Scheduler is designed to solve complex academic scheduling problems by modeling them as constraint satisfaction problems. It can handle:
@@ -77,16 +89,22 @@ for schedule in scheduler.get_models():
 # Start the server with custom options
 scheduler-server --port 8000 --host 0.0.0.0 --log-level info --workers 16
 
-# Submit a schedule request
+# 1) Submit a schedule request
 curl -X POST "http://localhost:8000/submit" \
   -H "Content-Type: application/json" \
   -d @example.json
 
-# Get the next schedule
-curl -X POST "http://localhost:8000/schedules/{schedule_id}/next"
+# 2) The submit response includes the schedule_id you need
+# {"schedule_id":"f9f2...","endpoint":"/schedules/f9f2..."}
 
-# Check generation progress
-curl -X GET "http://localhost:8000/schedules/{schedule_id}/count"
+# 3) Use that schedule_id for schedule generation and progress
+curl -X POST "http://localhost:8000/schedules/f9f2.../next"
+curl -X GET "http://localhost:8000/schedules/f9f2.../count"
+
+# Optional endpoints
+curl -X GET "http://localhost:8000/schedules/f9f2.../details"
+curl -X GET "http://localhost:8000/schedules/f9f2.../index/0"
+curl -X DELETE "http://localhost:8000/schedules/f9f2.../delete"
 ```
 
 ### Server deployment and security
@@ -103,6 +121,12 @@ See [SECURITY.md](SECURITY.md) for how to report vulnerabilities.
 
 **Published docs (configuration, Python API, REST API, development):**
 [https://mucsci-scheduler.docs.buildwithfern.com](https://mucsci-scheduler.docs.buildwithfern.com)
+
+If you are changing code or docs in this repo:
+
+- Contributor workflow: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Agent workflow: [AGENT.md](AGENT.md)
+- Skill playbooks: [skills/README.md](skills/README.md)
 
 CI publishes this site on pushes to `main` that touch `fern/`, `scripts/`, or `src/scheduler/` (see `.github/workflows/docs.yml`). The repository needs a **`FERN_TOKEN`** Actions secret from the Fern CLI (`fern token`) or dashboard.
 
@@ -127,9 +151,19 @@ uv run python scripts/gen_python_api_mdx.py
 fern docs dev
 ```
 
+Generated artifacts used by Fern:
+
+- `fern/openapi.json` (from FastAPI routes/models)
+- `fern/docs/assets/combined-config.schema.json` (from `CombinedConfig`)
+- `fern/docs/pages/python/reference.mdx` (from public docstrings)
+
+Regenerate these with the scripts above after API/config/docstring changes.
+
 ### Configuration quick link
 
 A short pointer to the new docs location: [docs/configuration.md](./docs/configuration.md).
+
+`example.json` is included in this repository for local cloning workflows. If you need a minimal sample, use `tests/fixtures/minimal_config.json`.
 
 ## Configuration
 
@@ -227,8 +261,8 @@ The scheduler is built with a modular architecture:
 
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd course-constraint-scheduler
+git clone https://github.com/mucsci/scheduler.git
+cd scheduler
 
 # Install dependencies (includes dev tools via uv default-groups; see pyproject.toml)
 uv sync

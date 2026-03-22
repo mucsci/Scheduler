@@ -25,9 +25,35 @@ Called by the scheduler CLI and scheduler-server at startup. Not invoked
 on library import, so applications that embed the scheduler control their
 own logging configuration.
 
+**Usage:**
+```python
+from scheduler.logging import configure_logging
+configure_logging()
+```
+
 <a id="scheduler.server"></a>
 
 # scheduler.server
+
+<a id="scheduler.server.TimeInstanceResponse"></a>
+
+## TimeInstanceResponse Objects
+
+```python
+class TimeInstanceResponse(BaseModel)
+```
+
+One meeting time block within a scheduled course (JSON shape).
+
+<a id="scheduler.server.CourseInstanceResponse"></a>
+
+## CourseInstanceResponse Objects
+
+```python
+class CourseInstanceResponse(BaseModel)
+```
+
+One course row in a generated schedule (`CourseInstance.model_dump` JSON shape).
 
 <a id="scheduler.server.HealthCheck"></a>
 
@@ -38,6 +64,11 @@ class HealthCheck(BaseModel)
 ```
 
 Health check response model.
+
+**Usage:**
+```python
+HealthCheck(status="healthy", active_sessions=0)
+```
 
 **Fields:**
 - status: Health status of the service
@@ -53,6 +84,11 @@ class SubmitResponse(BaseModel)
 
 Response model for schedule submission requests.
 
+**Usage:**
+```python
+SubmitResponse(schedule_id="...", endpoint="/schedules/...")
+```
+
 **Fields:**
 - schedule_id: Unique identifier for the generated schedule session
 - endpoint: URL endpoint to access the schedule
@@ -67,6 +103,11 @@ class MessageResponse(BaseModel)
 
 Generic message response model.
 
+**Usage:**
+```python
+MessageResponse(message="ok")
+```
+
 **Fields:**
 - message: Response message text
 
@@ -79,6 +120,11 @@ class GenerateAllResponse(BaseModel)
 ```
 
 Response model for generate-all schedule requests.
+
+**Usage:**
+```python
+GenerateAllResponse(message='...', current_count=1, target_count=10)
+```
 
 **Fields:**
 - message: Status message about the generation process
@@ -95,9 +141,14 @@ class ScheduleResponse(BaseModel)
 
 Response model for schedule retrieval requests.
 
+**Usage:**
+```python
+ScheduleResponse(schedule_id='...', schedule=[...], index=0, total_generated=1)
+```
+
 **Fields:**
 - schedule_id: Unique identifier for the schedule session
-- schedule: The generated schedule as a list of course instances
+- schedule: Generated schedule as `list[CourseInstanceResponse]` (typed JSON rows)
 - index: Index of this schedule in the generation sequence
 - total_generated: Total number of schedules generated so far
 
@@ -113,6 +164,11 @@ Response model for schedule details requests.
 
 Inherits all fields from CombinedConfig and adds:
 
+**Usage:**
+```python
+ScheduleDetailsResponse(schedule_id='...', total_generated=0, **combined.model_dump())
+```
+
 **Fields:**
 - schedule_id: Unique identifier for the schedule session
 - total_generated: Total number of schedules generated
@@ -126,6 +182,11 @@ class ScheduleCountResponse(BaseModel)
 ```
 
 Response model for schedule count requests.
+
+**Usage:**
+```python
+ScheduleCountResponse(schedule_id='...', current_count=2, limit=10, is_complete=False)
+```
 
 **Fields:**
 - schedule_id: Unique identifier for the schedule session
@@ -143,6 +204,11 @@ class ErrorResponse(BaseModel)
 
 Error response model for API errors.
 
+**Usage:**
+```python
+ErrorResponse(error="bad_request", message="...")
+```
+
 **Fields:**
 - error: Error type or code
 - message: Detailed error message
@@ -158,6 +224,11 @@ class ScheduleSession()
 
 Represents an active schedule generation session.
 
+**Usage:**
+```python
+# Internal session object for the HTTP API
+```
+
 <a id="scheduler.server.cleanup_session"></a>
 
 #### cleanup\_session
@@ -170,6 +241,9 @@ Remove a session from memory and clean up associated resources.
 
 **Args:**
 - schedule_id: Unique identifier for the schedule session to clean up
+```python
+cleanup_session(schedule_id)
+```
 
 <a id="scheduler.server.ensure_scheduler_initialized"></a>
 
@@ -185,6 +259,9 @@ Ensure the scheduler is initialized for a session.
 **Args:**
 - session_id: Unique identifier for the schedule session
 - session: The ScheduleSession object to initialize
+```python
+await ensure_scheduler_initialized(session_id, session)
+```
 
 <a id="scheduler.server.ensure_generator_initialized"></a>
 
@@ -203,6 +280,9 @@ Ensure the generator is initialized for a session.
 
 **Raises:**
 - HTTPException: If generator initialization fails or times out
+```python
+await ensure_generator_initialized(session_id, session)
+```
 
 <a id="scheduler.server.lifespan"></a>
 
@@ -215,6 +295,11 @@ async def lifespan(app: FastAPI)
 
 Application lifespan manager for cleanup.
 
+**Usage:**
+```python
+# FastAPI(..., lifespan=lifespan)
+```
+
 <a id="scheduler.server.submit_schedule"></a>
 
 #### submit\_schedule
@@ -225,6 +310,11 @@ async def submit_schedule(request: SubmitRequest)
 ```
 
 Submit a new schedule generation request.
+
+**Usage:**
+```python
+httpx.post("http://localhost:8000/submit", json=body)
+```
 
 <a id="scheduler.server.get_schedule_details"></a>
 
@@ -238,6 +328,11 @@ async def get_schedule_details(schedule_id: str)
 
 Get details about a schedule session.
 
+**Usage:**
+```python
+httpx.get(f"http://localhost:8000/schedules/{sid}/details")
+```
+
 <a id="scheduler.server.get_next_schedule"></a>
 
 #### get\_next\_schedule
@@ -248,6 +343,11 @@ async def get_next_schedule(schedule_id: str)
 ```
 
 Get the next generated schedule.
+
+**Usage:**
+```python
+httpx.post(f"http://localhost:8000/schedules/{sid}/next")
+```
 
 <a id="scheduler.server.generate_all_schedules"></a>
 
@@ -261,6 +361,11 @@ async def generate_all_schedules(schedule_id: str)
 
 Generate all remaining schedules for a session asynchronously.
 
+**Usage:**
+```python
+httpx.post(f"http://localhost:8000/schedules/{sid}/generate_all")
+```
+
 <a id="scheduler.server.get_schedule_count"></a>
 
 #### get\_schedule\_count
@@ -272,6 +377,11 @@ async def get_schedule_count(schedule_id: str)
 ```
 
 Get the current count of generated schedules for a session.
+
+**Usage:**
+```python
+httpx.get(f"http://localhost:8000/schedules/{sid}/count")
+```
 
 <a id="scheduler.server.get_schedule_by_index"></a>
 
@@ -285,6 +395,11 @@ async def get_schedule_by_index(schedule_id: str, index: int)
 
 Get a previously generated schedule by index.
 
+**Usage:**
+```python
+httpx.get(f"http://localhost:8000/schedules/{sid}/index/0")
+```
+
 <a id="scheduler.server.delete_schedule_session"></a>
 
 #### delete\_schedule\_session
@@ -297,6 +412,11 @@ async def delete_schedule_session(schedule_id: str,
 
 Delete a schedule session.
 
+**Usage:**
+```python
+httpx.delete(f"http://localhost:8000/schedules/{sid}/delete")
+```
+
 <a id="scheduler.server.cleanup_schedule_session"></a>
 
 #### cleanup\_schedule\_session
@@ -308,6 +428,11 @@ async def cleanup_schedule_session(schedule_id: str)
 
 Immediate cleanup of a schedule session.
 
+**Usage:**
+```python
+httpx.post(f"http://localhost:8000/schedules/{sid}/cleanup")
+```
+
 <a id="scheduler.server.health_check"></a>
 
 #### health\_check
@@ -318,6 +443,11 @@ async def health_check()
 ```
 
 Health check endpoint.
+
+**Usage:**
+```python
+httpx.get("http://localhost:8000/health")
+```
 
 <a id="scheduler.server.main"></a>
 
@@ -351,6 +481,11 @@ def main(port: int, log_level: str, host: str, workers: int)
 
 Run the Course Scheduler HTTP API server.
 
+**Usage:**
+```python
+python -m scheduler.server --port 8000
+```
+
 <a id="scheduler.config"></a>
 
 # scheduler.config
@@ -364,6 +499,12 @@ class StrictBaseModel(BaseModel)
 ```
 
 Base class for all models which need strict validation.
+
+**Usage:**
+```python
+class MyConfig(StrictBaseModel):
+    ...
+```
 
 **Fields:**
 - model_config: Configuration for the model
@@ -385,8 +526,6 @@ def edit_mode()
 
 Context manager for making multiple changes with automatic rollback on validation failure.
 
-**Usage:**
-
 **Raises:**
 - ValueError: If any configuration validation fails (with automatic rollback)
 ```python
@@ -405,6 +544,11 @@ class TimeBlock(StrictBaseModel)
 ```
 
 Represents a time block within a day.
+
+**Usage:**
+```python
+TimeBlock(start="09:00", spacing=60, end="17:00")
+```
 
 <a id="scheduler.config.TimeBlock.start"></a>
 
@@ -434,6 +578,11 @@ class TimeRange(StrictBaseModel)
 
 A time range with start and end times, ensuring start < end.
 
+**Usage:**
+```python
+TimeRange(start="09:00", end="17:00")
+```
+
 <a id="scheduler.config.TimeRange.start"></a>
 
 #### start
@@ -457,6 +606,11 @@ def from_string(cls, time_range_str: TimeRangeString) -> "TimeRange"
 
 Create TimeRange from string format "HH:MM-HH:MM"
 
+**Usage:**
+```python
+TimeRange.from_string("10:00-12:00")
+```
+
 <a id="scheduler.config.Meeting"></a>
 
 ## Meeting Objects
@@ -466,6 +620,11 @@ class Meeting(StrictBaseModel)
 ```
 
 Represents a single meeting instance.
+
+**Usage:**
+```python
+Meeting(day="MON", duration=90, lab=False)
+```
 
 <a id="scheduler.config.Meeting.day"></a>
 
@@ -501,6 +660,11 @@ class ClassPattern(StrictBaseModel)
 
 Represents a class pattern.
 
+**Usage:**
+```python
+ClassPattern(credits=3, meetings=[...])
+```
+
 <a id="scheduler.config.ClassPattern.credits"></a>
 
 #### credits
@@ -534,6 +698,11 @@ class TimeSlotConfig(StrictBaseModel)
 ```
 
 Represents a time slot configuration.
+
+**Usage:**
+```python
+TimeSlotConfig(times={...}, classes=[...])
+```
 
 <a id="scheduler.config.TimeSlotConfig.times"></a>
 
@@ -570,6 +739,11 @@ def validate()
 
 Validate that time slot config is consistent and complete.
 
+**Usage:**
+```python
+TimeSlotConfig.model_validate({...})
+```
+
 <a id="scheduler.config.CourseConfig"></a>
 
 ## CourseConfig Objects
@@ -579,6 +753,11 @@ class CourseConfig(StrictBaseModel)
 ```
 
 Represents a course configuration.
+
+**Usage:**
+```python
+CourseConfig(course_id="CS 101", credits=3, room=[...], lab=[...], conflicts=[], faculty=[])
+```
 
 <a id="scheduler.config.CourseConfig.course_id"></a>
 
@@ -625,6 +804,11 @@ class FacultyConfig(StrictBaseModel)
 ```
 
 Represents a faculty configuration.
+
+**Usage:**
+```python
+FacultyConfig(name="Dr. Smith", maximum_credits=12, minimum_credits=3, ...)
+```
 
 <a id="scheduler.config.FacultyConfig.name"></a>
 
@@ -697,6 +881,11 @@ def validate()
 
 Validate the model state.
 
+**Usage:**
+```python
+FacultyConfig.model_validate({...})
+```
+
 <a id="scheduler.config.SchedulerConfig"></a>
 
 ## SchedulerConfig Objects
@@ -706,6 +895,11 @@ class SchedulerConfig(StrictBaseModel)
 ```
 
 Represents a scheduler configuration.
+
+**Usage:**
+```python
+SchedulerConfig(rooms=[...], labs=[...], courses=[...], faculty=[...])
+```
 
 <a id="scheduler.config.SchedulerConfig.rooms"></a>
 
@@ -743,8 +937,6 @@ def validate()
 Validate all cross-references between child models.
 This method can be called manually or is used by Pydantic validators.
 
-**Usage:**
-
 **Raises:**
 - ValueError: If any cross-reference validation fails
 ```python
@@ -766,11 +958,23 @@ class OptimizerFlags(StrEnum)
 
 Optimize faculty course assignments using preferences
 
+**Usage:**
+```python
+OptimizerFlags.FACULTY_COURSE
+["FACULTY_COURSE"]  # accepted in CombinedConfig JSON
+```
+
 <a id="scheduler.config.OptimizerFlags.FACULTY_ROOM"></a>
 
 #### FACULTY\_ROOM
 
 Optimize faculty room assignments using preferences
+
+**Usage:**
+```python
+OptimizerFlags.FACULTY_ROOM
+["FACULTY_ROOM"]  # accepted in CombinedConfig JSON
+```
 
 <a id="scheduler.config.OptimizerFlags.FACULTY_LAB"></a>
 
@@ -778,11 +982,23 @@ Optimize faculty room assignments using preferences
 
 Optimize faculty lab assignments using preferences
 
+**Usage:**
+```python
+OptimizerFlags.FACULTY_LAB
+["FACULTY_LAB"]  # accepted in CombinedConfig JSON
+```
+
 <a id="scheduler.config.OptimizerFlags.SAME_ROOM"></a>
 
 #### SAME\_ROOM
 
 Force same room usage for courses taught by the same faculty
+
+**Usage:**
+```python
+OptimizerFlags.SAME_ROOM
+["SAME_ROOM"]  # accepted in CombinedConfig JSON
+```
 
 <a id="scheduler.config.OptimizerFlags.SAME_LAB"></a>
 
@@ -790,17 +1006,35 @@ Force same room usage for courses taught by the same faculty
 
 Force same lab usage for courses taught by the same faculty
 
+**Usage:**
+```python
+OptimizerFlags.SAME_LAB
+["SAME_LAB"]  # accepted in CombinedConfig JSON
+```
+
 <a id="scheduler.config.OptimizerFlags.PACK_ROOMS"></a>
 
 #### PACK\_ROOMS
 
 Optimize packing of rooms for courses taught
 
+**Usage:**
+```python
+OptimizerFlags.PACK_ROOMS
+["PACK_ROOMS"]  # accepted in CombinedConfig JSON
+```
+
 <a id="scheduler.config.OptimizerFlags.PACK_LABS"></a>
 
 #### PACK\_LABS
 
 Optimize packing of labs for courses taught
+
+**Usage:**
+```python
+OptimizerFlags.PACK_LABS
+["PACK_LABS"]  # accepted in CombinedConfig JSON
+```
 
 <a id="scheduler.config.CombinedConfig"></a>
 
@@ -811,6 +1045,11 @@ class CombinedConfig(StrictBaseModel)
 ```
 
 Represents a combined configuration.
+
+**Usage:**
+```python
+CombinedConfig(config=..., time_slot_config=..., limit=10)
+```
 
 <a id="scheduler.config.CombinedConfig.config"></a>
 
@@ -857,6 +1096,12 @@ Writer class for CSV output with consistent interface.
 This class provides a context manager interface for writing course schedules
 to CSV format, either to a file or stdout.
 
+**Usage:**
+```python
+with CSVWriter("out.csv") as w:
+    w.add_schedule(model)
+```
+
 <a id="scheduler.writers.csv_writer.CSVWriter.__init__"></a>
 
 #### \_\_init\_\_
@@ -869,6 +1114,9 @@ Initialize the CSVWriter.
 
 **Args:**
 - filename: The name of the file to write CSV data to, or None for stdout
+```python
+CSVWriter("out.csv")
+```
 
 <a id="scheduler.writers.csv_writer.CSVWriter.__enter__"></a>
 
@@ -882,6 +1130,9 @@ Enter the context manager.
 
 **Returns:**
 The CSVWriter instance
+```python
+with CSVWriter(None) as w:
+```
 
 <a id="scheduler.writers.csv_writer.CSVWriter.add_schedule"></a>
 
@@ -895,6 +1146,9 @@ Add a schedule to be written.
 
 **Args:**
 - schedule: List of CourseInstance objects representing a complete schedule
+```python
+writer.add_schedule(schedule)
+```
 
 <a id="scheduler.writers.csv_writer.CSVWriter.__exit__"></a>
 
@@ -910,6 +1164,9 @@ Exit the context manager and write all accumulated schedules.
 - exc_type: Exception type if an exception occurred
 - exc_value: Exception value if an exception occurred
 - traceback: Traceback if an exception occurred
+```python
+# Flushes accumulated rows to disk
+```
 
 <a id="scheduler.writers.json_writer"></a>
 
@@ -928,6 +1185,12 @@ Writer class for JSON output with consistent interface.
 This class provides a context manager interface for writing course schedules
 to JSON format, either to a file or stdout.
 
+**Usage:**
+```python
+with JSONWriter("out.json") as w:
+    w.add_schedule(model)
+```
+
 <a id="scheduler.writers.json_writer.JSONWriter.__init__"></a>
 
 #### \_\_init\_\_
@@ -940,6 +1203,9 @@ Initialize the JSONWriter.
 
 **Args:**
 - filename: The name of the file to write the JSON to
+```python
+JSONWriter("out.json")
+```
 
 <a id="scheduler.writers.json_writer.JSONWriter.__enter__"></a>
 
@@ -953,6 +1219,9 @@ Enter the context manager.
 
 **Returns:**
 The JSONWriter instance
+```python
+with JSONWriter(None) as w:
+```
 
 <a id="scheduler.writers.json_writer.JSONWriter.add_schedule"></a>
 
@@ -966,6 +1235,9 @@ Add a schedule to be written to the JSON file.
 
 **Args:**
 - schedule: The schedule to be written
+```python
+writer.add_schedule(schedule)
+```
 
 <a id="scheduler.writers.json_writer.JSONWriter.__exit__"></a>
 
@@ -981,6 +1253,9 @@ Exit the context manager and write all accumulated schedules as one JSON array.
 - exc_type: Exception type if an exception occurred
 - exc_value: Exception value if an exception occurred
 - traceback: Traceback if an exception occurred
+```python
+# Writes JSON array of schedules
+```
 
 <a id="scheduler.json_types"></a>
 
@@ -990,6 +1265,12 @@ TypedDict definitions for JSON structures used throughout the scheduler.
 
 This module provides type-safe definitions for all JSON data structures,
 including configuration, API requests/responses, and schedule outputs.
+
+**Usage:**
+```python
+from scheduler.json_types import CourseInstanceJSON
+# TypedDict shapes for JSON payloads
+```
 
 <a id="scheduler.json_types.TimeInstanceJSON"></a>
 
@@ -1001,11 +1282,21 @@ class TimeInstanceJSON(TypedDict)
 
 JSON representation of a TimeInstance.
 
+**Usage:**
+```python
+{"day": 0, "start": 480, "duration": 90}
+```
+
 <a id="scheduler.json_types.TimeInstanceJSON.day"></a>
 
 #### day
 
 Day enum value (e.g., 0)
+
+**Usage:**
+```python
+{"day": 0, "start": 480, "duration": 90}
+```
 
 <a id="scheduler.json_types.TimeInstanceJSON.start"></a>
 
@@ -1013,11 +1304,21 @@ Day enum value (e.g., 0)
 
 Timepoint in minutes (e.g., 0)
 
+**Usage:**
+```python
+{"day": 0, "start": 480, "duration": 90}
+```
+
 <a id="scheduler.json_types.TimeInstanceJSON.duration"></a>
 
 #### duration
 
 Duration in minutes (e.g., 120)
+
+**Usage:**
+```python
+{"day": 0, "start": 480, "duration": 120}
+```
 
 <a id="scheduler.json_types.CourseInstanceJSON"></a>
 
@@ -1029,11 +1330,21 @@ class CourseInstanceJSON(TypedDict)
 
 JSON representation of a CourseInstance.
 
+**Usage:**
+```python
+{"course": "CS101.01", "faculty": "...", "times": [...]}
+```
+
 <a id="scheduler.json_types.CourseInstanceJSON.course"></a>
 
 #### course
 
 Course string representation (e.g., "CS101.01")
+
+**Usage:**
+```python
+{"course": "CS101.01", "faculty": "Dr. Smith", "times": []}
+```
 
 <a id="scheduler.json_types.CourseInstanceJSON.faculty"></a>
 
@@ -1041,11 +1352,21 @@ Course string representation (e.g., "CS101.01")
 
 Faculty string representation (e.g., "Dr. Smith")
 
+**Usage:**
+```python
+{"course": "CS101.01", "faculty": "Dr. Smith", "times": []}
+```
+
 <a id="scheduler.json_types.CourseInstanceJSON.room"></a>
 
 #### room
 
 Room string representation (e.g., "Room 101")
+
+**Usage:**
+```python
+{"course": "CS101.01", "faculty": "Dr. Smith", "room": "Room 101", "times": []}
+```
 
 <a id="scheduler.json_types.CourseInstanceJSON.lab"></a>
 
@@ -1053,17 +1374,32 @@ Room string representation (e.g., "Room 101")
 
 Lab string representation (e.g., "Lab 101")
 
+**Usage:**
+```python
+{"course": "CS101.01", "faculty": "Dr. Smith", "lab": "Lab 101", "times": []}
+```
+
 <a id="scheduler.json_types.CourseInstanceJSON.times"></a>
 
 #### times
 
 List of time instances (e.g., `[{"day": 0, "start": 0, "duration": 120}]`)
 
+**Usage:**
+```python
+{"course": "CS101.01", "faculty": "Dr. Smith", "times": [{"day": 0, "start": 0, "duration": 120}]}
+```
+
 <a id="scheduler.json_types.CourseInstanceJSON.lab_index"></a>
 
 #### lab\_index
 
 Lab index (e.g., 0)
+
+**Usage:**
+```python
+{"course": "CS101.01", "faculty": "Dr. Smith", "times": [], "lab_index": 0}
+```
 
 <a id="scheduler.models.course"></a>
 
@@ -1079,6 +1415,11 @@ class Course()
 ```
 
 A course with a course_id, section, credits, conflicts, potential labs, potential rooms, and potential faculty.
+
+**Usage:**
+```python
+Course(course_id="CS 101", section=1, labs=[], rooms=[], conflicts=[], faculties=[])
+```
 
 <a id="scheduler.models.course.Course.course_id"></a>
 
@@ -1156,6 +1497,11 @@ def __str__() -> str
 
 Pretty Print representation of a course is its course_id and section
 
+**Usage:**
+```python
+str(course)
+```
+
 <a id="scheduler.models.course.CourseInstance"></a>
 
 ## CourseInstance Objects
@@ -1165,6 +1511,11 @@ class CourseInstance(BaseModel)
 ```
 
 A course instance with a course, time, faculty, room, and lab.
+
+**Usage:**
+```python
+CourseInstance(course=c, time=slot, faculty="Dr. Smith", room="R1", lab=None)
+```
 
 <a id="scheduler.models.course.CourseInstance.model_config"></a>
 
@@ -1216,6 +1567,9 @@ The string representation of the course
 
 **Returns:**
 The string representation of the course
+```python
+payload["course"]
+```
 
 <a id="scheduler.models.course.CourseInstance.times"></a>
 
@@ -1231,6 +1585,9 @@ The list of times assigned to the course instance
 
 **Returns:**
 The list of times assigned to the course instance
+```python
+instance.times
+```
 
 <a id="scheduler.models.course.CourseInstance.lab_index"></a>
 
@@ -1247,6 +1604,9 @@ The index of the lab assigned to the course instance
 **Returns:**
 The index of the lab assigned to the course instance.
 None if the course instance does not have a lab
+```python
+instance.lab_index
+```
 
 <a id="scheduler.models.course.CourseInstance.as_csv"></a>
 
@@ -1262,6 +1622,9 @@ The CSV representation of the course instance in the format:
 
 **Returns:**
 The CSV representation of the course instance
+```python
+row = instance.as_csv()
+```
 
 <a id="scheduler.models"></a>
 
@@ -1285,6 +1648,12 @@ This enum provides integer values for each weekday, starting from 1 (Monday)
 and incrementing through Friday. Used throughout the scheduler for day-based
 time slot management.
 
+**Usage:**
+```python
+Day.MON
+Day.MON.name
+```
+
 <a id="scheduler.models.day.Day.__repr__"></a>
 
 #### \_\_repr\_\_
@@ -1294,6 +1663,11 @@ def __repr__() -> str
 ```
 
 Pretty Print representation of a day
+
+**Usage:**
+```python
+repr(Day.MON)
+```
 
 <a id="scheduler.models.time_slot"></a>
 
@@ -1308,6 +1682,11 @@ class Duration(BaseModel)
 ```
 
 A duration of a time slot in minutes.
+
+**Usage:**
+```python
+Duration(duration=90)
+```
 
 <a id="scheduler.models.time_slot.Duration.model_config"></a>
 
@@ -1332,6 +1711,11 @@ def value() -> int
 
 The value of the duration in minutes since midnight
 
+**Usage:**
+```python
+d.value
+```
+
 <a id="scheduler.models.time_slot.TimePoint"></a>
 
 ## TimePoint Objects
@@ -1341,6 +1725,11 @@ class TimePoint(BaseModel)
 ```
 
 A time point in minutes since midnight.
+
+**Usage:**
+```python
+TimePoint.make_from(10, 30)
+```
 
 <a id="scheduler.models.time_slot.TimePoint.model_config"></a>
 
@@ -1365,6 +1754,11 @@ def make_from(hr: int, min: int) -> "TimePoint"
 
 Make a time point from an hour and minute
 
+**Usage:**
+```python
+TimePoint.make_from(9, 45)
+```
+
 <a id="scheduler.models.time_slot.TimePoint.hour"></a>
 
 #### hour
@@ -1375,6 +1769,11 @@ def hour()
 ```
 
 The hour of the time point
+
+**Usage:**
+```python
+tp.hour
+```
 
 <a id="scheduler.models.time_slot.TimePoint.minute"></a>
 
@@ -1387,6 +1786,11 @@ def minute()
 
 The minute of the time point
 
+**Usage:**
+```python
+tp.minute
+```
+
 <a id="scheduler.models.time_slot.TimePoint.value"></a>
 
 #### value
@@ -1398,6 +1802,11 @@ def value() -> int
 
 The value of the time point in minutes since midnight
 
+**Usage:**
+```python
+d.value
+```
+
 <a id="scheduler.models.time_slot.TimeInstance"></a>
 
 ## TimeInstance Objects
@@ -1407,6 +1816,11 @@ class TimeInstance(BaseModel)
 ```
 
 A time instance with a day, start time, and duration.
+
+**Usage:**
+```python
+TimeInstance(day=Day.MON, start=tp, duration=Duration(duration=90))
+```
 
 <a id="scheduler.models.time_slot.TimeInstance.model_config"></a>
 
@@ -1443,6 +1857,11 @@ def stop() -> TimePoint
 
 The stop time of the time instance
 
+**Usage:**
+```python
+end = inst.stop
+```
+
 <a id="scheduler.models.time_slot.TimeSlot"></a>
 
 ## TimeSlot Objects
@@ -1452,6 +1871,11 @@ class TimeSlot(BaseModel)
 ```
 
 A time slot with a list of time instances and a lab index.
+
+**Usage:**
+```python
+TimeSlot(times=[...], lab_index=0)
+```
 
 <a id="scheduler.models.time_slot.TimeSlot.model_config"></a>
 
@@ -1487,6 +1911,11 @@ def __hash__() -> int
 
 Hash the time slot by its string representation
 
+**Usage:**
+```python
+hash(slot)
+```
+
 <a id="scheduler.models.time_slot.TimeSlot.lab_time"></a>
 
 #### lab\_time
@@ -1500,6 +1929,9 @@ Returns the time instance corresponding to the lab time slot
 **Returns:**
 The time instance of the lab
 None if the time slot does not have a lab
+```python
+slot.lab_time()
+```
 
 <a id="scheduler.models.time_slot.TimeSlot.has_lab"></a>
 
@@ -1514,6 +1946,9 @@ Check if the time slot has a lab
 **Returns:**
 True if the time slot has a lab.
 False otherwise
+```python
+slot.has_lab()
+```
 
 <a id="scheduler.models.time_slot.TimeSlot.lab_next_to"></a>
 
@@ -1528,6 +1963,9 @@ Check if the time slot has a lab that is next to another time slot
 **Returns:**
 True if the time slot has a lab that is next to another time slot.
 False otherwise
+```python
+a.lab_next_to(b)
+```
 
 <a id="scheduler.models.time_slot.TimeSlot.lecture_next_to"></a>
 
@@ -1542,6 +1980,9 @@ Check if a time slot is logically next to another
 **Returns:**
 True if the time slot is logically next to another.
 False otherwise
+```python
+a.lecture_next_to(b)
+```
 
 <a id="scheduler.models.time_slot.TimeSlot.overlaps"></a>
 
@@ -1556,6 +1997,9 @@ Check if a time slot has any overlap with another time slot
 **Returns:**
 True if the time slot has any overlap with another time slot.
 False otherwise
+```python
+a.overlaps(b)
+```
 
 <a id="scheduler.models.time_slot.TimeSlot.lab_overlaps"></a>
 
@@ -1570,6 +2014,9 @@ Check if a course's lab time slot has any overlap with another course's lab time
 **Returns:**
 True if the course's lab time slot has any overlap with another course's lab time slot.
 False otherwise
+```python
+a.lab_overlaps(b)
+```
 
 <a id="scheduler.models.time_slot.TimeSlot.in_time_ranges"></a>
 
@@ -1584,6 +2031,9 @@ Check if a time slot fits into a list of time ranges
 **Returns:**
 True if the time slot fits into the list of time ranges
 False otherwise
+```python
+slot.in_time_ranges(availability_instances)
+```
 
 <a id="scheduler.scheduler"></a>
 
@@ -1610,6 +2060,10 @@ The loaded configuration
 **Example:**
 >>> load_config_from_file(CombinedConfig, "config.json")
 >>> load_config_from_file(CombinedConfig, Path("config.json"))
+```python
+from scheduler import CombinedConfig, load_config_from_file
+cfg = load_config_from_file(CombinedConfig, "config.json")
+```
 
 <a id="scheduler.scheduler.get_faculty_availability"></a>
 
@@ -1627,6 +2081,9 @@ Calculate the availability of a faculty as a list of `TimeInstance` objects.
 
 **Returns:**
 The availability of the faculty as a list of `TimeInstance` objects
+```python
+slots = get_faculty_availability(faculty_config)
+```
 
 <a id="scheduler.scheduler.Scheduler"></a>
 
@@ -1637,6 +2094,12 @@ class Scheduler()
 ```
 
 Scheduler class for generating schedules.
+
+**Usage:**
+```python
+sched = Scheduler(full_config)
+next(sched.get_models())
+```
 
 <a id="scheduler.scheduler.Scheduler.__init__"></a>
 
@@ -1655,6 +2118,9 @@ limit, and optimizer flags
 
 **Raises:**
 - ValueError: If the optimizer flags are invalid
+```python
+Scheduler(full_config)
+```
 
 <a id="scheduler.scheduler.Scheduler.get_models"></a>
 
@@ -1675,6 +2141,10 @@ Generator of lists of `CourseInstance` objects representing complete schedules
 >>> for model in scheduler.get_models():
 ...     for course in model:
 ...         print(course.as_csv())
+```python
+for schedule in sched.get_models():
+    ...
+```
 
 <a id="scheduler.main"></a>
 
@@ -1714,6 +2184,11 @@ def main(config: str, limit: int, format: str, output: str,
 
 Generate course schedules using constraint satisfaction solving.
 
+**Usage:**
+```python
+scheduler path/to/config.json -f csv -o out
+```
+
 <a id="scheduler.time_slot_generator"></a>
 
 # scheduler.time\_slot\_generator
@@ -1732,6 +2207,12 @@ This class generates all possible time slot combinations for courses
 based on the provided TimeSlotConfig, ensuring valid scheduling patterns
 and constraints are met.
 
+**Usage:**
+```python
+gen = TimeSlotGenerator(time_slot_config)
+gen.time_slots(3)
+```
+
 <a id="scheduler.time_slot_generator.TimeSlotGenerator.__init__"></a>
 
 #### \_\_init\_\_
@@ -1744,6 +2225,9 @@ Initialize the TimeSlotGenerator.
 
 **Args:**
 - config: The TimeSlotConfig containing time blocks and class patterns
+```python
+TimeSlotGenerator(time_slot_config)
+```
 
 <a id="scheduler.time_slot_generator.TimeSlotGenerator.time_slots"></a>
 
@@ -1761,3 +2245,6 @@ Generate all possible time slots for a given credit level.
 
 **Returns:**
 A list of TimeSlot objects
+```python
+generator.time_slots(credits=3)
+```

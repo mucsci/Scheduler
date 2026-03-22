@@ -32,3 +32,5 @@ uv run prek run --all-files
 ```
 
 Use `uv run <command>` so the project venv and paths stay consistent.
+
+For CI parity and GitHub Actions behavior, see [sched-github-ci](../sched-github-ci/SKILL.md).

@@ -28,6 +28,16 @@ Common **types**: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`.
 - Docs and **generated Fern artifacts** updated when APIs or config schema change
 - Breaking changes called out in the PR description
 
+For exact lint/type/prek command guidance, see [sched-ruff-ty-prek](../sched-ruff-ty-prek/SKILL.md).
+For CI parity and workflow behavior, see [sched-github-ci](../sched-github-ci/SKILL.md).
+
+## Commit-time hook behavior
+
+- Pre-commit hooks may auto-modify files (for example EOF fixes or Ruff auto-fixes).
+- If commit fails due to hook edits:
+  1. re-stage (`git add ...`),
+  2. re-run commit with the same message.
+
 ## PR description
 
 - What changed and why

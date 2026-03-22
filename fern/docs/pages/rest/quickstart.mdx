@@ -1,0 +1,76 @@
+---
+title: REST API quickstart
+description: Submit a config, iterate generated schedules, and manage session lifecycle from the HTTP API.
+---
+
+The REST API is session-based. You submit a configuration once, receive a `schedule_id`, then use that id to generate and inspect schedules.
+
+## Start the server
+
+```bash
+scheduler-server --port 8000 --host 0.0.0.0 --log-level info
+```
+
+Interactive docs are available at `http://localhost:8000/docs/`.
+
+## 1) Submit a configuration
+
+```bash
+curl -X POST "http://localhost:8000/submit" \
+  -H "Content-Type: application/json" \
+  -d @example.json
+```
+
+Example response:
+
+```json
+{
+  "schedule_id": "f9f2c906-5a00-4b78-a0dd-31f3240fbf4b",
+  "endpoint": "/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b"
+}
+```
+
+The `schedule_id` is the key for all follow-up requests.
+
+## 2) Generate schedules
+
+```bash
+curl -X POST "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/next"
+```
+
+- Call `next` repeatedly to enumerate feasible schedules.
+- Once generation is exhausted, the endpoint returns an error indicating no additional schedules are available.
+
+## 3) Inspect progress and existing schedules
+
+```bash
+curl -X GET "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/count"
+curl -X GET "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/index/0"
+curl -X GET "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/details"
+```
+
+Useful endpoints:
+
+- `count`: Current generated count, configured limit, completion status.
+- `index/{index}`: Retrieve a previously generated schedule by index.
+- `details`: Return the original combined config plus generation metadata.
+
+## Optional: background generation
+
+```bash
+curl -X POST "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/generate_all"
+```
+
+This starts background generation for all remaining schedules.
+
+## Cleanup
+
+```bash
+curl -X DELETE "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/delete"
+```
+
+Sessions are stored in-memory and are not shared across processes. Restarting the server clears active sessions.
+
+## Request/response schema
+
+The `POST /submit` request body matches `CombinedConfig` (same as CLI and Python API). The full endpoint contract is available under **REST API reference** in the sidebar.
