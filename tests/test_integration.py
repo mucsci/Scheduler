@@ -1,5 +1,6 @@
 """Integration tests: scheduler, CLI, and HTTP API."""
 
+import asyncio
 import itertools
 import json
 import subprocess
@@ -9,13 +10,24 @@ from pathlib import Path
 
 import pytest
 from _pytest.outcomes import Skipped
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from scheduler import CombinedConfig, Scheduler, load_config_from_file
+from scheduler import server as server_module
 from scheduler.config import CourseConfig
 from scheduler.models import CourseInstance
 from scheduler.scheduler import get_faculty_availability
-from scheduler.server import app, cleanup_session
+from scheduler.server import (
+    ApiLimits,
+    ScheduleResponse,
+    app,
+    cleanup_expired_sessions,
+    cleanup_session,
+    generate_all_schedules,
+    get_next_schedule,
+    submit_schedule,
+)
 
 
 def _course_key_from_instance(ci: CourseInstance) -> str:
@@ -96,6 +108,42 @@ def test_unsatisfiable_config_yields_no_models(unsatisfiable_combined_config: Co
     assert next(sched.get_models(), None) is None
 
 
+def test_unassigned_faculty_minimum_credits_makes_schedule_unsatisfiable(
+    minimal_config_path: Path,
+) -> None:
+    data = json.loads(minimal_config_path.read_text(encoding="utf-8"))
+    data["config"]["faculty"].append(
+        {
+            "name": "F2",
+            "maximum_credits": 4,
+            "minimum_credits": 4,
+            "unique_course_limit": 1,
+            "times": {"MON": ["08:00-20:00"]},
+        }
+    )
+    config = CombinedConfig(**data)
+    assert next(Scheduler(config).get_models(), None) is None
+
+
+def test_no_lab_schedule_uses_internal_no_lab_value(minimal_config_path: Path) -> None:
+    data = json.loads(minimal_config_path.read_text(encoding="utf-8"))
+    data["config"]["labs"] = []
+    data["config"]["courses"][0]["lab"] = []
+    data["time_slot_config"]["classes"][0]["meetings"][0]["lab"] = False
+    config = CombinedConfig(**data)
+    schedule = next(Scheduler(config).get_models())
+    assert schedule[0].lab is None
+    assert schedule[0].lab_index is None
+
+
+def test_z3_symbol_generation_accepts_colliding_display_names(minimal_config_path: Path) -> None:
+    data = json.loads(minimal_config_path.read_text(encoding="utf-8"))
+    data["config"]["rooms"] = ["A B", "A_B"]
+    data["config"]["courses"][0]["room"] = ["A B"]
+    config = CombinedConfig(**data)
+    assert next(Scheduler(config).get_models()) is not None
+
+
 @pytest.mark.slow
 def test_example_json_produces_schedules(example_json_path: Path) -> None:
     if not example_json_path.is_file():
@@ -171,3 +219,102 @@ def test_server_submit_invalid_body(client: TestClient) -> None:
 def test_server_cleanup_unknown_session_no_crash(client: TestClient) -> None:
     r = client.post("/schedules/00000000-0000-0000-0000-000000000000/cleanup")
     assert r.status_code == 200
+
+
+def test_server_serializes_concurrent_next_requests(minimal_combined_config: CombinedConfig) -> None:
+    config = minimal_combined_config.model_copy(update={"limit": 2})
+
+    async def generate_two() -> list[object]:
+        submitted = await submit_schedule(config)
+        try:
+            return await asyncio.gather(
+                get_next_schedule(submitted.schedule_id),
+                get_next_schedule(submitted.schedule_id),
+                return_exceptions=True,
+            )
+        finally:
+            cleanup_session(submitted.schedule_id)
+
+    results = asyncio.run(generate_two())
+    assert not any(isinstance(result, HTTPException) and result.status_code == 500 for result in results)
+    successful = [result for result in results if isinstance(result, ScheduleResponse)]
+    assert {result.index for result in successful} == set(range(len(successful)))
+
+
+def test_server_rejects_competing_background_generation(minimal_combined_config: CombinedConfig) -> None:
+    config = minimal_combined_config.model_copy(update={"limit": 2})
+
+    async def start_twice() -> None:
+        submitted = await submit_schedule(config)
+        try:
+            await generate_all_schedules(submitted.schedule_id)
+            with pytest.raises(HTTPException) as error:
+                await generate_all_schedules(submitted.schedule_id)
+            assert error.value.status_code == 409
+        finally:
+            cleanup_session(submitted.schedule_id)
+
+    asyncio.run(start_twice())
+
+
+def test_server_enforces_submission_limits(
+    minimal_combined_config: CombinedConfig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def submit_with(limits: ApiLimits, config: CombinedConfig) -> HTTPException:
+        monkeypatch.setattr(server_module, "API_LIMITS", limits)
+        with pytest.raises(HTTPException) as error:
+            await submit_schedule(config)
+        return error.value
+
+    too_many_courses = minimal_combined_config.model_copy(deep=True)
+    duplicate = too_many_courses.config.courses[0].model_copy(update={"course_id": "CS102"})
+    too_many_courses.config.courses.append(duplicate)
+    error = asyncio.run(
+        submit_with(
+            ApiLimits(max_courses=1),
+            too_many_courses,
+        )
+    )
+    assert error.status_code == 422
+
+    error = asyncio.run(
+        submit_with(
+            ApiLimits(max_schedules_per_session=1),
+            minimal_combined_config.model_copy(update={"limit": 2}),
+        )
+    )
+    assert error.status_code == 422
+
+    error = asyncio.run(submit_with(ApiLimits(max_candidate_slots=1), minimal_combined_config))
+    assert error.status_code == 422
+
+
+def test_server_enforces_active_session_limit(
+    minimal_combined_config: CombinedConfig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def submit_twice() -> HTTPException:
+        monkeypatch.setattr(server_module, "API_LIMITS", ApiLimits(max_active_sessions=1))
+        first = await submit_schedule(minimal_combined_config)
+        try:
+            with pytest.raises(HTTPException) as error:
+                await submit_schedule(minimal_combined_config)
+            return error.value
+        finally:
+            cleanup_session(first.schedule_id)
+
+    assert asyncio.run(submit_twice()).status_code == 429
+
+
+def test_server_expires_idle_sessions(minimal_combined_config: CombinedConfig, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def create_and_expire() -> str:
+        monkeypatch.setattr(server_module, "API_LIMITS", ApiLimits(session_ttl_seconds=1))
+        submitted = await submit_schedule(minimal_combined_config)
+        session = server_module.schedule_sessions[submitted.schedule_id]
+        assert session.scheduler_future is not None
+        session.scheduler = await asyncio.wrap_future(session.scheduler_future)
+        session.last_accessed_at -= 2
+        cleanup_expired_sessions()
+        return submitted.schedule_id
+
+    schedule_id = asyncio.run(create_and_expire())
+    assert schedule_id not in server_module.schedule_sessions

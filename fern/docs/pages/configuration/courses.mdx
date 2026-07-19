@@ -32,6 +32,7 @@ Each object in **`config.courses`** describes one course section family the solv
 ## Validation rules
 
 - Room, lab, and faculty names must exist in the corresponding global lists.
+- Every course credit value needs at least one enabled class pattern. A course with labs needs a pattern with one lab meeting; a course without labs needs a pattern with none.
 - Every `conflicts` entry must be a valid `course_id` of another course (not yourself).
 - A course cannot list itself in `conflicts`.
 

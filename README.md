@@ -113,6 +113,7 @@ The REST API is convenient for local use and trusted integrations. For productio
 
 - **No built-in authentication** — use a reverse proxy, API gateway, or private network; do not expose the process directly without controls you trust.
 - **In-memory sessions** — active schedule sessions are lost on restart and are not shared across multiple server processes.
+- **Resource limits** — the server caps active sessions, courses, requested schedules, candidate slots, solve time, and idle-session age. Tune the `SCHEDULER_API_*` environment variables documented in the REST quickstart for your deployment.
 - **CORS** — set the `CORS_ORIGINS` environment variable to a comma-separated list of allowed origins when browsers must send credentials. If unset, the server allows all origins without credentials (typical for local development).
 
 See [SECURITY.md](SECURITY.md) for how to report vulnerabilities.

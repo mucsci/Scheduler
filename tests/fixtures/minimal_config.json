@@ -40,7 +40,7 @@
       {
         "credits": 4,
         "meetings": [
-          { "day": "MON", "duration": 110, "lab": false },
+          { "day": "MON", "duration": 110, "lab": true },
           { "day": "WED", "duration": 110, "lab": false }
         ]
       }
