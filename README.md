@@ -146,23 +146,25 @@ The `/submit` request body matches `CombinedConfig` (same JSON as the CLI and Py
 
 ### Local Fern preview
 
-With [Node.js](https://nodejs.org/) and dev dependencies installed:
+With [Node.js 22](https://nodejs.org/), Docker, and the Python development dependencies installed:
 
 ```console
-npm install -g fern-api
+npm install -g fern-api@5.75.4
 uv run python scripts/export_openapi.py
 uv run python scripts/export_config_schema.py
-uv run python scripts/gen_python_api_mdx.py
+fern docs md generate --local --library scheduler-python
+fern check --warnings
 fern docs dev
 ```
 
-Generated artifacts used by Fern:
+Tracked generated artifacts used by Fern:
 
 - `fern/openapi.json` (from FastAPI routes/models)
 - `fern/docs/assets/combined-config.schema.json` (from `CombinedConfig`)
-- `fern/docs/pages/python/reference.mdx` (from public docstrings)
 
-Regenerate these with the scripts above after API/config/docstring changes.
+The Python library reference is generated from `src/scheduler` into the ignored
+`fern/static/python-reference/` directory. Regenerate it with the Fern command above after public API or
+docstring changes. CI performs the same generation before validating or publishing the site.
 
 ### Configuration quick link
 

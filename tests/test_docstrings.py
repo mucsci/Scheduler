@@ -23,9 +23,13 @@ def _public_callables(tree: ast.Module):
 def _documented_inline(class_node: ast.ClassDef, index: int, field: ast.AnnAssign) -> bool:
     if index + 1 < len(class_node.body):
         following = class_node.body[index + 1]
-        if isinstance(following, ast.Expr) and isinstance(following.value, ast.Constant):
-            if isinstance(following.value.value, str) and following.value.value.strip():
-                return True
+        if (
+            isinstance(following, ast.Expr)
+            and isinstance(following.value, ast.Constant)
+            and isinstance(following.value.value, str)
+            and following.value.value.strip()
+        ):
+            return True
     if isinstance(field.value, ast.Call):
         return any(
             keyword.arg == "description"

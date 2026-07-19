@@ -152,8 +152,7 @@ docs/
 
 scripts/
 ├── export_openapi.py       # Refresh fern/openapi.json
-├── export_config_schema.py # Refresh JSON Schema asset
-└── gen_python_api_mdx.py   # Refresh Python API reference from docstrings
+└── export_config_schema.py # Refresh JSON Schema asset
 ```
 
 ## Development Workflow
@@ -316,15 +315,18 @@ if not faculty_available:
 - Include request/response examples
 - Document error codes and messages
 - Regenerate **`fern/openapi.json`** with `uv run python scripts/export_openapi.py` when `server.py` or shared models change
-- Regenerate **`fern/docs/pages/python/reference.mdx`** with `uv run python scripts/gen_python_api_mdx.py` when public docstrings change
+- Regenerate the ignored Python library reference with `fern docs md generate --local --library scheduler-python`
+  when public APIs or docstrings change
 
 ### User Documentation
 
 - Update **Fern** pages under **`fern/docs/pages/`** (configuration, welcome, development)
 - Update README.md for new features
 - Regenerate **`fern/docs/assets/combined-config.schema.json`** with `uv run python scripts/export_config_schema.py` when `CombinedConfig` changes
-- Keep generated Fern artifacts committed when they are used by docs publishing (`fern/openapi.json`, `fern/docs/assets/combined-config.schema.json`, `fern/docs/pages/python/reference.mdx`)
-- Preview locally: `npm install -g fern-api` then `fern docs dev` (after the generate scripts above)
+- Keep tracked Fern artifacts committed when they are used by docs publishing (`fern/openapi.json` and
+  `fern/docs/assets/combined-config.schema.json`)
+- Use Node.js 22 and Docker for Fern library generation; install `fern-api@5.75.4`, generate the Python
+  reference, run `fern check --warnings`, then start `fern docs dev`
 
 ## Submitting Changes
 

@@ -46,7 +46,6 @@ dev = [
   "pytest>=8,<10",
   "twine~=6.2",
   "ty~=0.0",
-  "pydoc-markdown~=4.8",
 ]
 
 [tool.uv]
