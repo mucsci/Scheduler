@@ -6,6 +6,47 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/validate": {
+      "post": {
+        "summary": "Validate Schedule Configuration",
+        "description": "Validate raw configuration JSON and return structured, non-throwing diagnostics.",
+        "operationId": "validate_schedule_configuration_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object",
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigurationValidationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/submit": {
       "post": {
         "summary": "Submit Schedule",
@@ -68,6 +109,95 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ScheduleDetailsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedules/{schedule_id}/diagnosis": {
+      "get": {
+        "summary": "Get Schedule Diagnosis",
+        "description": "Check hard-constraint feasibility and report the business rules in an unsat core.",
+        "operationId": "get_schedule_diagnosis_schedules__schedule_id__diagnosis_get",
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Schedule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleDiagnosisResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedules/{schedule_id}/audit/{index}": {
+      "get": {
+        "summary": "Get Schedule Audit",
+        "description": "Audit a generated schedule's hard rules, resources, and enabled objectives.",
+        "operationId": "get_schedule_audit_schedules__schedule_id__audit__index__get",
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Schedule Id"
+            }
+          },
+          {
+            "name": "index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Index"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleAuditResponse"
                 }
               }
             }
@@ -188,6 +318,46 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ScheduleCountResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedules/{schedule_id}/status": {
+      "get": {
+        "summary": "Get Schedule Status",
+        "description": "Report generation state, configured safeguards, and any completion/failure reason.",
+        "operationId": "get_schedule_status_schedules__schedule_id__status_get",
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Schedule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDiagnosticResponse"
                 }
               }
             }
@@ -356,58 +526,137 @@
   },
   "components": {
     "schemas": {
-      "ClassPattern-Input": {
+      "CandidateDomainDiagnosticResponse": {
         "properties": {
-          "credits": {
-            "type": "integer",
-            "exclusiveMinimum": 0.0,
-            "title": "Credits",
-            "description": "Number of credit hours",
-            "example": 3
+          "course": {
+            "type": "string",
+            "title": "Course"
           },
-          "meetings": {
+          "locations": {
             "items": {
-              "$ref": "#/components/schemas/Meeting"
+              "type": "string"
             },
             "type": "array",
-            "title": "Meetings",
-            "description": "List of meeting times",
-            "example": [
-              {
-                "day": "MON",
-                "duration": 150,
-                "lab": false
-              }
-            ]
+            "title": "Locations"
           },
-          "disabled": {
+          "faculty_candidates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Faculty Candidates"
+          },
+          "faculty_origin": {
+            "type": "string",
+            "title": "Faculty Origin"
+          },
+          "room_candidates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Room Candidates"
+          },
+          "lab_candidates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Lab Candidates"
+          },
+          "compatible_time_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Compatible Time Patterns"
+          },
+          "availability_by_faculty": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Availability By Faculty"
+          },
+          "rejected_patterns": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Rejected Patterns"
+          },
+          "rejected_pattern_count": {
+            "type": "integer",
+            "title": "Rejected Pattern Count"
+          },
+          "rejected_patterns_truncated": {
             "type": "boolean",
-            "title": "Disabled",
-            "description": "Whether the pattern is disabled",
-            "default": false
-          },
-          "start_time": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TimeString"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Specific start time constraint"
+            "title": "Rejected Patterns Truncated"
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
-          "credits",
-          "meetings"
+          "course",
+          "locations",
+          "faculty_candidates",
+          "faculty_origin",
+          "room_candidates",
+          "lab_candidates",
+          "compatible_time_patterns",
+          "availability_by_faculty",
+          "rejected_patterns",
+          "rejected_pattern_count",
+          "rejected_patterns_truncated"
         ],
-        "title": "ClassPattern",
-        "description": "Represents a class pattern.\n\n**Usage:**\n```python\nClassPattern(credits=3, meetings=[...])\n```"
+        "title": "CandidateDomainDiagnosticResponse",
+        "description": "Static candidate domain and eliminations for one course."
       },
-      "ClassPattern-Output": {
+      "CapacityDiagnosticResponse": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "subjects": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subjects"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "required": {
+            "type": "integer",
+            "title": "Required"
+          },
+          "available": {
+            "type": "integer",
+            "title": "Available"
+          },
+          "locations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Locations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "subjects",
+          "message",
+          "required",
+          "available",
+          "locations"
+        ],
+        "title": "CapacityDiagnosticResponse",
+        "description": "A necessary-condition capacity calculation."
+      },
+      "ClassPattern": {
         "properties": {
           "credits": {
             "type": "integer",
@@ -603,6 +852,127 @@
         "title": "CombinedConfig",
         "description": "Represents a combined configuration.\n\n**Usage:**\n```python\nCombinedConfig(config=..., time_slot_config=..., limit=10)\n```"
       },
+      "ConfigurationDiagnosticResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "related_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Related Paths"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "path",
+          "message",
+          "related_paths"
+        ],
+        "title": "ConfigurationDiagnosticResponse"
+      },
+      "ConfigurationValidationResponse": {
+        "properties": {
+          "is_valid": {
+            "type": "boolean",
+            "title": "Is Valid"
+          },
+          "diagnostics": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigurationDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Diagnostics"
+          },
+          "configuration_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configuration Fingerprint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "is_valid",
+          "diagnostics"
+        ],
+        "title": "ConfigurationValidationResponse",
+        "description": "Structured schema and cross-reference validation result for raw JSON input."
+      },
+      "ConstraintDiagnosticResponse": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "subjects": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subjects"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "locations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Locations",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "subjects",
+          "message"
+        ],
+        "title": "ConstraintDiagnosticResponse",
+        "description": "One user-facing rule participating in an unsatisfiable core."
+      },
       "Course": {
         "type": "string",
         "description": "Course name",
@@ -654,13 +1024,19 @@
             "description": "List of course IDs that cannot be scheduled simultaneously"
           },
           "faculty": {
-            "items": {
-              "$ref": "#/components/schemas/Faculty"
-            },
-            "type": "array",
-            "minItems": 1,
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Faculty"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Faculty",
-            "description": "List of faculty names",
+            "description": "Faculty candidates, or null to derive candidates from faculty course preferences",
             "example": [
               "Dr. Smith"
             ]
@@ -723,13 +1099,19 @@
             "description": "List of course IDs that cannot be scheduled simultaneously"
           },
           "faculty": {
-            "items": {
-              "$ref": "#/components/schemas/Faculty"
-            },
-            "type": "array",
-            "minItems": 1,
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Faculty"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Faculty",
-            "description": "List of faculty names",
+            "description": "Faculty candidates, or null to derive candidates from faculty course preferences",
             "example": [
               "Dr. Smith"
             ]
@@ -823,6 +1205,63 @@
         ],
         "description": "Day of the week",
         "example": "MON"
+      },
+      "DayFeasibilityDiagnosticResponse": {
+        "properties": {
+          "faculty": {
+            "type": "string",
+            "title": "Faculty"
+          },
+          "day": {
+            "type": "string",
+            "title": "Day"
+          },
+          "availability_windows": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Availability Windows"
+          },
+          "eligible_courses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Eligible Courses"
+          },
+          "compatible_pattern_count": {
+            "type": "integer",
+            "title": "Compatible Pattern Count"
+          },
+          "available_pattern_count": {
+            "type": "integer",
+            "title": "Available Pattern Count"
+          },
+          "is_mandatory": {
+            "type": "boolean",
+            "title": "Is Mandatory"
+          },
+          "locations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Locations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "faculty",
+          "day",
+          "availability_windows",
+          "eligible_courses",
+          "compatible_pattern_count",
+          "available_pattern_count",
+          "is_mandatory",
+          "locations"
+        ],
+        "title": "DayFeasibilityDiagnosticResponse"
       },
       "Faculty": {
         "type": "string",
@@ -1081,6 +1520,70 @@
         "title": "FacultyConfig",
         "description": "Represents a faculty configuration.\n\n**Usage:**\n```python\nFacultyConfig(name=\"Dr. Smith\", maximum_credits=12, minimum_credits=3, ...)\n```"
       },
+      "FacultyWorkloadDiagnosticResponse": {
+        "properties": {
+          "faculty": {
+            "type": "string",
+            "title": "Faculty"
+          },
+          "credits": {
+            "type": "integer",
+            "title": "Credits"
+          },
+          "minimum_credits": {
+            "type": "integer",
+            "title": "Minimum Credits"
+          },
+          "maximum_credits": {
+            "type": "integer",
+            "title": "Maximum Credits"
+          },
+          "teaching_days": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Teaching Days"
+          },
+          "maximum_days": {
+            "type": "integer",
+            "title": "Maximum Days"
+          },
+          "distinct_courses": {
+            "type": "integer",
+            "title": "Distinct Courses"
+          },
+          "unique_course_limit": {
+            "type": "integer",
+            "title": "Unique Course Limit"
+          },
+          "mandatory_days_satisfied": {
+            "type": "boolean",
+            "title": "Mandatory Days Satisfied"
+          },
+          "locations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Locations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "faculty",
+          "credits",
+          "minimum_credits",
+          "maximum_credits",
+          "teaching_days",
+          "maximum_days",
+          "distinct_courses",
+          "unique_course_limit",
+          "mandatory_days_satisfied",
+          "locations"
+        ],
+        "title": "FacultyWorkloadDiagnosticResponse"
+      },
       "GenerateAllResponse": {
         "properties": {
           "message": {
@@ -1195,6 +1698,34 @@
         "title": "MessageResponse",
         "description": "Generic message response model.\n\n**Usage:**\n```python\nMessageResponse(message=\"ok\")\n```\n\n**Fields:**\n- message: Response message text"
       },
+      "ObjectiveScoreDiagnosticResponse": {
+        "properties": {
+          "objective": {
+            "type": "string",
+            "title": "Objective"
+          },
+          "score": {
+            "type": "integer",
+            "title": "Score"
+          },
+          "independent_upper_bound": {
+            "type": "integer",
+            "title": "Independent Upper Bound"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "objective",
+          "score",
+          "independent_upper_bound",
+          "message"
+        ],
+        "title": "ObjectiveScoreDiagnosticResponse"
+      },
       "OptimizerFlags": {
         "type": "string",
         "enum": [
@@ -1215,10 +1746,198 @@
         "description": "Preference score between 0 and 10",
         "example": 5
       },
+      "ProvenanceEdgeResponse": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "relationship": {
+            "type": "string",
+            "title": "Relationship"
+          },
+          "subjects": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subjects"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "target",
+          "relationship",
+          "subjects"
+        ],
+        "title": "ProvenanceEdgeResponse"
+      },
+      "RelaxationSuggestionResponse": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "subjects": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subjects"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "subjects",
+          "message",
+          "priority"
+        ],
+        "title": "RelaxationSuggestionResponse",
+        "description": "One safe, directly-derived change that may restore feasibility."
+      },
+      "RepairSetDiagnosticResponse": {
+        "properties": {
+          "relaxed_constraints": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Relaxed Constraints"
+          },
+          "verified": {
+            "type": "boolean",
+            "title": "Verified"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "relaxed_constraints",
+          "verified",
+          "message"
+        ],
+        "title": "RepairSetDiagnosticResponse",
+        "description": "A solver-verified set of hard-rule relaxations that restores feasibility."
+      },
+      "ResourceUsageDiagnosticResponse": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "resource": {
+            "type": "string",
+            "title": "Resource"
+          },
+          "assignments": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Assignments"
+          },
+          "collisions": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Collisions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "resource",
+          "assignments",
+          "collisions"
+        ],
+        "title": "ResourceUsageDiagnosticResponse"
+      },
       "Room": {
         "type": "string",
         "description": "Room name",
         "example": "Room 101"
+      },
+      "ScheduleAuditResponse": {
+        "properties": {
+          "schedule_id": {
+            "type": "string",
+            "title": "Schedule Id"
+          },
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "is_valid": {
+            "type": "boolean",
+            "title": "Is Valid"
+          },
+          "constraint_violations": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Constraint Violations"
+          },
+          "faculty_workloads": {
+            "items": {
+              "$ref": "#/components/schemas/FacultyWorkloadDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Faculty Workloads"
+          },
+          "resource_usage": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceUsageDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Resource Usage"
+          },
+          "objective_scores": {
+            "items": {
+              "$ref": "#/components/schemas/ObjectiveScoreDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Objective Scores"
+          },
+          "preference_outcomes": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Preference Outcomes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "schedule_id",
+          "index",
+          "is_valid",
+          "constraint_violations",
+          "faculty_workloads",
+          "resource_usage",
+          "objective_scores",
+          "preference_outcomes"
+        ],
+        "title": "ScheduleAuditResponse",
+        "description": "Independent verification and objective explanation for one generated schedule."
       },
       "ScheduleCountResponse": {
         "properties": {
@@ -1403,6 +2122,195 @@
         ],
         "title": "ScheduleDetailsResponse",
         "description": "Response model for schedule details requests.\n\nInherits all fields from CombinedConfig and adds:\n\n**Usage:**\n```python\nScheduleDetailsResponse(schedule_id='...', total_generated=0, **combined.model_dump())\n```\n\n**Fields:**\n- schedule_id: Unique identifier for the schedule session\n- total_generated: Total number of schedules generated"
+      },
+      "ScheduleDiagnosisResponse": {
+        "properties": {
+          "schedule_id": {
+            "type": "string",
+            "title": "Schedule Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "conflicting_constraints": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Conflicting Constraints"
+          },
+          "alternative_conflict_sets": {
+            "items": {
+              "items": {
+                "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Alternative Conflict Sets"
+          },
+          "supporting_facts": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Supporting Facts"
+          },
+          "relaxation_suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/RelaxationSuggestionResponse"
+            },
+            "type": "array",
+            "title": "Relaxation Suggestions"
+          },
+          "repair_sets": {
+            "items": {
+              "$ref": "#/components/schemas/RepairSetDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Repair Sets"
+          },
+          "candidate_domains": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateDomainDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Candidate Domains"
+          },
+          "capacity_analysis": {
+            "items": {
+              "$ref": "#/components/schemas/CapacityDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Capacity Analysis"
+          },
+          "day_feasibility": {
+            "items": {
+              "$ref": "#/components/schemas/DayFeasibilityDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Day Feasibility"
+          },
+          "preflight_findings": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Preflight Findings"
+          },
+          "provenance": {
+            "items": {
+              "$ref": "#/components/schemas/ProvenanceEdgeResponse"
+            },
+            "type": "array",
+            "title": "Provenance"
+          },
+          "configuration_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configuration Fingerprint"
+          },
+          "core_is_minimal": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Core Is Minimal"
+          },
+          "alternative_cores_complete": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alternative Cores Complete"
+          },
+          "repair_sets_complete": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repair Sets Complete"
+          },
+          "diagnostic_completeness": {
+            "type": "string",
+            "title": "Diagnostic Completeness"
+          },
+          "diagnostic_version": {
+            "type": "string",
+            "title": "Diagnostic Version"
+          },
+          "elapsed_ms": {
+            "type": "integer",
+            "title": "Elapsed Ms"
+          },
+          "solver_timeout_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Solver Timeout Ms"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "schedule_id",
+          "status",
+          "conflicting_constraints",
+          "alternative_conflict_sets",
+          "supporting_facts",
+          "relaxation_suggestions",
+          "repair_sets",
+          "candidate_domains",
+          "capacity_analysis",
+          "day_feasibility",
+          "preflight_findings",
+          "provenance",
+          "configuration_fingerprint",
+          "core_is_minimal",
+          "alternative_cores_complete",
+          "repair_sets_complete",
+          "diagnostic_completeness",
+          "diagnostic_version",
+          "elapsed_ms",
+          "solver_timeout_ms",
+          "reason"
+        ],
+        "title": "ScheduleDiagnosisResponse",
+        "description": "Hard-constraint feasibility result for a schedule session."
       },
       "ScheduleResponse": {
         "properties": {
@@ -1636,6 +2544,104 @@
         "title": "SchedulerConfig",
         "description": "Represents a scheduler configuration.\n\n**Usage:**\n```python\nSchedulerConfig(rooms=[...], labs=[...], courses=[...], faculty=[...])\n```"
       },
+      "SessionDiagnosticResponse": {
+        "properties": {
+          "schedule_id": {
+            "type": "string",
+            "title": "Schedule Id"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "background_state": {
+            "type": "string",
+            "title": "Background State"
+          },
+          "background_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Background Error"
+          },
+          "completion_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Reason"
+          },
+          "generated_schedules": {
+            "type": "integer",
+            "title": "Generated Schedules"
+          },
+          "requested_schedule_limit": {
+            "type": "integer",
+            "title": "Requested Schedule Limit"
+          },
+          "enumeration_scope": {
+            "type": "string",
+            "title": "Enumeration Scope"
+          },
+          "known_distinct_schedules": {
+            "type": "integer",
+            "title": "Known Distinct Schedules"
+          },
+          "idle_seconds": {
+            "type": "integer",
+            "title": "Idle Seconds"
+          },
+          "session_ttl_seconds": {
+            "type": "integer",
+            "title": "Session Ttl Seconds"
+          },
+          "solver_timeout_ms": {
+            "type": "integer",
+            "title": "Solver Timeout Ms"
+          },
+          "max_courses": {
+            "type": "integer",
+            "title": "Max Courses"
+          },
+          "max_candidate_slots": {
+            "type": "integer",
+            "title": "Max Candidate Slots"
+          },
+          "max_schedules_per_session": {
+            "type": "integer",
+            "title": "Max Schedules Per Session"
+          }
+        },
+        "type": "object",
+        "required": [
+          "schedule_id",
+          "state",
+          "background_state",
+          "background_error",
+          "completion_reason",
+          "generated_schedules",
+          "requested_schedule_limit",
+          "enumeration_scope",
+          "known_distinct_schedules",
+          "idle_seconds",
+          "session_ttl_seconds",
+          "solver_timeout_ms",
+          "max_courses",
+          "max_candidate_slots",
+          "max_schedules_per_session"
+        ],
+        "title": "SessionDiagnosticResponse",
+        "description": "Operational state, configured safeguards, and completion reason for a session."
+      },
       "SubmitResponse": {
         "properties": {
           "schedule_id": {
@@ -1803,7 +2809,7 @@
           },
           "classes": {
             "items": {
-              "$ref": "#/components/schemas/ClassPattern-Input"
+              "$ref": "#/components/schemas/ClassPattern"
             },
             "type": "array",
             "title": "Classes",
@@ -1854,7 +2860,7 @@
           },
           "classes": {
             "items": {
-              "$ref": "#/components/schemas/ClassPattern-Output"
+              "$ref": "#/components/schemas/ClassPattern"
             },
             "type": "array",
             "title": "Classes",

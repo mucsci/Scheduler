@@ -102,7 +102,11 @@ curl -X POST "http://localhost:8000/schedules/f9f2.../next"
 curl -X GET "http://localhost:8000/schedules/f9f2.../count"
 
 # Optional endpoints
+curl -X POST "http://localhost:8000/validate" -H "Content-Type: application/json" -d @example.json
 curl -X GET "http://localhost:8000/schedules/f9f2.../details"
+curl -X GET "http://localhost:8000/schedules/f9f2.../diagnosis"
+curl -X GET "http://localhost:8000/schedules/f9f2.../audit/0"
+curl -X GET "http://localhost:8000/schedules/f9f2.../status"
 curl -X GET "http://localhost:8000/schedules/f9f2.../index/0"
 curl -X DELETE "http://localhost:8000/schedules/f9f2.../delete"
 ```

@@ -69,6 +69,9 @@ Rough expectations (hardware-dependent):
 - Check faculty availability vs. generated time grid.
 - Check room/lab lists vs. course requirements.
 - Ensure `conflicts` do not make the instance unsatisfiable.
+- Use `POST /validate` for structured schema and cross-reference errors before submitting.
+- Use `GET /schedules/{id}/diagnosis` for feasible candidate domains, capacity shortfalls, unsat cores, provenance, and verified rule-level repair sets.
+- After generation, use `GET /schedules/{id}/audit/{index}` to inspect workloads, resource use, and enabled-objective scores.
 
 ## Debug logging
 

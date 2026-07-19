@@ -15,7 +15,20 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .config import CombinedConfig
 from .logging import configure_logging, logger
-from .scheduler import CourseInstance, Scheduler
+from .scheduler import (
+    CandidateDomainDiagnostic,
+    CapacityDiagnostic,
+    ConfigurationDiagnostic,
+    ConstraintDiagnostic,
+    CourseInstance,
+    DayFeasibilityDiagnostic,
+    ProvenanceEdge,
+    RepairSetDiagnostic,
+    ScheduleAudit,
+    ScheduleDiagnosis,
+    Scheduler,
+    validate_combined_config_data,
+)
 
 # Global thread pool executor for Z3 operations
 z3_executor: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=16, thread_name_prefix="z3-solver")
@@ -226,6 +239,300 @@ class ScheduleCountResponse(BaseModel):
     is_complete: bool
 
 
+class SessionDiagnosticResponse(BaseModel):
+    """Operational state, configured safeguards, and completion reason for a session."""
+
+    schedule_id: str
+    state: str
+    background_state: str
+    background_error: str | None
+    completion_reason: str | None
+    generated_schedules: int
+    requested_schedule_limit: int
+    enumeration_scope: str
+    known_distinct_schedules: int
+    idle_seconds: int
+    session_ttl_seconds: int
+    solver_timeout_ms: int
+    max_courses: int
+    max_candidate_slots: int
+    max_schedules_per_session: int
+
+
+class ScheduleDiagnosisResponse(BaseModel):
+    """Hard-constraint feasibility result for a schedule session."""
+
+    schedule_id: str
+    status: str
+    conflicting_constraints: list["ConstraintDiagnosticResponse"]
+    alternative_conflict_sets: list[list["ConstraintDiagnosticResponse"]]
+    supporting_facts: list["ConstraintDiagnosticResponse"]
+    relaxation_suggestions: list["RelaxationSuggestionResponse"]
+    repair_sets: list["RepairSetDiagnosticResponse"]
+    candidate_domains: list["CandidateDomainDiagnosticResponse"]
+    capacity_analysis: list["CapacityDiagnosticResponse"]
+    day_feasibility: list["DayFeasibilityDiagnosticResponse"]
+    preflight_findings: list["ConstraintDiagnosticResponse"]
+    provenance: list["ProvenanceEdgeResponse"]
+    configuration_fingerprint: str | None
+    core_is_minimal: bool | None
+    alternative_cores_complete: bool | None
+    repair_sets_complete: bool | None
+    diagnostic_completeness: str
+    diagnostic_version: str
+    elapsed_ms: int
+    solver_timeout_ms: int | None
+    reason: str | None
+
+
+class ConstraintDiagnosticResponse(BaseModel):
+    """One user-facing rule participating in an unsatisfiable core."""
+
+    kind: str
+    subjects: list[str]
+    message: str
+    code: str | None = None
+    locations: list[str] = []
+
+
+class CandidateDomainDiagnosticResponse(BaseModel):
+    """Static candidate domain and eliminations for one course."""
+
+    course: str
+    locations: list[str]
+    faculty_candidates: list[str]
+    faculty_origin: str
+    room_candidates: list[str]
+    lab_candidates: list[str]
+    compatible_time_patterns: list[str]
+    availability_by_faculty: list[ConstraintDiagnosticResponse]
+    rejected_patterns: list[ConstraintDiagnosticResponse]
+    rejected_pattern_count: int
+    rejected_patterns_truncated: bool
+
+
+class ProvenanceEdgeResponse(BaseModel):
+    source: str
+    target: str
+    relationship: str
+    subjects: list[str]
+
+
+class CapacityDiagnosticResponse(BaseModel):
+    """A necessary-condition capacity calculation."""
+
+    kind: str
+    subjects: list[str]
+    message: str
+    required: int
+    available: int
+    locations: list[str]
+
+
+class DayFeasibilityDiagnosticResponse(BaseModel):
+    faculty: str
+    day: str
+    availability_windows: list[str]
+    eligible_courses: list[str]
+    compatible_pattern_count: int
+    available_pattern_count: int
+    is_mandatory: bool
+    locations: list[str]
+
+
+class RepairSetDiagnosticResponse(BaseModel):
+    """A solver-verified set of hard-rule relaxations that restores feasibility."""
+
+    relaxed_constraints: list[ConstraintDiagnosticResponse]
+    verified: bool
+    message: str
+
+
+class FacultyWorkloadDiagnosticResponse(BaseModel):
+    faculty: str
+    credits: int
+    minimum_credits: int
+    maximum_credits: int
+    teaching_days: list[str]
+    maximum_days: int
+    distinct_courses: int
+    unique_course_limit: int
+    mandatory_days_satisfied: bool
+    locations: list[str]
+
+
+class ResourceUsageDiagnosticResponse(BaseModel):
+    kind: str
+    resource: str
+    assignments: list[str]
+    collisions: list[ConstraintDiagnosticResponse]
+
+
+class ObjectiveScoreDiagnosticResponse(BaseModel):
+    objective: str
+    score: int
+    independent_upper_bound: int
+    message: str
+
+
+class ScheduleAuditResponse(BaseModel):
+    """Independent verification and objective explanation for one generated schedule."""
+
+    schedule_id: str
+    index: int
+    is_valid: bool
+    constraint_violations: list[ConstraintDiagnosticResponse]
+    faculty_workloads: list[FacultyWorkloadDiagnosticResponse]
+    resource_usage: list[ResourceUsageDiagnosticResponse]
+    objective_scores: list[ObjectiveScoreDiagnosticResponse]
+    preference_outcomes: list[ConstraintDiagnosticResponse]
+
+
+class ConfigurationDiagnosticResponse(BaseModel):
+    code: str
+    path: str
+    message: str
+    value: str | None = None
+    related_paths: list[str]
+
+
+class ConfigurationValidationResponse(BaseModel):
+    """Structured schema and cross-reference validation result for raw JSON input."""
+
+    is_valid: bool
+    diagnostics: list[ConfigurationDiagnosticResponse]
+    configuration_fingerprint: str | None = None
+
+
+def _constraint_diagnostic_response(diagnostic: "ConstraintDiagnostic") -> ConstraintDiagnosticResponse:
+    return ConstraintDiagnosticResponse(
+        kind=diagnostic.kind,
+        subjects=list(diagnostic.subjects),
+        message=diagnostic.message,
+        code=diagnostic.code,
+        locations=list(diagnostic.locations),
+    )
+
+
+def _candidate_domain_response(domain: CandidateDomainDiagnostic) -> CandidateDomainDiagnosticResponse:
+    return CandidateDomainDiagnosticResponse(
+        course=domain.course,
+        locations=list(domain.locations),
+        faculty_candidates=list(domain.faculty_candidates),
+        faculty_origin=domain.faculty_origin,
+        room_candidates=list(domain.room_candidates),
+        lab_candidates=list(domain.lab_candidates),
+        compatible_time_patterns=list(domain.compatible_time_patterns),
+        availability_by_faculty=[_constraint_diagnostic_response(item) for item in domain.availability_by_faculty],
+        rejected_patterns=[_constraint_diagnostic_response(item) for item in domain.rejected_patterns],
+        rejected_pattern_count=domain.rejected_pattern_count,
+        rejected_patterns_truncated=domain.rejected_patterns_truncated,
+    )
+
+
+def _provenance_response(edge: ProvenanceEdge) -> ProvenanceEdgeResponse:
+    return ProvenanceEdgeResponse(
+        source=edge.source,
+        target=edge.target,
+        relationship=edge.relationship,
+        subjects=list(edge.subjects),
+    )
+
+
+def _capacity_response(diagnostic: CapacityDiagnostic) -> CapacityDiagnosticResponse:
+    return CapacityDiagnosticResponse(
+        kind=diagnostic.kind,
+        subjects=list(diagnostic.subjects),
+        message=diagnostic.message,
+        required=diagnostic.required,
+        available=diagnostic.available,
+        locations=list(diagnostic.locations),
+    )
+
+
+def _day_feasibility_response(diagnostic: DayFeasibilityDiagnostic) -> DayFeasibilityDiagnosticResponse:
+    return DayFeasibilityDiagnosticResponse(
+        faculty=diagnostic.faculty,
+        day=diagnostic.day,
+        availability_windows=list(diagnostic.availability_windows),
+        eligible_courses=list(diagnostic.eligible_courses),
+        compatible_pattern_count=diagnostic.compatible_pattern_count,
+        available_pattern_count=diagnostic.available_pattern_count,
+        is_mandatory=diagnostic.is_mandatory,
+        locations=list(diagnostic.locations),
+    )
+
+
+def _repair_set_response(repair_set: RepairSetDiagnostic) -> RepairSetDiagnosticResponse:
+    return RepairSetDiagnosticResponse(
+        relaxed_constraints=[_constraint_diagnostic_response(item) for item in repair_set.relaxed_constraints],
+        verified=repair_set.verified,
+        message=repair_set.message,
+    )
+
+
+def _schedule_audit_response(schedule_id: str, index: int, audit: ScheduleAudit) -> ScheduleAuditResponse:
+    return ScheduleAuditResponse(
+        schedule_id=schedule_id,
+        index=index,
+        is_valid=audit.is_valid,
+        constraint_violations=[_constraint_diagnostic_response(item) for item in audit.constraint_violations],
+        faculty_workloads=[
+            FacultyWorkloadDiagnosticResponse(
+                faculty=item.faculty,
+                credits=item.credits,
+                minimum_credits=item.minimum_credits,
+                maximum_credits=item.maximum_credits,
+                teaching_days=list(item.teaching_days),
+                maximum_days=item.maximum_days,
+                distinct_courses=item.distinct_courses,
+                unique_course_limit=item.unique_course_limit,
+                mandatory_days_satisfied=item.mandatory_days_satisfied,
+                locations=list(item.locations),
+            )
+            for item in audit.faculty_workloads
+        ],
+        resource_usage=[
+            ResourceUsageDiagnosticResponse(
+                kind=item.kind,
+                resource=item.resource,
+                assignments=list(item.assignments),
+                collisions=[_constraint_diagnostic_response(collision) for collision in item.collisions],
+            )
+            for item in audit.resource_usage
+        ],
+        objective_scores=[
+            ObjectiveScoreDiagnosticResponse(
+                objective=item.objective,
+                score=item.score,
+                independent_upper_bound=item.independent_upper_bound,
+                message=item.message,
+            )
+            for item in audit.objective_scores
+        ],
+        preference_outcomes=[_constraint_diagnostic_response(item) for item in audit.preference_outcomes],
+    )
+
+
+def _configuration_diagnostic_response(diagnostic: ConfigurationDiagnostic) -> ConfigurationDiagnosticResponse:
+    return ConfigurationDiagnosticResponse(
+        code=diagnostic.code,
+        path=diagnostic.path,
+        message=diagnostic.message,
+        value=diagnostic.value,
+        related_paths=list(diagnostic.related_paths),
+    )
+
+
+class RelaxationSuggestionResponse(BaseModel):
+    """One safe, directly-derived change that may restore feasibility."""
+
+    kind: str
+    subjects: list[str]
+    message: str
+    priority: int
+
+
 class ErrorResponse(BaseModel):
     """
     Error response model for API errors.
@@ -260,11 +567,14 @@ class ScheduleSession:
     generator: Generator[list[CourseInstance], None, None] | None
     full_config: CombinedConfig
     generated_schedules: list[list[CourseInstanceResponse]]
+    generated_models: list[list[CourseInstance]] = field(default_factory=list)
     generation_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     background_task: asyncio.Task[None] | None = None
     created_at: float = field(default_factory=time.monotonic)
     last_accessed_at: float = field(default_factory=time.monotonic)
     is_exhausted: bool = False
+    completion_reason: str | None = None
+    background_error: str | None = None
 
 
 # Global storage for active sessions
@@ -307,6 +617,49 @@ def cleanup_session(schedule_id: str):
 def _session_has_active_work(session: ScheduleSession) -> bool:
     return (session.scheduler_future is not None and not session.scheduler_future.done()) or (
         session.background_task is not None and not session.background_task.done()
+    )
+
+
+def _session_diagnostic_response(schedule_id: str, session: ScheduleSession) -> SessionDiagnosticResponse:
+    """Render live session state without invoking the solver or generator."""
+    if session.scheduler_future is not None and not session.scheduler_future.done():
+        state = "initializing"
+    elif session.background_task is not None and not session.background_task.done():
+        state = "generating"
+    elif session.is_exhausted or len(session.generated_schedules) >= session.full_config.limit:
+        state = "complete"
+    else:
+        state = "ready"
+
+    if session.background_task is None:
+        background_state = "not_started"
+    elif not session.background_task.done():
+        background_state = "running"
+    elif session.background_task.cancelled():
+        background_state = "cancelled"
+    elif session.background_error:
+        background_state = "failed"
+    else:
+        background_state = "completed"
+
+    return SessionDiagnosticResponse(
+        schedule_id=schedule_id,
+        state=state,
+        background_state=background_state,
+        background_error=session.background_error,
+        completion_reason=session.completion_reason,
+        generated_schedules=len(session.generated_schedules),
+        requested_schedule_limit=session.full_config.limit,
+        enumeration_scope=(
+            "exhausted" if session.completion_reason == "solution_space_exhausted" else "bounded_by_requested_limit"
+        ),
+        known_distinct_schedules=len(session.generated_schedules),
+        idle_seconds=round(time.monotonic() - session.last_accessed_at),
+        session_ttl_seconds=API_LIMITS.session_ttl_seconds,
+        solver_timeout_ms=API_LIMITS.solver_timeout_ms,
+        max_courses=API_LIMITS.max_courses,
+        max_candidate_slots=API_LIMITS.max_candidate_slots,
+        max_schedules_per_session=API_LIMITS.max_schedules_per_session,
     )
 
 
@@ -444,6 +797,7 @@ async def _advance_session(schedule_id: str, session: ScheduleSession) -> Schedu
     async with session.generation_lock:
         if len(session.generated_schedules) >= session.full_config.limit:
             session.is_exhausted = True
+            session.completion_reason = "requested_schedule_limit_reached"
             raise HTTPException(
                 status_code=400,
                 detail=f"All {session.full_config.limit} schedules have been generated",
@@ -458,15 +812,19 @@ async def _advance_session(schedule_id: str, session: ScheduleSession) -> Schedu
             )
         except StopIteration:
             session.is_exhausted = True
+            session.completion_reason = "solution_space_exhausted"
             raise HTTPException(status_code=400, detail="No more schedules available") from None
         except Exception as e:
             if "StopIteration" in str(e):
                 session.is_exhausted = True
+                session.completion_reason = "solution_space_exhausted"
                 raise HTTPException(status_code=400, detail="No more schedules available") from e
+            session.completion_reason = "generation_error"
             raise HTTPException(status_code=500, detail=f"Schedule generation failed: {str(e)}") from e
 
         rows = _schedule_response_rows(model)
         session.generated_schedules.append(rows)
+        session.generated_models.append(model)
         session.last_accessed_at = time.monotonic()
         current_index = len(session.generated_schedules) - 1
         return ScheduleResponse(
@@ -528,6 +886,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.post("/validate", response_model=ConfigurationValidationResponse)
+async def validate_schedule_configuration(payload: dict[str, Any]) -> ConfigurationValidationResponse:
+    """Validate raw configuration JSON and return structured, non-throwing diagnostics."""
+    result = validate_combined_config_data(payload)
+    return ConfigurationValidationResponse(
+        is_valid=result.is_valid,
+        diagnostics=[_configuration_diagnostic_response(item) for item in result.diagnostics],
+        configuration_fingerprint=result.configuration_fingerprint,
+    )
 
 
 @app.post("/submit", response_model=SubmitResponse)
@@ -596,6 +965,80 @@ async def get_schedule_details(schedule_id: str):
         **session.full_config.model_dump(),
         total_generated=len(session.generated_schedules),
     )
+
+
+@app.get("/schedules/{schedule_id}/diagnosis", response_model=ScheduleDiagnosisResponse)
+async def get_schedule_diagnosis(schedule_id: str) -> ScheduleDiagnosisResponse:
+    """Check hard-constraint feasibility and report the business rules in an unsat core."""
+    if schedule_id not in schedule_sessions:
+        raise HTTPException(status_code=404, detail="Schedule session not found")
+
+    session = schedule_sessions[schedule_id]
+    await ensure_scheduler_initialized(schedule_id, session)
+    assert session.scheduler is not None
+    async with session.generation_lock:
+        diagnosis = cast(
+            ScheduleDiagnosis,
+            await asyncio.wrap_future(z3_executor.submit(session.scheduler.diagnose)),
+        )
+    session.last_accessed_at = time.monotonic()
+    return ScheduleDiagnosisResponse(
+        schedule_id=schedule_id,
+        status=diagnosis.status,
+        conflicting_constraints=[
+            _constraint_diagnostic_response(constraint) for constraint in diagnosis.conflicting_constraints
+        ],
+        alternative_conflict_sets=[
+            [_constraint_diagnostic_response(constraint) for constraint in conflict_set]
+            for conflict_set in diagnosis.alternative_conflict_sets
+        ],
+        supporting_facts=[_constraint_diagnostic_response(fact) for fact in diagnosis.supporting_facts],
+        relaxation_suggestions=[
+            RelaxationSuggestionResponse(
+                kind=suggestion.kind,
+                subjects=list(suggestion.subjects),
+                message=suggestion.message,
+                priority=suggestion.priority,
+            )
+            for suggestion in diagnosis.relaxation_suggestions
+        ],
+        repair_sets=[_repair_set_response(repair_set) for repair_set in diagnosis.repair_sets],
+        candidate_domains=[_candidate_domain_response(domain) for domain in diagnosis.candidate_domains],
+        capacity_analysis=[_capacity_response(item) for item in diagnosis.capacity_analysis],
+        day_feasibility=[_day_feasibility_response(item) for item in diagnosis.day_feasibility],
+        preflight_findings=[_constraint_diagnostic_response(item) for item in diagnosis.preflight_findings],
+        provenance=[_provenance_response(edge) for edge in diagnosis.provenance],
+        configuration_fingerprint=diagnosis.configuration_fingerprint,
+        core_is_minimal=diagnosis.core_is_minimal,
+        alternative_cores_complete=diagnosis.alternative_cores_complete,
+        repair_sets_complete=diagnosis.repair_sets_complete,
+        diagnostic_completeness=diagnosis.diagnostic_completeness,
+        diagnostic_version=diagnosis.diagnostic_version,
+        elapsed_ms=diagnosis.elapsed_ms,
+        solver_timeout_ms=diagnosis.solver_timeout_ms,
+        reason=diagnosis.reason,
+    )
+
+
+@app.get("/schedules/{schedule_id}/audit/{index}", response_model=ScheduleAuditResponse)
+async def get_schedule_audit(schedule_id: str, index: int) -> ScheduleAuditResponse:
+    """Audit a generated schedule's hard rules, resources, and enabled objectives."""
+    if schedule_id not in schedule_sessions:
+        raise HTTPException(status_code=404, detail="Schedule session not found")
+    session = schedule_sessions[schedule_id]
+    await ensure_scheduler_initialized(schedule_id, session)
+    if index < 0 or index >= len(session.generated_models):
+        raise HTTPException(status_code=404, detail="Generated schedule not found")
+    assert session.scheduler is not None
+    async with session.generation_lock:
+        audit = cast(
+            ScheduleAudit,
+            await asyncio.wrap_future(
+                z3_executor.submit(session.scheduler.audit_schedule, session.generated_models[index])
+            ),
+        )
+    session.last_accessed_at = time.monotonic()
+    return _schedule_audit_response(schedule_id, index, audit)
 
 
 @app.post("/schedules/{schedule_id}/next", response_model=ScheduleResponse)
@@ -687,23 +1130,31 @@ async def generate_all_schedules(schedule_id: str):
                 except HTTPException as e:
                     if e.status_code != 400:
                         logger.error(f"Failed to generate schedules for session {schedule_id}: {e.detail}")
+                        session.background_error = str(e.detail)
                     session.is_exhausted = True
+                    session.completion_reason = session.completion_reason or "solution_space_exhausted"
                     logger.info(f"No more schedules available for session {schedule_id}")
                     break
                 except asyncio.CancelledError:
                     logger.debug(f"Background generation cancelled for session {schedule_id}")
+                    session.completion_reason = "background_generation_cancelled"
                     return
                 except Exception as e:
                     count = len(session.generated_schedules) + 1
                     logger.error(f"Failed to generate schedule {count} for session {schedule_id}: {e}")
+                    session.background_error = str(e)
+                    session.completion_reason = "background_generation_failed"
                     break
             n = len(session.generated_schedules)
             logger.info(f"Completed background generation for session {schedule_id}. Total generated: {n}")
 
         except asyncio.CancelledError:
             logger.debug(f"Background generation cancelled for session {schedule_id}")
+            session.completion_reason = "background_generation_cancelled"
         except Exception as e:
             logger.error(f"Background generation failed for session {schedule_id}: {e}")
+            session.background_error = str(e)
+            session.completion_reason = "background_generation_failed"
 
     # Start one background task for this session.
     session.background_task = asyncio.create_task(generate_all_background())
@@ -737,6 +1188,16 @@ async def get_schedule_count(schedule_id: str):
         limit=session.full_config.limit,
         is_complete=session.is_exhausted or len(session.generated_schedules) >= session.full_config.limit,
     )
+
+
+@app.get("/schedules/{schedule_id}/status", response_model=SessionDiagnosticResponse)
+async def get_schedule_status(schedule_id: str) -> SessionDiagnosticResponse:
+    """Report generation state, configured safeguards, and any completion/failure reason."""
+    if schedule_id not in schedule_sessions:
+        raise HTTPException(status_code=404, detail="Schedule session not found")
+    session = schedule_sessions[schedule_id]
+    session.last_accessed_at = time.monotonic()
+    return _session_diagnostic_response(schedule_id, session)
 
 
 @app.get("/schedules/{schedule_id}/index/{index}", response_model=ScheduleResponse)

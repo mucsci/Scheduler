@@ -205,6 +205,96 @@ ScheduleCountResponse(schedule_id='...', current_count=2, limit=10, is_complete=
 - limit: Maximum number of schedules to generate
 - is_complete: Whether all schedules have been generated
 
+<a id="scheduler.server.SessionDiagnosticResponse"></a>
+
+## SessionDiagnosticResponse Objects
+
+```python
+class SessionDiagnosticResponse(BaseModel)
+```
+
+Operational state, configured safeguards, and completion reason for a session.
+
+<a id="scheduler.server.ScheduleDiagnosisResponse"></a>
+
+## ScheduleDiagnosisResponse Objects
+
+```python
+class ScheduleDiagnosisResponse(BaseModel)
+```
+
+Hard-constraint feasibility result for a schedule session.
+
+<a id="scheduler.server.ConstraintDiagnosticResponse"></a>
+
+## ConstraintDiagnosticResponse Objects
+
+```python
+class ConstraintDiagnosticResponse(BaseModel)
+```
+
+One user-facing rule participating in an unsatisfiable core.
+
+<a id="scheduler.server.CandidateDomainDiagnosticResponse"></a>
+
+## CandidateDomainDiagnosticResponse Objects
+
+```python
+class CandidateDomainDiagnosticResponse(BaseModel)
+```
+
+Static candidate domain and eliminations for one course.
+
+<a id="scheduler.server.CapacityDiagnosticResponse"></a>
+
+## CapacityDiagnosticResponse Objects
+
+```python
+class CapacityDiagnosticResponse(BaseModel)
+```
+
+A necessary-condition capacity calculation.
+
+<a id="scheduler.server.RepairSetDiagnosticResponse"></a>
+
+## RepairSetDiagnosticResponse Objects
+
+```python
+class RepairSetDiagnosticResponse(BaseModel)
+```
+
+A solver-verified set of hard-rule relaxations that restores feasibility.
+
+<a id="scheduler.server.ScheduleAuditResponse"></a>
+
+## ScheduleAuditResponse Objects
+
+```python
+class ScheduleAuditResponse(BaseModel)
+```
+
+Independent verification and objective explanation for one generated schedule.
+
+<a id="scheduler.server.ConfigurationValidationResponse"></a>
+
+## ConfigurationValidationResponse Objects
+
+```python
+class ConfigurationValidationResponse(BaseModel)
+```
+
+Structured schema and cross-reference validation result for raw JSON input.
+
+<a id="scheduler.server.RelaxationSuggestionResponse"></a>
+
+## RelaxationSuggestionResponse Objects
+
+```python
+class RelaxationSuggestionResponse(BaseModel)
+```
+
+One safe, directly-derived change that may restore feasibility.
+
 <a id="scheduler.server.ErrorResponse"></a>
 
 ## ErrorResponse Objects
@@ -321,6 +411,18 @@ Application lifespan manager for cleanup.
 # FastAPI(..., lifespan=lifespan)
 ```
 
+<a id="scheduler.server.validate_schedule_configuration"></a>
+
+#### validate\_schedule\_configuration
+
+```python
+@app.post("/validate", response_model=ConfigurationValidationResponse)
+async def validate_schedule_configuration(
+        payload: dict[str, Any]) -> ConfigurationValidationResponse
+```
+
+Validate raw configuration JSON and return structured, non-throwing diagnostics.
+
 <a id="scheduler.server.submit_schedule"></a>
 
 #### submit\_schedule
@@ -354,13 +456,39 @@ Get details about a schedule session.
 httpx.get(f"http://localhost:8000/schedules/{sid}/details")
 ```
 
+<a id="scheduler.server.get_schedule_diagnosis"></a>
+
+#### get\_schedule\_diagnosis
+
+```python
+@app.get("/schedules/{schedule_id}/diagnosis",
+         response_model=ScheduleDiagnosisResponse)
+async def get_schedule_diagnosis(
+        schedule_id: str) -> ScheduleDiagnosisResponse
+```
+
+Check hard-constraint feasibility and report the business rules in an unsat core.
+
+<a id="scheduler.server.get_schedule_audit"></a>
+
+#### get\_schedule\_audit
+
+```python
+@app.get("/schedules/{schedule_id}/audit/{index}",
+         response_model=ScheduleAuditResponse)
+async def get_schedule_audit(schedule_id: str,
+                             index: int) -> ScheduleAuditResponse
+```
+
+Audit a generated schedule's hard rules, resources, and enabled objectives.
+
 <a id="scheduler.server.get_next_schedule"></a>
 
 #### get\_next\_schedule
 
 ```python
 @app.post("/schedules/{schedule_id}/next", response_model=ScheduleResponse)
-async def get_next_schedule(schedule_id: str)
+async def get_next_schedule(schedule_id: str) -> ScheduleResponse
 ```
 
 Get the next generated schedule.
@@ -403,6 +531,18 @@ Get the current count of generated schedules for a session.
 ```python
 httpx.get(f"http://localhost:8000/schedules/{sid}/count")
 ```
+
+<a id="scheduler.server.get_schedule_status"></a>
+
+#### get\_schedule\_status
+
+```python
+@app.get("/schedules/{schedule_id}/status",
+         response_model=SessionDiagnosticResponse)
+async def get_schedule_status(schedule_id: str) -> SessionDiagnosticResponse
+```
+
+Report generation state, configured safeguards, and any completion/failure reason.
 
 <a id="scheduler.server.get_schedule_by_index"></a>
 
@@ -2086,6 +2226,54 @@ from scheduler import CombinedConfig, load_config_from_file
 cfg = load_config_from_file(CombinedConfig, "config.json")
 ```
 
+<a id="scheduler.scheduler.ConfigurationDiagnostic"></a>
+
+## ConfigurationDiagnostic Objects
+
+```python
+@dataclass(frozen=True)
+class ConfigurationDiagnostic()
+```
+
+One schema or cross-reference validation error with a JSON Pointer path.
+
+<a id="scheduler.scheduler.ConfigurationValidationResult"></a>
+
+## ConfigurationValidationResult Objects
+
+```python
+@dataclass(frozen=True)
+class ConfigurationValidationResult()
+```
+
+Structured result of validating an untrusted scheduler configuration payload.
+
+<a id="scheduler.scheduler.ProvenanceEdge"></a>
+
+## ProvenanceEdge Objects
+
+```python
+@dataclass(frozen=True)
+class ProvenanceEdge()
+```
+
+A directed explanation edge from input data to a derived diagnostic fact.
+
+<a id="scheduler.scheduler.validate_combined_config_data"></a>
+
+#### validate\_combined\_config\_data
+
+```python
+def validate_combined_config_data(
+        payload: Mapping[str, Any]) -> ConfigurationValidationResult
+```
+
+Validate raw configuration data without raising a Pydantic exception.
+
+Use this at API boundaries when callers need actionable diagnostics rather
+than an exception payload.  A valid result retains only a stable input
+fingerprint; callers can construct :class:`CombinedConfig` separately.
+
 <a id="scheduler.scheduler.get_faculty_availability"></a>
 
 #### get\_faculty\_availability
@@ -2105,6 +2293,127 @@ The availability of the faculty as a list of `TimeInstance` objects
 ```python
 slots = get_faculty_availability(faculty_config)
 ```
+
+<a id="scheduler.scheduler.ScheduleDiagnosis"></a>
+
+## ScheduleDiagnosis Objects
+
+```python
+@dataclass(frozen=True)
+class ScheduleDiagnosis()
+```
+
+Result of checking the hard scheduling constraints without optimization.
+
+<a id="scheduler.scheduler.ConstraintDiagnostic"></a>
+
+## ConstraintDiagnostic Objects
+
+```python
+@dataclass(frozen=True)
+class ConstraintDiagnostic()
+```
+
+One business rule participating in an unsatisfiable core.
+
+<a id="scheduler.scheduler.CandidateDomainDiagnostic"></a>
+
+## CandidateDomainDiagnostic Objects
+
+```python
+@dataclass(frozen=True)
+class CandidateDomainDiagnostic()
+```
+
+The remaining candidate domain for one course after static filtering.
+
+<a id="scheduler.scheduler.CapacityDiagnostic"></a>
+
+## CapacityDiagnostic Objects
+
+```python
+@dataclass(frozen=True)
+class CapacityDiagnostic()
+```
+
+A necessary-condition capacity check, independent of solver search.
+
+<a id="scheduler.scheduler.DayFeasibilityDiagnostic"></a>
+
+## DayFeasibilityDiagnostic Objects
+
+```python
+@dataclass(frozen=True)
+class DayFeasibilityDiagnostic()
+```
+
+One cell of the faculty/day availability and pattern-feasibility matrix.
+
+<a id="scheduler.scheduler.RepairSetDiagnostic"></a>
+
+## RepairSetDiagnostic Objects
+
+```python
+@dataclass(frozen=True)
+class RepairSetDiagnostic()
+```
+
+A verified minimal set of business rules whose relaxation restores feasibility.
+
+<a id="scheduler.scheduler.FacultyWorkloadDiagnostic"></a>
+
+## FacultyWorkloadDiagnostic Objects
+
+```python
+@dataclass(frozen=True)
+class FacultyWorkloadDiagnostic()
+```
+
+A faculty member's assigned load with its configured bounds.
+
+<a id="scheduler.scheduler.ResourceUsageDiagnostic"></a>
+
+## ResourceUsageDiagnostic Objects
+
+```python
+@dataclass(frozen=True)
+class ResourceUsageDiagnostic()
+```
+
+One resource's assignments and any detected collisions.
+
+<a id="scheduler.scheduler.ObjectiveScoreDiagnostic"></a>
+
+## ObjectiveScoreDiagnostic Objects
+
+```python
+@dataclass(frozen=True)
+class ObjectiveScoreDiagnostic()
+```
+
+Score and independent upper bound for one enabled soft objective.
+
+<a id="scheduler.scheduler.ScheduleAudit"></a>
+
+## ScheduleAudit Objects
+
+```python
+@dataclass(frozen=True)
+class ScheduleAudit()
+```
+
+Independent post-generation hard-rule and objective audit.
+
+<a id="scheduler.scheduler.RelaxationSuggestion"></a>
+
+## RelaxationSuggestion Objects
+
+```python
+@dataclass(frozen=True)
+class RelaxationSuggestion()
+```
+
+A targeted configuration change that may restore feasibility.
 
 <a id="scheduler.scheduler.Scheduler"></a>
 
@@ -2147,6 +2456,30 @@ remain uncapped by default.
 ```python
 Scheduler(full_config)
 ```
+
+<a id="scheduler.scheduler.Scheduler.diagnose"></a>
+
+#### diagnose
+
+```python
+def diagnose() -> ScheduleDiagnosis
+```
+
+Explain hard-constraint feasibility without running soft optimization objectives.
+
+<a id="scheduler.scheduler.Scheduler.audit_schedule"></a>
+
+#### audit\_schedule
+
+```python
+def audit_schedule(schedule: list["CourseInstance"]) -> ScheduleAudit
+```
+
+Independently audit one emitted schedule and explain its soft scores.
+
+This accepts a schedule returned by :meth:`get_models`; it does not
+trust the solver model and therefore also catches serialization or
+downstream mutation errors.
 
 <a id="scheduler.scheduler.Scheduler.get_models"></a>
 

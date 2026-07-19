@@ -47,6 +47,9 @@ curl -X POST "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf
 curl -X GET "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/count"
 curl -X GET "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/index/0"
 curl -X GET "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/details"
+curl -X GET "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/diagnosis"
+curl -X GET "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/audit/0"
+curl -X GET "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/status"
 ```
 
 Useful endpoints:
@@ -54,6 +57,19 @@ Useful endpoints:
 - `count`: Current generated count, configured limit, completion status.
 - `index/{index}`: Retrieve a previously generated schedule by index.
 - `details`: Return the original combined config plus generation metadata.
+- `diagnosis`: Check hard-constraint feasibility. It returns source paths, a configuration fingerprint, candidate domains and rejected patterns, workload/resource capacity checks, provenance edges, subset-minimal unsat cores, bounded alternative cores, and solver-verified rule-level repair sets. `unknown` responses include the solver reason, elapsed time, and configured timeout.
+- `audit/{index}`: Independently verify one generated schedule, including hard-rule compliance, faculty workloads, room/lab use, enabled objective scores, and unmet preference/objective outcomes.
+- `status`: Report initialization/background generation state, completion or failure reason, generated-model count, enumeration scope (exhausted or request-bounded), idle TTL, and active API resource limits.
+
+## Validate before submitting
+
+```bash
+curl -X POST "http://localhost:8000/validate" \
+  -H "Content-Type: application/json" \
+  -d @example.json
+```
+
+Unlike `/submit`, this endpoint always returns a structured validation result. Each invalid field has a stable code and JSON Pointer path; a valid payload returns its configuration fingerprint.
 
 ## Optional: background generation
 
