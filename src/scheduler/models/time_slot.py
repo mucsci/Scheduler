@@ -39,13 +39,20 @@ class Duration(BaseModel):
 
     @property
     def value(self) -> int:
-        """
-        The value of the duration in minutes since midnight
+        """Return the duration as an integer number of minutes.
 
-        **Usage:**
-        ```python
-        d.value
-        ```
+        Args:
+            None.
+
+        Returns:
+            Stored duration in minutes.
+
+        Raises:
+            None.
+
+        Behavior:
+            Returns the validated scalar unchanged and supplies the canonical value
+            used by arithmetic, ordering, stringification, and serialization.
         """
         return self.duration
 
@@ -115,49 +122,75 @@ class TimePoint(BaseModel):
 
     @staticmethod
     def make_from(hr: int, min: int) -> "TimePoint":
-        """
-        Make a time point from an hour and minute
+        """Construct a time point from separate hour and minute components.
 
-        **Usage:**
-        ```python
-        TimePoint.make_from(9, 45)
-        ```
+        Args:
+            hr: Hour component interpreted on a 24-hour clock.
+            min: Minute component added to the supplied hour.
+
+        Returns:
+            Time point containing ``hr * 60 + min`` minutes after midnight.
+
+        Raises:
+            pydantic.ValidationError: If calculated data violates model validation.
+
+        Behavior:
+            Performs arithmetic conversion only; it does not wrap or independently
+            constrain out-of-range hour or minute arguments.
         """
         return TimePoint(timepoint=(60 * hr + min))
 
     @property
     def hour(self):
-        """
-        The hour of the time point
+        """Return the whole-hour component of this minute offset.
 
-        **Usage:**
-        ```python
-        tp.hour
-        ```
+        Args:
+            None.
+
+        Returns:
+            Integer floor division of total minutes by sixty.
+
+        Raises:
+            None.
+
+        Behavior:
+            Computes the component on access and does not normalize the stored value.
         """
         return self.timepoint // 60
 
     @property
     def minute(self):
-        """
-        The minute of the time point
+        """Return the within-hour minute component of this offset.
 
-        **Usage:**
-        ```python
-        tp.minute
-        ```
+        Args:
+            None.
+
+        Returns:
+            Integer remainder after division by sixty.
+
+        Raises:
+            None.
+
+        Behavior:
+            Computes the component on access using Python modulo semantics.
         """
         return self.timepoint % 60
 
     @property
     def value(self) -> int:
-        """
-        The value of the time point in minutes since midnight
+        """Return the stored minute offset from midnight.
 
-        **Usage:**
-        ```python
-        d.value
-        ```
+        Args:
+            None.
+
+        Returns:
+            Integer number of minutes represented by this time point.
+
+        Raises:
+            None.
+
+        Behavior:
+            Returns the validated scalar unchanged for arithmetic and serialization.
         """
         return self.timepoint
 
@@ -231,13 +264,20 @@ class TimeInstance(BaseModel):
 
     @property
     def stop(self) -> TimePoint:
-        """
-        The stop time of the time instance
+        """Calculate the exclusive stop point of this meeting interval.
 
-        **Usage:**
-        ```python
-        end = inst.stop
-        ```
+        Args:
+            None.
+
+        Returns:
+            New time point equal to start plus duration.
+
+        Raises:
+            pydantic.ValidationError: If the calculated time point is invalid.
+
+        Behavior:
+            Recomputes a new immutable value on every access without altering start
+            or duration.
         """
         return TimePoint(timepoint=(self.start.value + self.duration.value))
 
@@ -287,34 +327,38 @@ class TimeSlot(BaseModel):
         return hash(str(self))
 
     def lab_time(self) -> TimeInstance | None:
-        """
-        Returns the time instance corresponding to the lab time slot
+        """Return the meeting marked as the lab portion of this time slot.
 
-        **Usage:**
-        ```python
-        slot.lab_time()
-        ```
+        Args:
+            None.
 
-        **Returns:**
-        The time instance of the lab
-        None if the time slot does not have a lab
+        Returns:
+            Lab meeting instance, or ``None`` when no lab index is present.
+
+        Raises:
+            IndexError: If a malformed slot contains an out-of-range lab index.
+
+        Behavior:
+            Uses only ``lab_index``; it does not infer lab status from duration or day.
         """
         if self.lab_index is None:
             return None
         return self.times[self.lab_index]
 
     def has_lab(self) -> bool:
-        """
-        Check if the time slot has a lab
+        """Report whether this slot explicitly marks one meeting as a lab.
 
-        **Usage:**
-        ```python
-        slot.has_lab()
-        ```
+        Args:
+            None.
 
-        **Returns:**
-        True if the time slot has a lab.
-        False otherwise
+        Returns:
+            ``True`` exactly when ``lab_index`` is not ``None``.
+
+        Raises:
+            None.
+
+        Behavior:
+            Checks marker presence only and does not dereference or validate the index.
         """
         return self.lab_index is not None
 
@@ -341,17 +385,20 @@ class TimeSlot(BaseModel):
             return min(abs(t1.start - t2.start), abs(t1.stop - t2.stop))
 
     def lab_next_to(self, other: "TimeSlot") -> bool:
-        """
-        Check if the time slot has a lab that is next to another time slot
+        """Determine whether two marked lab meetings satisfy adjacency semantics.
 
-        **Usage:**
-        ```python
-        a.lab_next_to(b)
-        ```
+        Args:
+            other: Time slot whose lab meeting is compared with this slot.
 
-        **Returns:**
-        True if the time slot has a lab that is next to another time slot.
-        False otherwise
+        Returns:
+            Whether both labs exist and are within the configured maximum gap.
+
+        Raises:
+            IndexError: If either slot contains an invalid lab index.
+
+        Behavior:
+            Same-day labs use minimum interval separation; labs on different days
+            must overlap in clock time and start within ``max_time_gap``.
         """
         a = self.lab_time()
         b = other.lab_time()
@@ -366,17 +413,20 @@ class TimeSlot(BaseModel):
         )
 
     def lecture_next_to(self, other: "TimeSlot") -> bool:
-        """
-        Check if a time slot is logically next to another
+        """Determine whether any meeting pair satisfies lecture adjacency semantics.
 
-        **Usage:**
-        ```python
-        a.lecture_next_to(b)
-        ```
+        Args:
+            other: Time slot compared with this slot.
 
-        **Returns:**
-        True if the time slot is logically next to another.
-        False otherwise
+        Returns:
+            ``True`` when at least one pair is within ``max_time_gap``.
+
+        Raises:
+            None.
+
+        Behavior:
+            Scans meeting pairs in stored order and returns on the first witness;
+            cross-day comparisons use corresponding clock-time separation.
         """
         for _i1, t1 in enumerate(self.times):
             for _i2, t2 in enumerate(other.times):
@@ -385,32 +435,38 @@ class TimeSlot(BaseModel):
         return False
 
     def overlaps(self, other: "TimeSlot") -> bool:
-        """
-        Check if a time slot has any overlap with another time slot
+        """Determine whether any same-day meeting intervals overlap.
 
-        **Usage:**
-        ```python
-        a.overlaps(b)
-        ```
+        Args:
+            other: Time slot compared with this slot.
 
-        **Returns:**
-        True if the time slot has any overlap with another time slot.
-        False otherwise
+        Returns:
+            ``True`` when any meeting pair intersects with positive duration.
+
+        Raises:
+            None.
+
+        Behavior:
+            Evaluates the Cartesian product of meetings; touching endpoints are not
+            considered overlaps because stop points are exclusive.
         """
         return any(TimeSlot._overlaps(a, b) for a in self.times for b in other.times)
 
     def lab_overlaps(self, other: "TimeSlot") -> bool:
-        """
-        Check if a course's lab time slot has any overlap with another course's lab time slot
+        """Determine whether the marked lab meetings overlap on the same day.
 
-        **Usage:**
-        ```python
-        a.lab_overlaps(b)
-        ```
+        Args:
+            other: Time slot whose lab meeting is compared with this slot.
 
-        **Returns:**
-        True if the course's lab time slot has any overlap with another course's lab time slot.
-        False otherwise
+        Returns:
+            ``False`` if either lab is absent; otherwise interval overlap status.
+
+        Raises:
+            IndexError: If either slot contains an invalid lab index.
+
+        Behavior:
+            Ignores all non-lab meetings and applies the same exclusive-stop overlap
+            semantics used by complete time slots.
         """
         a: TimeInstance | None = self.lab_time()
         b: TimeInstance | None = other.lab_time()
@@ -438,17 +494,20 @@ class TimeSlot(BaseModel):
         return (a.day == b.day) and (a.start < b.stop) and (b.start < a.stop)
 
     def in_time_ranges(self, ranges: list[TimeInstance]) -> bool:
-        """
-        Check if a time slot fits into a list of time ranges
+        """Check whether every meeting is contained in an availability interval.
 
-        **Usage:**
-        ```python
-        slot.in_time_ranges(availability_instances)
-        ```
+        Args:
+            ranges: Day-specific inclusive-start, inclusive-stop availability windows.
 
-        **Returns:**
-        True if the time slot fits into the list of time ranges
-        False otherwise
+        Returns:
+            ``True`` only when every meeting has at least one containing range.
+
+        Raises:
+            None.
+
+        Behavior:
+            Matches ranges by weekday, permits different ranges to cover different
+            meetings, and treats an empty meeting list as vacuously available.
         """
         return all(
             any(

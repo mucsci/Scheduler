@@ -62,10 +62,56 @@ class Scheduler:
         self._auditor = ScheduleAuditor(self._problem)
 
     def get_models(self) -> Generator[list[CourseInstance], None, None]:
+        """Enumerate optimized schedules through the owned solver engine.
+
+        Args:
+            None.
+
+        Returns:
+            A lazy generator yielding decoded course assignments in deterministic
+            model-blocking order, bounded by the configured schedule limit.
+
+        Raises:
+            z3.Z3Exception: If Z3 rejects solver construction or optimization state.
+
+        Behavior:
+            Delegates directly to :class:`SolverEngine`; schedules are generated
+            only as the caller advances the returned generator.
+        """
         return self._solver.get_models()
 
     def diagnose(self) -> ScheduleDiagnosis:
+        """Explain hard-constraint feasibility without changing model enumeration.
+
+        Args:
+            None.
+
+        Returns:
+            Structured feasibility, core, repair, provenance, and preflight data.
+
+        Raises:
+            z3.Z3Exception: If Z3 cannot execute a diagnostic feasibility check.
+
+        Behavior:
+            Delegates to the diagnostic engine, which uses immutable solver artifacts
+            and does not run or mutate soft optimization objectives.
+        """
         return self._diagnostics.diagnose()
 
     def audit_schedule(self, schedule: list["CourseInstance"]) -> ScheduleAudit:
+        """Independently validate and score one decoded schedule.
+
+        Args:
+            schedule: Course assignments to validate against normalized policies.
+
+        Returns:
+            Hard-rule findings, workload/resource summaries, and objective scores.
+
+        Raises:
+            KeyError: If assignments reference unknown faculty in preference scoring.
+
+        Behavior:
+            Delegates to the Z3-independent auditor and never trusts or queries the
+            solver model that originally produced the supplied assignments.
+        """
         return self._auditor.audit_schedule(schedule)

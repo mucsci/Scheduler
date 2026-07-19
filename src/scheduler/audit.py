@@ -86,9 +86,21 @@ class ScheduleAuditor:
     def audit_schedule(self, schedule: list["CourseInstance"]) -> ScheduleAudit:
         """Independently audit one emitted schedule and explain its soft scores.
 
-        This accepts a schedule returned by :meth:`get_models`; it does not
-        trust the solver model and therefore also catches serialization or
-        downstream mutation errors.
+        Args:
+            schedule: Decoded assignments expected to cover every configured course.
+
+        Returns:
+            Independent hard-rule findings, workload and resource summaries, and
+            scores and explanations for every enabled objective.
+
+        Raises:
+            KeyError: If a preference-enabled assignment names unknown faculty.
+
+        Behavior:
+            Reconstructs coverage by course name, validates every assignment and
+            cross-course relation without consulting Z3, aggregates workload and
+            collision data, then recalculates soft scores. This catches solver,
+            decoding, serialization, and downstream-mutation errors.
         """
         by_course = {str(instance.course): instance for instance in schedule}
         violations: list[ConstraintDiagnostic] = []

@@ -127,65 +127,78 @@ class CourseInstance(BaseModel):
     @computed_field(alias="course")
     @property
     def course_str(self) -> str:
-        """
-        The string representation of the course
+        """Return the stable display identifier for the assigned course section.
 
-        **Usage:**
-        ```python
-        payload["course"]
-        ```
+        Args:
+            None.
 
-        **Returns:**
-        The string representation of the course
+        Returns:
+            Course identifier plus zero-padded section number.
+
+        Raises:
+            None.
+
+        Behavior:
+            Delegates to the underlying course string representation and is emitted
+            under the serialized ``course`` alias while the course object is excluded.
         """
         return str(self.course)
 
     @computed_field
     @property
     def times(self) -> list[TimeInstance]:
-        """
-        The list of times assigned to the course instance
+        """Expose the ordered meeting instances from the selected time slot.
 
-        **Usage:**
-        ```python
-        instance.times
-        ```
+        Args:
+            None.
 
-        **Returns:**
-        The list of times assigned to the course instance
+        Returns:
+            The selected slot's meeting list in configured pattern order.
+
+        Raises:
+            None.
+
+        Behavior:
+            Returns the underlying list without reordering and includes it as the
+            serialized ``times`` computed field.
         """
         return self.time.times
 
     @computed_field
     @property
     def lab_index(self) -> int | None:
-        """
-        The index of the lab assigned to the course instance
+        """Return the meeting index reserved for the assigned lab, when any.
 
-        **Usage:**
-        ```python
-        instance.lab_index
-        ```
+        Args:
+            None.
 
-        **Returns:**
-        The index of the lab assigned to the course instance.
-        None if the course instance does not have a lab
+        Returns:
+            Selected slot lab index, or ``None`` when no lab resource is assigned.
+
+        Raises:
+            None.
+
+        Behavior:
+            Hides the internal slot lab marker for documented no-lab assignments so
+            external payloads consistently report both ``lab`` and ``lab_index`` null.
         """
         return self.time.lab_index if (self.lab is not None) else None
 
     def as_csv(self) -> str:
-        """
-        The CSV representation of the course instance in the format:
+        """Serialize the assignment as one scheduler CSV row without a header.
 
-        `<course>,<faculty>,<room>,<lab>,<times>`
+        Args:
+            None.
 
-        **Usage:**
-        ```python
-        row = instance.as_csv()
-        ```
+        Returns:
+            ``course,faculty,room,lab,times`` using display representations.
 
-        **Returns:**
-        The CSV representation of the course instance
+        Raises:
+            None.
+
+        Behavior:
+            Preserves meeting order and the lab caret marker for lab assignments;
+            removes that internal marker when the decoded assignment has no lab.
         """
         room_str = str(self.room)
         lab_str = str(self.lab)

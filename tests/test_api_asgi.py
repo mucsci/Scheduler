@@ -11,7 +11,6 @@ import pytest
 from scheduler import CombinedConfig
 from scheduler import server as server_module
 from scheduler.server import ApiLimits, ScheduleSession, app, cleanup_session
-
 from tests.scenario_builders import config_from, minimal_config_data, two_course_config_data
 
 pytestmark = pytest.mark.integration

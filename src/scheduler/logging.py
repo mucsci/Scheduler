@@ -6,17 +6,24 @@ logger = logging.getLogger("Scheduler")
 
 def configure_logging() -> None:
     """
-    Configure logging for CLI and server entry points.
+    Configure the process-wide default logging handler for application entry points.
 
-    Called by the scheduler CLI and scheduler-server at startup. Not invoked
-    on library import, so applications that embed the scheduler control their
-    own logging configuration.
+    Args:
+        None.
 
-    **Usage:**
-    ```python
-    from scheduler.logging import configure_logging
-    configure_logging()
-    ```
+    Returns:
+        None.
+
+    Raises:
+        None under normal operation; exceptions from the standard library logging
+        configuration are allowed to propagate.
+
+    Behavior:
+        The root logger is configured with a timestamped text format and the level
+        named by ``LOGLEVEL``, defaulting to ``INFO``. The function is called by
+        CLI and server startup rather than library import, so embedding applications
+        retain control of logging. As with ``logging.basicConfig``, an existing root
+        handler normally causes the call to leave the active configuration intact.
     """
     logging.basicConfig(
         level=os.getenv("LOGLEVEL", "INFO").upper(),

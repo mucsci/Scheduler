@@ -19,7 +19,7 @@ def main() -> None:
     assets.mkdir(parents=True, exist_ok=True)
     out = assets / "combined-config.schema.json"
     schema = CombinedConfig.model_json_schema()
-    out.write_text(json.dumps(schema, indent=2), encoding="utf-8")
+    out.write_text(json.dumps(schema, indent=2) + "\n", encoding="utf-8")
     print(f"Wrote {out}")
 
 

@@ -11,7 +11,21 @@ from .time_slot_generator import TimeSlotGenerator
 
 
 def get_faculty_availability(faculty_config: FacultyConfig) -> list[TimeInstance]:
-    """Expand configured faculty time ranges into domain time instances."""
+    """Expand one faculty configuration into normalized availability intervals.
+
+    Args:
+        faculty_config: Validated faculty policy containing weekday time ranges.
+
+    Returns:
+        Time instances in deterministic weekday and configured-range order.
+
+    Raises:
+        ValueError: If a time string cannot be parsed into hour and minute components.
+
+    Behavior:
+        Iterates every scheduler weekday, converts each configured range into a
+        start point plus duration, and omits weekdays without availability.
+    """
     result: list[TimeInstance] = []
     for day in Day:
         for time_range in faculty_config.times.get(day.name, []):
@@ -31,7 +45,21 @@ def get_faculty_availability(faculty_config: FacultyConfig) -> list[TimeInstance
 
 @dataclass(frozen=True)
 class FacultyPolicy:
-    """Normalized workload, availability, and preference policy for one faculty member."""
+    """Normalized workload, availability, and preference policy for one faculty member.
+
+    Fields:
+        name: Unique faculty label.
+        minimum_credits: Required minimum assigned credits.
+        maximum_credits: Allowed maximum assigned credits.
+        maximum_days: Allowed maximum number of teaching weekdays.
+        unique_course_limit: Allowed number of distinct course identifiers.
+        mandatory_days: Weekdays on which this faculty must teach.
+        availability: Normalized intervals in which assignments may occur.
+        course_preferences: Course preference scores keyed by course identifier.
+        room_preferences: Room preference scores keyed by room label.
+        lab_preferences: Lab preference scores keyed by lab label.
+        config_path: JSON Pointer to the source faculty configuration.
+    """
 
     name: str
     minimum_credits: int
@@ -48,7 +76,20 @@ class FacultyPolicy:
 
 @dataclass(frozen=True)
 class CoursePolicy:
-    """Normalized, immutable eligibility and provenance policy for one course section."""
+    """Normalized, immutable eligibility and provenance policy for one course section.
+
+    Fields:
+        name: Display identifier including the generated section number.
+        course_id: Base configured course identifier.
+        section: One-based section number among matching course identifiers.
+        credits: Credit value used to select meeting-pattern domains.
+        labs: Eligible labs; empty means the course has no lab meeting.
+        rooms: Eligible rooms.
+        conflicts: Base course identifiers that must not overlap.
+        faculties: Eligible faculty after explicit or preference-derived resolution.
+        config_path: JSON Pointer to the source course configuration.
+        faculty_origin: Whether faculty eligibility was configured or derived.
+    """
 
     name: str
     course_id: str
@@ -64,7 +105,23 @@ class CoursePolicy:
 
 @dataclass
 class SchedulingProblem:
-    """All normalized scheduling data shared by solving, diagnostics, and auditing."""
+    """All normalized scheduling data shared by solving, diagnostics, and auditing.
+
+    Fields:
+        full_config: Original validated combined configuration.
+        courses: Compatibility course objects populated with solver mirrors later.
+        course_policies: Immutable normalized course policies keyed by display name.
+        faculty: Faculty labels in configuration order.
+        faculty_policies: Normalized faculty policies keyed by name.
+        rooms: Global room labels in configuration order.
+        labs: Global lab labels in configuration order.
+        slots: Generated time-slot domain across required credit values.
+        slot_ranges: Inclusive slot-index range for each credit value.
+        course_config_paths: Course display names mapped to source JSON Pointers.
+        course_faculty_origins: Course display names mapped to faculty derivation mode.
+        optimizer_flags: Enabled optimization objectives in configured order.
+        limit: Maximum number of schedules requested by the caller.
+    """
 
     full_config: CombinedConfig
     courses: list[Course]
@@ -83,6 +140,22 @@ class SchedulingProblem:
 
     @classmethod
     def from_config(cls, full_config: CombinedConfig) -> "SchedulingProblem":
+        """Normalize validated configuration without constructing any Z3 objects.
+
+        Args:
+            full_config: Validated scheduler, time-slot, limit, and optimizer configuration.
+
+        Returns:
+            A normalized problem with policies, provenance paths, and time domains.
+
+        Raises:
+            ValueError: If a configured time value cannot be normalized.
+
+        Behavior:
+            Preserves configuration ordering, assigns deterministic section numbers,
+            derives only explicitly-null faculty lists from preferences, generates
+            slot ranges once per required credit value, and copies mutable inputs.
+        """
         config = full_config.config
         faculty_policies: dict[str, FacultyPolicy] = {}
         faculty_names: list[str] = []
@@ -175,7 +248,21 @@ class SchedulingProblem:
         )
 
     def compatible_slots(self, course: Course) -> tuple[TimeSlot, ...]:
-        """Return and cache time slots matching one course's credits and lab requirement."""
+        """Return the cached time domain matching a course's credits and lab semantics.
+
+        Args:
+            course: Normalized course whose compatible domain is requested.
+
+        Returns:
+            An immutable tuple of slots with matching credits and lab presence.
+
+        Raises:
+            KeyError: If the course credit value has no generated slot range.
+
+        Behavior:
+            Computes a course domain on first access, preserves global slot ordering,
+            caches it by section display name, and returns the same tuple thereafter.
+        """
         course_name = str(course)
         cached = self._compatible_slots_by_course.get(course_name)
         if cached is not None:
@@ -190,6 +277,20 @@ class SchedulingProblem:
         return compatible
 
     def configuration_fingerprint(self) -> str:
-        """Return the stable fingerprint used by diagnostic responses."""
+        """Calculate the stable fingerprint used by diagnostic responses.
+
+        Args:
+            None.
+
+        Returns:
+            Lowercase SHA-256 hex digest of canonical JSON configuration data.
+
+        Raises:
+            TypeError: If an unexpected configuration value is not JSON serializable.
+
+        Behavior:
+            Serializes the original validated configuration with sorted keys and
+            compact separators so equivalent payloads produce identical identities.
+        """
         payload = json.dumps(self.full_config.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(payload.encode()).hexdigest()

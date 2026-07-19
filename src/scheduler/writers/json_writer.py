@@ -49,15 +49,23 @@ class JSONWriter:
 
     def add_schedule(self, schedule: list[CourseInstance]) -> None:
         """
-        Add a schedule to be written to the JSON file.
+        Serialize one complete schedule in the writer's JSON representation.
 
-        **Usage:**
-        ```python
-        writer.add_schedule(schedule)
-        ```
+        Args:
+            schedule: Ordered course assignments comprising one generated schedule.
 
-        **Args:**
-        - schedule: The schedule to be written
+        Returns:
+            None.
+
+        Raises:
+            TypeError: If a value emitted by a course model is not JSON serializable.
+            OSError: If immediate stdout output fails.
+
+        Behavior:
+            Each course is dumped using aliases and with null fields omitted.
+            File-backed writers buffer the resulting schedule so context-manager
+            exit can emit one compact outer array. Stdout-backed writers print the
+            individual schedule immediately as compact JSON.
         """
         schedule_data = []
         for course_instance in schedule:

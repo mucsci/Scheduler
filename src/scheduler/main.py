@@ -54,12 +54,32 @@ def main(
     optimizer_flags: list[OptimizerFlags],
 ):
     """
-    Generate course schedules using constraint satisfaction solving.
+    Run the command-line schedule generator and write selected models.
 
-    **Usage:**
-    ```python
-    scheduler path/to/config.json -f csv -o out
-    ```
+    Args:
+        config: Path to a combined scheduler configuration JSON file.
+        limit: Optional command-line override for the maximum model count.
+        format: Output encoding, either ``"csv"`` or ``"json"``.
+        output: Optional basename for file output; when omitted, schedules are
+            printed and the user is prompted before subsequent models.
+        optimizer_flags: Optional optimizer choices supplied by Click.
+
+    Returns:
+        None. Click invokes this command for its console side effects.
+
+    Raises:
+        OSError: If configuration input or schedule output cannot be accessed.
+        json.JSONDecodeError: If the configuration file is not valid JSON.
+        ValidationError: If the combined configuration is invalid.
+        SchedulerInitializationError: If solver construction fails.
+
+    Behavior:
+        Logging is configured, configuration is loaded, and explicit limit and
+        optimizer options override file values. Models are consumed lazily from a
+        ``Scheduler`` and sent to the selected writer. Interactive output asks
+        before requesting another model; file output consumes models until the
+        configured limit or solver exhaustion and adds the selected extension to
+        the basename.
     """
     configure_logging()
 

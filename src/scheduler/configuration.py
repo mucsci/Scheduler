@@ -16,7 +16,24 @@ def load_config_from_file[T: BaseModel](
     config_cls: type[T],
     filename: str | os.PathLike[str],
 ) -> T:
-    """Load and validate one JSON configuration file."""
+    """Load one JSON file and validate it as the requested Pydantic model.
+
+    Args:
+        config_cls: Pydantic model class used to validate decoded JSON data.
+        filename: Filesystem path to a UTF-8 JSON document.
+
+    Returns:
+        A validated instance of ``config_cls``.
+
+    Raises:
+        OSError: If the file cannot be opened or read.
+        json.JSONDecodeError: If the document is not valid JSON.
+        pydantic.ValidationError: If decoded data does not satisfy ``config_cls``.
+
+    Behavior:
+        Reads the complete document as UTF-8, decodes exactly one JSON value, and
+        delegates all schema and cross-field validation to the supplied model.
+    """
     with open(filename, encoding="utf-8") as config_file:
         data = json.load(config_file)
     return config_cls(**data)
@@ -29,7 +46,23 @@ def _json_pointer(location: tuple[object, ...]) -> str:
 
 
 def validate_combined_config_data(payload: Mapping[str, Any]) -> ConfigurationValidationResult:
-    """Validate raw configuration data without raising a Pydantic exception."""
+    """Validate untrusted combined configuration data into a structured result.
+
+    Args:
+        payload: Raw mapping expected to match :class:`CombinedConfig`.
+
+    Returns:
+        A result containing ordered path-aware errors, or a stable fingerprint
+        when validation succeeds.
+
+    Raises:
+        TypeError: If successful validated data cannot be canonically serialized.
+
+    Behavior:
+        Converts Pydantic validation failures into stable diagnostic codes and
+        JSON Pointers without raising them. Valid input is canonicalized and hashed;
+        rejected scalar values are represented without retaining complex payloads.
+    """
     try:
         config = CombinedConfig.model_validate(payload)
     except ValidationError as exc:

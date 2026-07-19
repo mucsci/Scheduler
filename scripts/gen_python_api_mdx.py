@@ -31,6 +31,11 @@ def strip_empty_usage_sections(text: str) -> str:
     return EMPTY_USAGE_PATTERN.sub("", text)
 
 
+def _normalize_generated_markdown(text: str) -> str:
+    """Remove renderer-introduced trailing whitespace and normalize the final newline."""
+    return "\n".join(line.rstrip() for line in text.splitlines()).rstrip() + "\n"
+
+
 def main() -> None:
     pydoc = shutil.which("pydoc-markdown")
     if not pydoc:
@@ -44,7 +49,7 @@ def main() -> None:
         text=True,
     )
     OUT.parent.mkdir(parents=True, exist_ok=True)
-    rendered = strip_empty_usage_sections(proc.stdout)
+    rendered = _normalize_generated_markdown(strip_empty_usage_sections(proc.stdout))
     OUT.write_text(FRONTMATTER + rendered, encoding="utf-8")
     print(f"Wrote {OUT}")
 

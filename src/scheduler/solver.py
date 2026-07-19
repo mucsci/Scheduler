@@ -19,13 +19,15 @@ from .problem import SchedulingProblem
 
 @dataclass(frozen=True)
 class RelationTables:
-    """
-    Structured data for function constraints and their references.
+    """Z3 relation declarations and their finite truth-table constraints.
 
-    **Usage:**
-    ```python
-    # Built by Scheduler._build_function_constraints
-    ```
+    Fields:
+        constraints: Expressions defining every finite relation-table entry.
+        overlaps: Relation indicating whether two complete time slots overlap.
+        lab_overlaps: Relation indicating whether two lab meetings overlap.
+        lecture_next_to: Relation indicating lecture adjacency.
+        faculty_available: Relation indicating faculty availability for a slot.
+        lab_next_to: Relation indicating lab-meeting adjacency.
     """
 
     constraints: tuple[z3.BoolRef, ...]
@@ -38,13 +40,17 @@ class RelationTables:
 
 @dataclass(frozen=True)
 class Z3Symbols:
-    """
-    Structured data for Z3 sorts and their corresponding constant mappings.
+    """Z3 enum sorts and deterministic mappings to domain values.
 
-    **Usage:**
-    ```python
-    # Built by Scheduler._create_z3_enumsorts
-    ```
+    Fields:
+        time_slot_sort: Enum sort representing generated time slots.
+        time_slot_constants: Bidirectional mapping from slots to enum constants.
+        faculty_sort: Enum sort representing configured faculty.
+        faculty_constants: Bidirectional mapping from faculty labels to constants.
+        room_sort: Enum sort representing configured rooms.
+        room_constants: Bidirectional mapping from room labels to constants.
+        lab_sort: Enum sort representing labs plus the internal no-lab value.
+        lab_constants: Bidirectional mapping from lab labels or ``None`` to constants.
     """
 
     time_slot_sort: z3.SortRef
@@ -59,6 +65,15 @@ class Z3Symbols:
 
 @dataclass(frozen=True)
 class DiagnosticConstraintArtifact:
+    """Tracked hard-rule expression with business-level explanation metadata.
+
+    Fields:
+        expression: Z3 Boolean expression implementing the rule.
+        message: Human-readable explanation used in diagnoses.
+        kind: Stable business-rule family.
+        subjects: Courses, faculty, days, or resources governed by the rule.
+    """
+
     expression: z3.BoolRef
     message: str
     kind: str = "constraint"
@@ -67,7 +82,14 @@ class DiagnosticConstraintArtifact:
 
 @dataclass(frozen=True)
 class CourseVariables:
-    """Z3 variables for one course, independent of compatibility mirrors."""
+    """Z3 assignment variables for one course section.
+
+    Fields:
+        time: Selected time-slot enum variable.
+        faculty: Selected faculty enum variable.
+        room: Selected room enum variable.
+        lab: Selected lab or no-lab enum variable.
+    """
 
     time: z3.ExprRef
     faculty: z3.ExprRef
@@ -77,7 +99,16 @@ class CourseVariables:
 
 @dataclass(frozen=True)
 class SolverArtifacts:
-    """Read-only solver structures needed for feasibility diagnostics."""
+    """Read-only solver structures needed for feasibility diagnostics.
+
+    Fields:
+        context: Z3 context owning every included expression and declaration.
+        symbols: Deterministic enum sorts and domain mappings.
+        relations: Finite relation declarations and truth-table constraints.
+        constraints: Simplified hard constraints used for normal solving.
+        diagnostic_constraints: Individually tracked business-rule constraints.
+        course_variables: Immutable mapping from course names to assignment variables.
+    """
 
     context: z3.Context
     symbols: Z3Symbols
@@ -110,7 +141,21 @@ class SolverEngine:
 
     @property
     def artifacts(self) -> SolverArtifacts:
-        """Immutable view of solver state consumed by diagnostics."""
+        """Expose the immutable solver state consumed by diagnostics.
+
+        Args:
+            None.
+
+        Returns:
+            Frozen symbols, relation tables, constraints, and course-variable map.
+
+        Raises:
+            AttributeError: If accessed before engine initialization completes.
+
+        Behavior:
+            Returns the same snapshot for the engine lifetime; callers cannot replace
+            mapped course variables or mutate the constraint tuples through it.
+        """
         return self._artifacts
 
     def _create_z3_enumsorts(self) -> Z3Symbols:
@@ -1013,24 +1058,23 @@ class SolverEngine:
             s.add(z3.Or(per_course))
 
     def get_models(self) -> Generator[list[CourseInstance], None, None]:
-        """
-        Generate schedules one-at-a-time using the Z3 solver.
+        """Generate optimized schedules lazily in stable model-blocking order.
 
-        **Usage:**
-        ```python
-        for schedule in sched.get_models():
-            ...
-        ```
+        Args:
+            None.
 
-        **Returns:**
-        Generator of lists of `CourseInstance` objects representing complete schedules
+        Returns:
+            A generator of complete decoded course-assignment lists, stopping at the
+            configured limit, solver exhaustion, or an unknown solver result.
 
-        **Example:**
-        >>> full_config = load_config_from_file(CombinedConfig, "config.json")
-        >>> scheduler = Scheduler(full_config)
-        >>> for model in scheduler.get_models():
-        ...     for course in model:
-        ...         print(course.as_csv())
+        Raises:
+            z3.Z3Exception: If solver configuration, optimization, or evaluation fails.
+
+        Behavior:
+            Creates a fresh optimizer, applies the configured timeout and hard rules,
+            registers enabled objectives in their established order, decodes each
+            optimal model, yields it, and blocks the emitted arrangement before the
+            next check. Unknown and unsatisfiable results terminate enumeration.
         """
         s = z3.Optimize(ctx=self._ctx)
 

@@ -55,7 +55,23 @@ class DiagnosticEngine:
         self._faculty_availability = {name: list(policy.availability) for name, policy in policies.items()}
 
     def diagnose(self) -> ScheduleDiagnosis:
-        """Explain hard-constraint feasibility without running soft optimization objectives."""
+        """Explain hard-constraint feasibility without running soft objectives.
+
+        Args:
+            None.
+
+        Returns:
+            A complete public diagnosis containing status, static analyses,
+            provenance, and bounded core and repair data when unsatisfiable.
+
+        Raises:
+            z3.Z3Exception: If Z3 cannot create or execute a feasibility solver.
+
+        Behavior:
+            Checks tracked hard rules, subset-minimizes an UNSAT core, performs
+            bounded alternative-core and repair searches, derives supporting facts
+            and relaxations, and always records timing, timeout, and completeness.
+        """
         started_at = time.perf_counter()
         status, conflicts, core_indexes, reason = self._diagnostic_core()
         if status == "unsatisfiable":

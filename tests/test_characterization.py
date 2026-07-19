@@ -7,7 +7,6 @@ import pytest
 
 from scheduler import CombinedConfig, Scheduler
 from scheduler.server import _schedule_response_rows
-
 from tests.scenario_builders import schedule_signature, stable_payload
 
 GOLDENS = Path(__file__).resolve().parent / "fixtures" / "characterization"
