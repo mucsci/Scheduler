@@ -18,6 +18,7 @@ def test_duration_ordering_and_abs() -> None:
     assert a <= b
     assert b > a
     assert abs(Duration(duration=-5)).value == 5
+    assert repr(Duration(duration=5)) == "Duration(duration=5)"
 
 
 def test_time_point_make_from_and_arithmetic() -> None:
@@ -53,6 +54,7 @@ def test_time_slot_lab_time_and_has_lab() -> None:
     slot = TimeSlot(times=[t0, t1], lab_index=1, max_time_gap=Duration(duration=30))
     assert slot.has_lab()
     assert slot.lab_time() == t1
+    assert isinstance(repr(slot), str)
 
 
 def test_time_slot_no_lab() -> None:
@@ -185,4 +187,4 @@ def test_time_point_serializer_roundtrip() -> None:
 
 def test_models_reject_extra_fields() -> None:
     with pytest.raises(ValidationError):
-        Duration(duration=1, extra=2)  # type: ignore[call-arg]
+        Duration(duration=1, extra=2)  # type: ignore[unknown-argument]

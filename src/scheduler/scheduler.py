@@ -136,7 +136,7 @@ class _Z3SortsAndConstants:
     room_sort: z3.SortRef
     room_constants: frozenbidict[str, z3.ExprRef]
     lab_sort: z3.SortRef
-    lab_constants: frozenbidict[str, z3.ExprRef]
+    lab_constants: frozenbidict[str | None, z3.ExprRef]
 
 
 class Scheduler:
@@ -161,7 +161,7 @@ class Scheduler:
         """
         for faculty_data in config.faculty:
             faculty_name = faculty_data.name
-            self._faculty.add(faculty_name)
+            self._faculty.append(faculty_name)
             self._faculty_maximum_credits[faculty_name] = faculty_data.maximum_credits
             self._faculty_maximum_days[faculty_name] = faculty_data.maximum_days
             self._faculty_minimum_credits[faculty_name] = faculty_data.minimum_credits
@@ -190,12 +190,11 @@ class Scheduler:
         for c in config.courses:
             course_counts[c.course_id] += 1
             required_credits.add(c.credits)
-            course_faculty = c.faculty
-            if not course_faculty:
-                for faculty_data in config.faculty:
-                    if c.course_id in faculty_data.course_preferences:
-                        course_faculty.append(faculty_data.name)
-
+            course_faculty = (
+                list(c.faculty)
+                if c.faculty is not None
+                else [faculty.name for faculty in config.faculty if c.course_id in faculty.course_preferences]
+            )
             course = Course(
                 credits=c.credits,
                 course_id=c.course_id,
@@ -237,35 +236,34 @@ class Scheduler:
         ```
         """
 
-        def sanitize(name):
-            return name.replace(" ", "_")
-
         # Create TimeSlot EnumSort
-        time_slot_names = [sanitize(str(slot)) for slot in self._slots]
+        time_slot_names = [f"time_slot_{i}" for i in range(len(self._slots))]
         time_slot_sort, time_slot_constants = z3.EnumSort("TimeSlot", time_slot_names, ctx=self._ctx)
         time_slot_constants_dict = frozenbidict(
             {time_slot: time_slot_constants[i] for i, time_slot in enumerate(self._slots)}
         )
 
         # Create Faculty EnumSort
-        faculty_names = [sanitize(faculty) for faculty in self._faculty]
+        faculty_names = [f"faculty_{i}" for i in range(len(self._faculty))]
         faculty_sort, faculty_constants = z3.EnumSort("Faculty", faculty_names, ctx=self._ctx)
         faculty_constants_dict = frozenbidict(
             {faculty: faculty_constants[i] for i, faculty in enumerate(self._faculty)},
         )
 
         # Create Room EnumSort
-        room_names = [sanitize(room) for room in self._rooms]
+        room_names = [f"room_{i}" for i in range(len(self._rooms))]
         room_sort, room_constants = z3.EnumSort("Room", room_names, ctx=self._ctx)
         room_constants_dict = frozenbidict(
             {room: room_constants[i] for i, room in enumerate(self._rooms)},
         )
 
-        # Create Lab EnumSort
-        lab_names = [sanitize(lab) for lab in self._labs]
+        # Always include an internal no-lab value so configurations without
+        # labs do not create an invalid empty EnumSort.
+        lab_values: list[str | None] = [None, *self._labs]
+        lab_names = ["lab_none", *[f"lab_{i}" for i in range(len(self._labs))]]
         lab_sort, lab_constants = z3.EnumSort("Lab", lab_names, ctx=self._ctx)
         lab_constants_dict = frozenbidict(
-            {lab: lab_constants[i] for i, lab in enumerate(self._labs)},
+            {lab: lab_constants[i] for i, lab in enumerate(lab_values)},
         )
 
         return _Z3SortsAndConstants(
@@ -294,7 +292,7 @@ class Scheduler:
             course.room = z3.Const(f"{str(course)}_room", z3_data.room_sort)
             course.lab = z3.Const(f"{str(course)}_lab", z3_data.lab_sort)
 
-    def __init__(self, full_config: CombinedConfig):
+    def __init__(self, full_config: CombinedConfig, *, solver_timeout_ms: int | None = None):
         """
         Initializes the scheduler with all the necessary constraints and variables.
 
@@ -307,6 +305,9 @@ class Scheduler:
         - full_config: `CombinedConfig` object containing all the configuration
                        settings including the scheduler config, time slot config,
                        limit, and optimizer flags
+        - solver_timeout_ms: Optional per-check Z3 timeout in milliseconds.
+          The REST API supplies this as a deployment safeguard; library callers
+          remain uncapped by default.
 
         **Raises:**
         - ValueError: If the optimizer flags are invalid
@@ -316,12 +317,13 @@ class Scheduler:
         time_slot_config = full_config.time_slot_config
         self._optimizer_flags = full_config.optimizer_flags
         self._limit = full_config.limit
+        self._solver_timeout_ms = solver_timeout_ms
 
         # Initialize Z3 context
         self._ctx = z3.Context()
 
         # Initialize data structures
-        self._faculty: set[str] = set()
+        self._faculty: list[str] = []
         self._faculty_maximum_credits: dict[str, int] = {}
         self._faculty_maximum_days: dict[str, int] = {}
         self._faculty_minimum_credits: dict[str, int] = {}
@@ -334,8 +336,8 @@ class Scheduler:
         self._initialize_faculty_data(config)
 
         # Initialize courses and time slots
-        self._rooms = set(config.rooms)
-        self._labs = set(config.labs)
+        self._rooms = list(config.rooms)
+        self._labs = list(config.labs)
         self._courses, required_credits = self._initialize_courses(config)
         self._initialize_time_slots(time_slot_config, required_credits)
 
@@ -554,11 +556,6 @@ class Scheduler:
         - `list[z3.BoolRef]` containing the faculty constraints
         """
         # Pre-compute course groupings to reduce repeated calculations
-        faculty_course_map: defaultdict[str, list[Course]] = defaultdict(list)
-        for c in self._courses:
-            for faculty in c.faculties:
-                faculty_course_map[faculty].append(c)
-
         # Pre-compute time slot constants per day for reuse
         day_slot_map: defaultdict[Day, set[z3.ExprRef]] = defaultdict(set)
         for slot in self._slots:
@@ -572,43 +569,40 @@ class Scheduler:
         # Add faculty credit and unique course limits - batch generation
         faculty_constraints: list[z3.BoolRef] = []
         for faculty in self._faculty:
-            faculty_courses = faculty_course_map.get(faculty, [])
+            # Include every course in these sums.  Course-level eligibility
+            # constraints make non-candidate terms false, while this also
+            # correctly detects faculty with positive minimums and no work.
+            faculty_courses = self._courses
             faculty_constant = z3_data.faculty_constants[faculty]
             max_days = self._faculty_maximum_days[faculty]
             mandatory_days = self._faculty_mandatory_days[faculty]
-            if faculty_courses:
-                min_credits = self._faculty_minimum_credits[faculty]
-                max_credits = self._faculty_maximum_credits[faculty]
-                credit_sum = z3.Sum([z3.If(c.faculty == faculty_constant, c.credits, 0) for c in faculty_courses])
-                # ensure that each faculty is assigned between min and max credits
-                faculty_constraints.append(
-                    cast(
-                        z3.BoolRef,
-                        z3.And(credit_sum >= min_credits, credit_sum <= max_credits),
-                    )
+            min_credits = self._faculty_minimum_credits[faculty]
+            max_credits = self._faculty_maximum_credits[faculty]
+            credit_sum = z3.Sum([z3.If(c.faculty == faculty_constant, c.credits, 0) for c in faculty_courses])
+            # Ensure that every faculty is assigned between their min and max,
+            # including faculty with no eligible courses.
+            faculty_constraints.append(
+                cast(
+                    z3.BoolRef,
+                    z3.And(credit_sum >= min_credits, credit_sum <= max_credits),
                 )
+            )
 
-                # Unique course limit constraint - only generate if needed
-                unique_limit = self._faculty_unique_course_limits[faculty]
-
-                # Group courses by their unique identifier (subject + number)
-                unique_courses: defaultdict[str, list[Course]] = defaultdict(list)
-                for c in faculty_courses:
-                    unique_courses[c.course_id].append(c)
-
-                # Only create constraint if there are multiple unique courses
-                if len(unique_courses) > unique_limit:
-                    teaches_course: list[z3.BoolRef] = []
-                    for course_group in unique_courses.values():
-                        teaches_course.append(
-                            cast(
-                                z3.BoolRef,
-                                z3.Or([c.faculty == faculty_constant for c in course_group]),
-                            )
+            unique_limit = self._faculty_unique_course_limits[faculty]
+            unique_courses: defaultdict[str, list[Course]] = defaultdict(list)
+            for c in faculty_courses:
+                unique_courses[c.course_id].append(c)
+            if len(unique_courses) > unique_limit:
+                teaches_course: list[z3.BoolRef] = []
+                for course_group in unique_courses.values():
+                    teaches_course.append(
+                        cast(
+                            z3.BoolRef,
+                            z3.Or([c.faculty == faculty_constant for c in course_group]),
                         )
-                    # ensure that each faculty is assigned <= unique course limit
-                    limit = self._simplify(z3.Sum([z3.If(tc, 1, 0) for tc in teaches_course]) <= unique_limit)
-                    faculty_constraints.append(limit)
+                    )
+                limit = self._simplify(z3.Sum([z3.If(tc, 1, 0) for tc in teaches_course]) <= unique_limit)
+                faculty_constraints.append(limit)
 
             # Track whether the faculty teaches on a given day
             day_indicator_map: dict[Day, z3.BoolRef] = {}
@@ -682,7 +676,10 @@ class Scheduler:
 
             # Get valid time slots for this credit level
             start, stop = self._ranges[c.credits]
-            valid_time_slots = {i for i, _ in enumerate(self._slots) if start <= i <= stop}
+            requires_lab = bool(c.labs)
+            valid_time_slots = {
+                i for i, slot in enumerate(self._slots) if start <= i <= stop and slot.has_lab() == requires_lab
+            }
             if valid_time_slots:
                 # Constrain time to valid slots for this credit level
                 course_constraint_list.append(
@@ -700,6 +697,8 @@ class Scheduler:
                         z3.Or([c.lab == z3_data.lab_constants[lab] for lab in self._labs if lab in c.labs]),
                     )
                 )
+            else:
+                course_constraint_list.append(cast(z3.BoolRef, c.lab == z3_data.lab_constants[None]))
             if c.rooms:
                 # we must assign to a room when we have options
                 course_constraint_list.append(
@@ -969,6 +968,9 @@ class Scheduler:
         ...         print(course.as_csv())
         """
         s = z3.Optimize(ctx=self._ctx)
+
+        if self._solver_timeout_ms is not None:
+            s.set(timeout=self._solver_timeout_ms)
 
         # Optimized solver configuration for EnumSort-based problems
         # Core optimization settings

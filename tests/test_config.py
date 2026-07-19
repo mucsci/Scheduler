@@ -23,6 +23,7 @@ from scheduler.config import (
     TimeSlotConfig,
 )
 from scheduler.scheduler import load_config_from_file
+from scheduler.time_slot_generator import TimeSlotGenerator
 
 
 def _faculty_times(raw: dict[str, list[str | TimeRange]]) -> dict[Day, list[TimeRange]]:
@@ -87,7 +88,7 @@ def test_meeting_with_start_time() -> None:
 
 def test_meeting_invalid_day() -> None:
     with pytest.raises(ValidationError):
-        Meeting(day="SAT", duration=50)  # type: ignore[arg-type]
+        Meeting(day="SAT", duration=50)  # type: ignore[invalid-argument-type]
 
 
 def test_class_pattern_valid() -> None:
@@ -120,6 +121,14 @@ def test_class_pattern_disabled_and_start_time() -> None:
     )
     assert p.disabled
     assert p.start_time == "10:00"
+
+
+def test_class_pattern_rejects_multiple_lab_meetings() -> None:
+    with pytest.raises(ValidationError, match="at most one lab"):
+        ClassPattern(
+            credits=4,
+            meetings=[Meeting(day="MON", duration=50, lab=True), Meeting(day="WED", duration=50, lab=True)],
+        )
 
 
 # --- TimeSlotConfig ---
@@ -199,6 +208,21 @@ def test_time_slot_config_all_disabled_patterns() -> None:
                 )
             ],
         )
+
+
+def test_meeting_start_time_overrides_pattern_start_time() -> None:
+    config = TimeSlotConfig(
+        times=_valid_times(),
+        classes=[
+            ClassPattern(
+                credits=3,
+                start_time="09:00",
+                meetings=[Meeting(day="MON", start_time="12:00", duration=50)],
+            )
+        ],
+    )
+    slots = TimeSlotGenerator(config).time_slots(3)
+    assert {slot.times[0].start.value for slot in slots} == {12 * 60}
 
 
 # --- FacultyConfig ---
@@ -367,6 +391,31 @@ def test_scheduler_config_valid() -> None:
     SchedulerConfig(**_minimal_scheduler_kwargs())
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [("credits", 0), ("room", []), ("faculty", [])],
+)
+def test_course_config_rejects_documented_invalid_values(field: str, value: object) -> None:
+    values: dict[str, object] = {
+        "course_id": "CS101",
+        "credits": 3,
+        "room": ["R1"],
+        "lab": [],
+        "conflicts": [],
+        "faculty": ["F1"],
+    }
+    values[field] = value
+    with pytest.raises(ValidationError):
+        CourseConfig.model_validate(values)
+
+
+def test_scheduler_config_rejects_empty_rooms() -> None:
+    kwargs = _minimal_scheduler_kwargs()
+    kwargs["rooms"] = []
+    with pytest.raises(ValidationError):
+        SchedulerConfig(**kwargs)
+
+
 def test_scheduler_config_duplicate_rooms() -> None:
     kw = _minimal_scheduler_kwargs()
     kw["rooms"] = ["R1", "R1"]
@@ -483,6 +532,47 @@ def test_scheduler_config_invalid_course_faculty() -> None:
         SchedulerConfig(**kw)
 
 
+def test_scheduler_config_derives_null_course_faculty_from_preferences() -> None:
+    kwargs = _minimal_scheduler_kwargs()
+    kwargs["courses"] = [
+        CourseConfig(
+            course_id="CS101",
+            credits=3,
+            room=["R1"],
+            lab=["L1"],
+            conflicts=[],
+            faculty=None,
+        )
+    ]
+    kwargs["faculty"] = [
+        FacultyConfig(
+            name="F1",
+            maximum_credits=12,
+            minimum_credits=3,
+            unique_course_limit=1,
+            times=_faculty_times({"MON": ["09:00-17:00"]}),
+            course_preferences={"CS101": 5},
+        )
+    ]
+    SchedulerConfig(**kwargs)
+
+
+def test_scheduler_config_rejects_null_course_faculty_without_preferences() -> None:
+    kwargs = _minimal_scheduler_kwargs()
+    kwargs["courses"] = [
+        CourseConfig(
+            course_id="CS101",
+            credits=3,
+            room=["R1"],
+            lab=["L1"],
+            conflicts=[],
+            faculty=None,
+        )
+    ]
+    with pytest.raises(ValidationError, match="no faculty course preferences"):
+        SchedulerConfig(**kwargs)
+
+
 def test_scheduler_config_invalid_faculty_course_pref() -> None:
     kw = _minimal_scheduler_kwargs()
     kw["faculty"] = [
@@ -564,6 +654,20 @@ def test_combined_config_extra_forbidden() -> None:
     data = json.loads((Path(__file__).parent / "fixtures" / "minimal_config.json").read_text(encoding="utf-8"))
     data["bogus"] = 1
     with pytest.raises(ValidationError):
+        CombinedConfig(**data)
+
+
+def test_combined_config_requires_matching_course_pattern() -> None:
+    data = json.loads((Path(__file__).parent / "fixtures" / "minimal_config.json").read_text(encoding="utf-8"))
+    data["config"]["courses"][0]["credits"] = 99
+    with pytest.raises(ValidationError, match="no enabled class pattern"):
+        CombinedConfig(**data)
+
+
+def test_combined_config_requires_matching_lab_pattern() -> None:
+    data = json.loads((Path(__file__).parent / "fixtures" / "minimal_config.json").read_text(encoding="utf-8"))
+    data["config"]["courses"][0]["lab"] = []
+    with pytest.raises(ValidationError, match="no lab meeting"):
         CombinedConfig(**data)
 
 
