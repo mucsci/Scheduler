@@ -192,18 +192,26 @@ class StrictBaseModel(BaseModel):
     @contextmanager
     def edit_mode(self):
         """
-        Context manager for making multiple changes with automatic rollback on validation failure.
+        Apply a group of configuration changes atomically after validation.
 
-        **Usage:**
-        ```python
-        with config.edit_mode() as editable_config:
-            editable_config.some_field = "new_value"
-            editable_config.another_field.append("item")
-        # If validation fails, changes are automatically rolled back
-        ```
+        Args:
+            None. The context manager operates on this model instance.
 
-        **Raises:**
-        - ValueError: If any configuration validation fails (with automatic rollback)
+        Returns:
+            A context manager that yields a deep, independently editable copy of
+            this model.
+
+        Raises:
+            ValidationError: If the edited copy does not satisfy the model's
+                field or cross-field validation rules. The original model is
+                unchanged when validation fails.
+
+        Behavior:
+            A deep copy is yielded so nested containers may be edited safely.
+            When the context exits normally, the copy is reconstructed through
+            the concrete model class to run all Pydantic validation. Only a
+            successfully validated state is copied back to the original object;
+            exceptions raised inside the context bypass the commit naturally.
         """
         # Create a working copy for editing
         working_copy = self.model_copy(deep=True)
@@ -303,12 +311,25 @@ class TimeRange(StrictBaseModel):
     @classmethod
     def from_string(cls, time_range_str: TimeRangeString) -> "TimeRange":
         """
-        Create TimeRange from string format "HH:MM-HH:MM"
+        Parse a compact clock range into a validated ``TimeRange`` instance.
 
-        **Usage:**
-        ```python
-        TimeRange.from_string("10:00-12:00")
-        ```
+        Args:
+            time_range_str: Range expressed as ``HH:MM-HH:MM`` using 24-hour
+                clock values.
+
+        Returns:
+            A validated instance whose ``start`` and ``end`` fields contain the
+            two parsed clock strings.
+
+        Raises:
+            ValueError: If the input cannot be split into exactly two values,
+                either clock value is invalid, or the end is not after the start.
+            ValidationError: If construction fails Pydantic validation.
+
+        Behavior:
+            The value is split at the hyphen and passed through the normal model
+            constructor. Parsing therefore uses exactly the same clock-format and
+            ordering rules as configuration loaded from JSON.
         """
         start, end = time_range_str.split("-")
         return cls(start=start, end=end)
@@ -451,12 +472,24 @@ class TimeSlotConfig(StrictBaseModel):
     @model_validator(mode="after")
     def validate(self):
         """
-        Validate that time slot config is consistent and complete.
+        Validate the completeness and usability of a time-slot configuration.
 
-        **Usage:**
-        ```python
-        TimeSlotConfig.model_validate({...})
-        ```
+        Args:
+            None. Validation inspects the fields of this instance.
+
+        Returns:
+            This validated ``TimeSlotConfig`` instance for Pydantic's after-model
+            validator protocol.
+
+        Raises:
+            ValueError: If a day key is unsupported, any weekday has no time
+                blocks, no class pattern exists, or every pattern is disabled.
+
+        Behavior:
+            Validation checks all weekday coverage and pattern availability in a
+            single pass, accumulates every discovered problem, and raises one
+            combined error so callers can correct the complete configuration at
+            once. It does not mutate the configuration.
         """
         errors = []
 
@@ -672,12 +705,24 @@ class FacultyConfig(StrictBaseModel):
     @model_validator(mode="after")
     def validate(self):
         """
-        Validate the model state.
+        Validate workload limits and mandatory-day availability for one faculty member.
 
-        **Usage:**
-        ```python
-        FacultyConfig.model_validate({...})
-        ```
+        Args:
+            None. Validation inspects the fields of this instance.
+
+        Returns:
+            This validated ``FacultyConfig`` instance for Pydantic's after-model
+            validator protocol.
+
+        Raises:
+            ValueError: If minimum credits exceed maximum credits, maximum days
+                cannot contain all mandatory days, or a mandatory day has no
+                availability entry.
+
+        Behavior:
+            Numeric bounds are checked before day feasibility. Day enum and string
+            representations are normalized for comparison, but stored fields are
+            not changed. The first invalid relationship is reported immediately.
         """
         if self.minimum_credits > self.maximum_credits:
             raise ValueError(
@@ -768,17 +813,28 @@ class SchedulerConfig(StrictBaseModel):
     @model_validator(mode="after")
     def validate(self):
         """
-        Validate all cross-references between child models.
-        This method can be called manually or is used by Pydantic validators.
+        Validate uniqueness and all cross-references in scheduler configuration.
 
-        **Usage:**
-        ```python
-        config.courses[0].room = ["NewRoom"]
-        config.validate()  # Validates all cross-references
-        ```
+        Args:
+            None. Validation inspects this configuration and its nested course and
+            faculty records.
 
-        **Raises:**
-        - ValueError: If any cross-reference validation fails
+        Returns:
+            This validated ``SchedulerConfig`` instance for Pydantic's after-model
+            validator protocol.
+
+        Raises:
+            ValueError: If resource or faculty names are duplicated; a course,
+                conflict, room, lab, or preference reference is unknown; a course
+                conflicts with itself; or null faculty cannot be inferred from
+                course preferences.
+
+        Behavior:
+            Uniqueness is checked first. Remaining reference errors are accumulated
+            across courses and faculty and emitted together. An explicit faculty
+            list is validated directly; ``faculty=None`` instead requires at least
+            one faculty course-preference entry from which eligibility can later be
+            derived. Validation never replaces the null value or mutates children.
         """
         # Validate uniqueness first
         self._validate_uniqueness()

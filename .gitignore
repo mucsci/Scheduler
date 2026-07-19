@@ -14,6 +14,8 @@ dist/
 .coverage
 htmlcov/
 
+/fern/static/python-reference/
+
 **/*~
 **/#*#
 

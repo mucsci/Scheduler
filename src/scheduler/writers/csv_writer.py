@@ -46,15 +46,22 @@ class CSVWriter:
 
     def add_schedule(self, schedule: list[CourseInstance]) -> None:
         """
-        Add a schedule to be written.
+        Serialize one complete schedule in the writer's CSV representation.
 
-        **Usage:**
-        ```python
-        writer.add_schedule(schedule)
-        ```
+        Args:
+            schedule: Ordered course assignments comprising one generated schedule.
 
-        **Args:**
-        - schedule: List of CourseInstance objects representing a complete schedule
+        Returns:
+            None.
+
+        Raises:
+            None directly; exceptions raised by course CSV serialization or stdout
+            writing are allowed to propagate.
+
+        Behavior:
+            Course rows are joined with newlines. File-backed writers buffer the
+            complete serialized schedule until context-manager exit, preserving a
+            blank line between schedules. Stdout-backed writers print immediately.
         """
         schedule_data = "\n".join(course_instance.as_csv() for course_instance in schedule)
         if self.filename:

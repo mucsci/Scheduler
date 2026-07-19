@@ -6,10 +6,51 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/validate": {
+      "post": {
+        "summary": "Validate Schedule Configuration",
+        "description": "Validate raw combined configuration JSON without converting errors to HTTP failures.\n\nArgs:\n    payload: Untrusted JSON object containing scheduler and time-slot sections.\n\nReturns:\n    Structured validity, ordered diagnostics, and a fingerprint when valid.\n\nRaises:\n    None for configuration errors; they are encoded in the returned diagnostics.\n\nBehavior:\n    Validation uses the same schema and combined cross-reference rules as\n    submission, but preserves all discovered configuration problems as response\n    records. It does not create a scheduler, consume session capacity, or invoke\n    Z3, making the endpoint suitable for pre-submission feedback.",
+        "operationId": "validate_schedule_configuration_validate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object",
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigurationValidationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/submit": {
       "post": {
         "summary": "Submit Schedule",
-        "description": "Submit a new schedule generation request.\n\n**Usage:**\n```python\nhttpx.post(\"http://localhost:8000/submit\", json=body)\n```",
+        "description": "Create an API generation session for a validated combined configuration.\n\nArgs:\n    request: Pydantic-validated combined scheduler configuration from the body.\n\nReturns:\n    A new session identifier and its base schedule endpoint.\n\nRaises:\n    HTTPException: Status 429 when active-session capacity is full; status 422\n        for course, schedule, or candidate-slot limits; status 500 if work cannot\n        be submitted; or status 400 for other request setup failures.\n\nBehavior:\n    Expired sessions and all built-in request limits are checked before work is\n    accepted. Scheduler construction is queued on the shared executor with the\n    API solver timeout. A UUID-backed session is registered immediately with\n    empty results so later requests can await initialization asynchronously.",
         "operationId": "submit_schedule_submit_post",
         "requestBody": {
           "content": {
@@ -48,7 +89,7 @@
     "/schedules/{schedule_id}/details": {
       "get": {
         "summary": "Get Schedule Details",
-        "description": "Get details about a schedule session.\n\n**Usage:**\n```python\nhttpx.get(f\"http://localhost:8000/schedules/{sid}/details\")\n```",
+        "description": "Return the submitted configuration and generation count for one session.\n\nArgs:\n    schedule_id: Unique identifier returned by schedule submission.\n\nReturns:\n    The full combined configuration augmented with session id and current count.\n\nRaises:\n    HTTPException: Status 404 when the session does not exist, or status 422 if\n        its queued scheduler initialization fails.\n\nBehavior:\n    Access refreshes the session's idle timestamp and awaits scheduler\n    construction so failed initialization cannot masquerade as a usable session.\n    The endpoint reports retained results but does not initialize or advance the\n    model generator.",
         "operationId": "get_schedule_details_schedules__schedule_id__details_get",
         "parameters": [
           {
@@ -85,10 +126,99 @@
         }
       }
     },
+    "/schedules/{schedule_id}/diagnosis": {
+      "get": {
+        "summary": "Get Schedule Diagnosis",
+        "description": "Diagnose hard-constraint feasibility for a submitted session configuration.\n\nArgs:\n    schedule_id: Unique identifier of the session to diagnose.\n\nReturns:\n    Full structured diagnosis including cores, domains, repairs, provenance,\n    completeness metadata, timing, and solver status.\n\nRaises:\n    HTTPException: Status 404 when no session exists or status 422 if scheduler\n        initialization fails. Unhandled executor failures become server errors.\n\nBehavior:\n    Scheduler initialization is awaited, then diagnosis runs on the shared Z3\n    executor while holding the session generation lock so it cannot race model\n    enumeration or auditing. Internal immutable contracts are copied into API\n    response models, and successful access refreshes the session TTL.",
+        "operationId": "get_schedule_diagnosis_schedules__schedule_id__diagnosis_get",
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Schedule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleDiagnosisResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/schedules/{schedule_id}/audit/{index}": {
+      "get": {
+        "summary": "Get Schedule Audit",
+        "description": "Independently audit one previously generated schedule and explain its objectives.\n\nArgs:\n    schedule_id: Unique identifier of the containing generation session.\n    index: Zero-based index in that session's retained schedules.\n\nReturns:\n    Hard-rule validity, violations, workload and resource summaries, objective\n    scores, and preference outcomes for the selected model.\n\nRaises:\n    HTTPException: Status 404 for an unknown session or schedule index, or status\n        422 if scheduler initialization fails. Executor failures propagate as\n        server errors.\n\nBehavior:\n    The original decoded model is audited rather than its serialized response.\n    Audit execution is dispatched to the shared executor while holding the same\n    generation lock used by enumeration and diagnosis. No solver state is\n    advanced, and successful access refreshes the session TTL.",
+        "operationId": "get_schedule_audit_schedules__schedule_id__audit__index__get",
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Schedule Id"
+            }
+          },
+          {
+            "name": "index",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Index"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleAuditResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/schedules/{schedule_id}/next": {
       "post": {
         "summary": "Get Next Schedule",
-        "description": "Get the next generated schedule.\n\n**Usage:**\n```python\nhttpx.post(f\"http://localhost:8000/schedules/{sid}/next\")\n```",
+        "description": "Generate, retain, and return exactly one next schedule for a session.\n\nArgs:\n    schedule_id: Unique identifier of the generation session to advance.\n\nReturns:\n    The newly generated schedule, its zero-based index, and total retained count.\n\nRaises:\n    HTTPException: Status 404 for an unknown session, 409 while generate-all is\n        active, 400 at requested-limit or solution-space exhaustion, 408/422 for\n        initialization problems, or 500 for unexpected generation failures.\n\nBehavior:\n    Background conflicts are checked both before and after lazy scheduler and\n    generator initialization. The shared advance path holds the session lock,\n    calls ``next`` on the Z3 executor, appends serialized and original forms\n    atomically, blocks duplicate models through the generator, and refreshes TTL.",
         "operationId": "get_next_schedule_schedules__schedule_id__next_post",
         "parameters": [
           {
@@ -128,7 +258,7 @@
     "/schedules/{schedule_id}/generate_all": {
       "post": {
         "summary": "Generate All Schedules",
-        "description": "Generate all remaining schedules for a session asynchronously.\n\n**Usage:**\n```python\nhttpx.post(f\"http://localhost:8000/schedules/{sid}/generate_all\")\n```",
+        "description": "Start one background task to generate all remaining schedules up to the limit.\n\nArgs:\n    schedule_id: Unique identifier of the generation session to exhaust.\n\nReturns:\n    Confirmation containing the current retained count and target limit; the\n    response does not wait for enumeration to finish.\n\nRaises:\n    HTTPException: Status 404 for an unknown session, 409 when another background\n        run is active, 400 when the requested limit is already reached, or the\n        initialization errors documented by the scheduler/generator helpers.\n\nBehavior:\n    Initialization completes before a single session-owned task is created.\n    That task repeatedly uses the same locked advance path as ``/next``, stopping\n    on the requested bound, solution-space exhaustion, cancellation, or error.\n    Terminal reasons and unexpected error text are recorded for status queries;\n    concurrent next or generate-all calls observe the active-task conflict.",
         "operationId": "generate_all_schedules_schedules__schedule_id__generate_all_post",
         "parameters": [
           {
@@ -168,7 +298,7 @@
     "/schedules/{schedule_id}/count": {
       "get": {
         "summary": "Get Schedule Count",
-        "description": "Get the current count of generated schedules for a session.\n\n**Usage:**\n```python\nhttpx.get(f\"http://localhost:8000/schedules/{sid}/count\")\n```",
+        "description": "Report the retained schedule count and completion state for one session.\n\nArgs:\n    schedule_id: Unique identifier of the session to inspect.\n\nReturns:\n    Current result count, requested limit, and whether enumeration is complete.\n\nRaises:\n    HTTPException: Status 404 when the session does not exist.\n\nBehavior:\n    This is a non-blocking snapshot: it neither awaits initialization nor\n    acquires the generation lock. Completion is true after solver exhaustion or\n    once the retained count reaches the requested limit. Access refreshes TTL.",
         "operationId": "get_schedule_count_schedules__schedule_id__count_get",
         "parameters": [
           {
@@ -205,10 +335,50 @@
         }
       }
     },
+    "/schedules/{schedule_id}/status": {
+      "get": {
+        "summary": "Get Schedule Status",
+        "description": "Report live generation state, API safeguards, and terminal reason for a session.\n\nArgs:\n    schedule_id: Unique identifier of the session to inspect.\n\nReturns:\n    A non-blocking operational snapshot including initialization/background\n    states, idle age, counts, completion metadata, and configured limits.\n\nRaises:\n    HTTPException: Status 404 when the session does not exist.\n\nBehavior:\n    State is derived from futures, tasks, exhaustion, and retained counts without\n    invoking the solver or generator. The query refreshes the session access\n    timestamp before the response is built, so reported idle time is near zero.",
+        "operationId": "get_schedule_status_schedules__schedule_id__status_get",
+        "parameters": [
+          {
+            "name": "schedule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Schedule Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionDiagnosticResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/schedules/{schedule_id}/index/{index}": {
       "get": {
         "summary": "Get Schedule By Index",
-        "description": "Get a previously generated schedule by index.\n\n**Usage:**\n```python\nhttpx.get(f\"http://localhost:8000/schedules/{sid}/index/0\")\n```",
+        "description": "Return one previously retained schedule without advancing generation.\n\nArgs:\n    schedule_id: Unique identifier of the containing generation session.\n    index: Zero-based index into schedules generated so far.\n\nReturns:\n    The stored serialized schedule, requested index, and current total count.\n\nRaises:\n    HTTPException: Status 404 when either the session or requested index does not\n        exist; the detail identifies the currently available index interval.\n\nBehavior:\n    Results are read directly from the append-only serialized schedule list. No\n    scheduler initialization or generation lock is required, and retrieving a\n    result refreshes the session's idle-expiry timestamp.",
         "operationId": "get_schedule_by_index_schedules__schedule_id__index__index__get",
         "parameters": [
           {
@@ -257,7 +427,7 @@
     "/schedules/{schedule_id}/delete": {
       "delete": {
         "summary": "Delete Schedule Session",
-        "description": "Delete a schedule session.\n\n**Usage:**\n```python\nhttpx.delete(f\"http://localhost:8000/schedules/{sid}/delete\")\n```",
+        "description": "Schedule deletion of an existing session after the HTTP response is sent.\n\nArgs:\n    schedule_id: Unique identifier of the session to delete.\n    background_tasks: FastAPI response-scoped background task collector.\n\nReturns:\n    A message confirming that session cleanup has been queued.\n\nRaises:\n    HTTPException: Status 404 when the session does not exist.\n\nBehavior:\n    Cleanup is registered with FastAPI rather than run before responding. The\n    cleanup routine removes the session and requests cancellation of unfinished\n    scheduler initialization or background generation. A later request may see\n    the session until the response background task executes.",
         "operationId": "delete_schedule_session_schedules__schedule_id__delete_delete",
         "parameters": [
           {
@@ -297,7 +467,7 @@
     "/schedules/{schedule_id}/cleanup": {
       "post": {
         "summary": "Cleanup Schedule Session",
-        "description": "Immediate cleanup of a schedule session.\n\n**Usage:**\n```python\nhttpx.post(f\"http://localhost:8000/schedules/{sid}/cleanup\")\n```",
+        "description": "Immediately remove a session and request cancellation of its active work.\n\nArgs:\n    schedule_id: Unique identifier of the session to clean up.\n\nReturns:\n    A cleanup confirmation message for the supplied identifier.\n\nRaises:\n    None for missing sessions; cleanup is intentionally idempotent.\n\nBehavior:\n    Existing sessions are synchronously removed through ``cleanup_session``;\n    unknown identifiers still receive the same success-shaped response. Running\n    thread-pool work may finish internally after its future is cancelled, but\n    its session is no longer addressable.",
         "operationId": "cleanup_schedule_session_schedules__schedule_id__cleanup_post",
         "parameters": [
           {
@@ -337,7 +507,7 @@
     "/health": {
       "get": {
         "summary": "Health Check",
-        "description": "Health check endpoint.\n\n**Usage:**\n```python\nhttpx.get(\"http://localhost:8000/health\")\n```",
+        "description": "Return a lightweight service health and active-session snapshot.\n\nArgs:\n    None.\n\nReturns:\n    A healthy status string and the current number of registered sessions.\n\nRaises:\n    None.\n\nBehavior:\n    The endpoint reads only the in-memory registry and does not expire sessions,\n    await solver work, or probe Z3. It therefore confirms process responsiveness\n    rather than the satisfiability or completion of individual requests.",
         "operationId": "health_check_health_get",
         "responses": {
           "200": {
@@ -356,58 +526,137 @@
   },
   "components": {
     "schemas": {
-      "ClassPattern-Input": {
+      "CandidateDomainDiagnosticResponse": {
         "properties": {
-          "credits": {
-            "type": "integer",
-            "exclusiveMinimum": 0.0,
-            "title": "Credits",
-            "description": "Number of credit hours",
-            "example": 3
+          "course": {
+            "type": "string",
+            "title": "Course"
           },
-          "meetings": {
+          "locations": {
             "items": {
-              "$ref": "#/components/schemas/Meeting"
+              "type": "string"
             },
             "type": "array",
-            "title": "Meetings",
-            "description": "List of meeting times",
-            "example": [
-              {
-                "day": "MON",
-                "duration": 150,
-                "lab": false
-              }
-            ]
+            "title": "Locations"
           },
-          "disabled": {
+          "faculty_candidates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Faculty Candidates"
+          },
+          "faculty_origin": {
+            "type": "string",
+            "title": "Faculty Origin"
+          },
+          "room_candidates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Room Candidates"
+          },
+          "lab_candidates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Lab Candidates"
+          },
+          "compatible_time_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Compatible Time Patterns"
+          },
+          "availability_by_faculty": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Availability By Faculty"
+          },
+          "rejected_patterns": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Rejected Patterns"
+          },
+          "rejected_pattern_count": {
+            "type": "integer",
+            "title": "Rejected Pattern Count"
+          },
+          "rejected_patterns_truncated": {
             "type": "boolean",
-            "title": "Disabled",
-            "description": "Whether the pattern is disabled",
-            "default": false
-          },
-          "start_time": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/TimeString"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "Specific start time constraint"
+            "title": "Rejected Patterns Truncated"
           }
         },
-        "additionalProperties": false,
         "type": "object",
         "required": [
-          "credits",
-          "meetings"
+          "course",
+          "locations",
+          "faculty_candidates",
+          "faculty_origin",
+          "room_candidates",
+          "lab_candidates",
+          "compatible_time_patterns",
+          "availability_by_faculty",
+          "rejected_patterns",
+          "rejected_pattern_count",
+          "rejected_patterns_truncated"
         ],
-        "title": "ClassPattern",
-        "description": "Represents a class pattern.\n\n**Usage:**\n```python\nClassPattern(credits=3, meetings=[...])\n```"
+        "title": "CandidateDomainDiagnosticResponse",
+        "description": "Static resource and time-domain analysis for one configured course.\n\nFields:\n    course: Course identifier being analyzed.\n    locations: Source paths that define the course domain.\n    faculty_candidates: Faculty eligible to teach the course.\n    faculty_origin: Whether eligibility was explicit or preference-derived.\n    room_candidates: Rooms eligible for the course.\n    lab_candidates: Labs eligible for the course, empty for no-lab courses.\n    compatible_time_patterns: Time-slot patterns compatible with course semantics.\n    availability_by_faculty: Availability findings for each candidate faculty.\n    rejected_patterns: Detailed reasons sampled from rejected patterns.\n    rejected_pattern_count: Total number of rejected patterns.\n    rejected_patterns_truncated: Whether detailed rejection output was capped."
       },
-      "ClassPattern-Output": {
+      "CapacityDiagnosticResponse": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "subjects": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subjects"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "required": {
+            "type": "integer",
+            "title": "Required"
+          },
+          "available": {
+            "type": "integer",
+            "title": "Available"
+          },
+          "locations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Locations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "subjects",
+          "message",
+          "required",
+          "available",
+          "locations"
+        ],
+        "title": "CapacityDiagnosticResponse",
+        "description": "Necessary-condition comparison between required and available capacity.\n\nFields:\n    kind: Capacity category such as faculty credits or resource slots.\n    subjects: Domain identifiers participating in the calculation.\n    message: Human-readable interpretation of the comparison.\n    required: Minimum capacity demanded by the configuration.\n    available: Capacity available under the analyzed restrictions.\n    locations: Configuration paths supporting the calculation."
+      },
+      "ClassPattern": {
         "properties": {
           "credits": {
             "type": "integer",
@@ -603,6 +852,128 @@
         "title": "CombinedConfig",
         "description": "Represents a combined configuration.\n\n**Usage:**\n```python\nCombinedConfig(config=..., time_slot_config=..., limit=10)\n```"
       },
+      "ConfigurationDiagnosticResponse": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "related_paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Related Paths"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "path",
+          "message",
+          "related_paths"
+        ],
+        "title": "ConfigurationDiagnosticResponse",
+        "description": "One structured schema or cross-reference error in raw configuration input.\n\nFields:\n    code: Stable machine-readable validation code.\n    path: Primary JSON-style path containing the invalid value.\n    message: Human-readable explanation of the problem.\n    value: Safe textual representation of the invalid value, when available.\n    related_paths: Other configuration paths involved in the same problem."
+      },
+      "ConfigurationValidationResponse": {
+        "properties": {
+          "is_valid": {
+            "type": "boolean",
+            "title": "Is Valid"
+          },
+          "diagnostics": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigurationDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Diagnostics"
+          },
+          "configuration_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configuration Fingerprint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "is_valid",
+          "diagnostics"
+        ],
+        "title": "ConfigurationValidationResponse",
+        "description": "Non-throwing schema and cross-reference validation result for raw JSON input.\n\nFields:\n    is_valid: Whether the payload can construct a valid combined configuration.\n    diagnostics: Ordered structured errors; empty when validation succeeds.\n    configuration_fingerprint: Stable digest for valid normalized input only."
+      },
+      "ConstraintDiagnosticResponse": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "subjects": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subjects"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "locations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Locations",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "subjects",
+          "message"
+        ],
+        "title": "ConstraintDiagnosticResponse",
+        "description": "One user-facing hard rule, finding, or supporting diagnostic fact.\n\nFields:\n    kind: Stable category of the diagnostic rule.\n    subjects: Course, faculty, day, or resource identifiers involved.\n    message: Human-readable explanation of the rule or finding.\n    code: Stable machine-readable diagnostic code when available.\n    locations: Source configuration paths contributing to the finding."
+      },
       "Course": {
         "type": "string",
         "description": "Course name",
@@ -654,13 +1025,19 @@
             "description": "List of course IDs that cannot be scheduled simultaneously"
           },
           "faculty": {
-            "items": {
-              "$ref": "#/components/schemas/Faculty"
-            },
-            "type": "array",
-            "minItems": 1,
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Faculty"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Faculty",
-            "description": "List of faculty names",
+            "description": "Faculty candidates, or null to derive candidates from faculty course preferences",
             "example": [
               "Dr. Smith"
             ]
@@ -723,13 +1100,19 @@
             "description": "List of course IDs that cannot be scheduled simultaneously"
           },
           "faculty": {
-            "items": {
-              "$ref": "#/components/schemas/Faculty"
-            },
-            "type": "array",
-            "minItems": 1,
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/Faculty"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Faculty",
-            "description": "List of faculty names",
+            "description": "Faculty candidates, or null to derive candidates from faculty course preferences",
             "example": [
               "Dr. Smith"
             ]
@@ -810,7 +1193,7 @@
           "times"
         ],
         "title": "CourseInstanceResponse",
-        "description": "One course row in a generated schedule (`CourseInstance.model_dump` JSON shape)."
+        "description": "One course assignment in the JSON representation of a generated schedule.\n\nFields:\n    course: Course identifier including its generated section suffix.\n    faculty: Faculty member assigned to teach the course.\n    times: Ordered lecture and optional lab meeting instances.\n    room: Assigned lecture room, or null when absent.\n    lab: Assigned lab resource, or null for a no-lab course.\n    lab_index: Index of the lab meeting in ``times``, or null for no lab."
       },
       "Day": {
         "type": "string",
@@ -823,6 +1206,64 @@
         ],
         "description": "Day of the week",
         "example": "MON"
+      },
+      "DayFeasibilityDiagnosticResponse": {
+        "properties": {
+          "faculty": {
+            "type": "string",
+            "title": "Faculty"
+          },
+          "day": {
+            "type": "string",
+            "title": "Day"
+          },
+          "availability_windows": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Availability Windows"
+          },
+          "eligible_courses": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Eligible Courses"
+          },
+          "compatible_pattern_count": {
+            "type": "integer",
+            "title": "Compatible Pattern Count"
+          },
+          "available_pattern_count": {
+            "type": "integer",
+            "title": "Available Pattern Count"
+          },
+          "is_mandatory": {
+            "type": "boolean",
+            "title": "Is Mandatory"
+          },
+          "locations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Locations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "faculty",
+          "day",
+          "availability_windows",
+          "eligible_courses",
+          "compatible_pattern_count",
+          "available_pattern_count",
+          "is_mandatory",
+          "locations"
+        ],
+        "title": "DayFeasibilityDiagnosticResponse",
+        "description": "Feasibility summary for one faculty member on one teaching day.\n\nFields:\n    faculty: Faculty member whose day is analyzed.\n    day: Weekday name under consideration.\n    availability_windows: Configured time windows on that day.\n    eligible_courses: Courses the faculty member may teach.\n    compatible_pattern_count: Patterns compatible before availability filtering.\n    available_pattern_count: Compatible patterns fitting availability windows.\n    is_mandatory: Whether faculty policy requires teaching on this day.\n    locations: Configuration paths supporting the analysis."
       },
       "Faculty": {
         "type": "string",
@@ -1081,6 +1522,71 @@
         "title": "FacultyConfig",
         "description": "Represents a faculty configuration.\n\n**Usage:**\n```python\nFacultyConfig(name=\"Dr. Smith\", maximum_credits=12, minimum_credits=3, ...)\n```"
       },
+      "FacultyWorkloadDiagnosticResponse": {
+        "properties": {
+          "faculty": {
+            "type": "string",
+            "title": "Faculty"
+          },
+          "credits": {
+            "type": "integer",
+            "title": "Credits"
+          },
+          "minimum_credits": {
+            "type": "integer",
+            "title": "Minimum Credits"
+          },
+          "maximum_credits": {
+            "type": "integer",
+            "title": "Maximum Credits"
+          },
+          "teaching_days": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Teaching Days"
+          },
+          "maximum_days": {
+            "type": "integer",
+            "title": "Maximum Days"
+          },
+          "distinct_courses": {
+            "type": "integer",
+            "title": "Distinct Courses"
+          },
+          "unique_course_limit": {
+            "type": "integer",
+            "title": "Unique Course Limit"
+          },
+          "mandatory_days_satisfied": {
+            "type": "boolean",
+            "title": "Mandatory Days Satisfied"
+          },
+          "locations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Locations"
+          }
+        },
+        "type": "object",
+        "required": [
+          "faculty",
+          "credits",
+          "minimum_credits",
+          "maximum_credits",
+          "teaching_days",
+          "maximum_days",
+          "distinct_courses",
+          "unique_course_limit",
+          "mandatory_days_satisfied",
+          "locations"
+        ],
+        "title": "FacultyWorkloadDiagnosticResponse",
+        "description": "Independently computed workload and policy compliance for one faculty member.\n\nFields:\n    faculty: Faculty member whose assignments are summarized.\n    credits: Total assigned course credits.\n    minimum_credits: Configured minimum credit requirement.\n    maximum_credits: Configured maximum credit allowance.\n    teaching_days: Distinct weekdays containing assigned meetings.\n    maximum_days: Configured maximum number of teaching days.\n    distinct_courses: Count of distinct base course identifiers assigned.\n    unique_course_limit: Configured distinct-course limit.\n    mandatory_days_satisfied: Whether all required teaching days are used.\n    locations: Source paths defining the faculty workload policy."
+      },
       "GenerateAllResponse": {
         "properties": {
           "message": {
@@ -1195,6 +1701,35 @@
         "title": "MessageResponse",
         "description": "Generic message response model.\n\n**Usage:**\n```python\nMessageResponse(message=\"ok\")\n```\n\n**Fields:**\n- message: Response message text"
       },
+      "ObjectiveScoreDiagnosticResponse": {
+        "properties": {
+          "objective": {
+            "type": "string",
+            "title": "Objective"
+          },
+          "score": {
+            "type": "integer",
+            "title": "Score"
+          },
+          "independent_upper_bound": {
+            "type": "integer",
+            "title": "Independent Upper Bound"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "objective",
+          "score",
+          "independent_upper_bound",
+          "message"
+        ],
+        "title": "ObjectiveScoreDiagnosticResponse",
+        "description": "Explain one enabled optimization objective's realized schedule score.\n\nFields:\n    objective: Stable optimizer objective identifier.\n    score: Preference score achieved by the audited schedule.\n    independent_upper_bound: Per-assignment upper bound ignoring interactions.\n    message: Human-readable interpretation of the objective result."
+      },
       "OptimizerFlags": {
         "type": "string",
         "enum": [
@@ -1215,10 +1750,200 @@
         "description": "Preference score between 0 and 10",
         "example": 5
       },
+      "ProvenanceEdgeResponse": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "relationship": {
+            "type": "string",
+            "title": "Relationship"
+          },
+          "subjects": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subjects"
+          }
+        },
+        "type": "object",
+        "required": [
+          "source",
+          "target",
+          "relationship",
+          "subjects"
+        ],
+        "title": "ProvenanceEdgeResponse",
+        "description": "Directed relationship connecting two diagnostic facts or configuration values.\n\nFields:\n    source: Identifier of the source fact or configuration node.\n    target: Identifier of the conclusion or dependent fact.\n    relationship: Semantic label describing how source affects target.\n    subjects: Domain identifiers shared by the relationship."
+      },
+      "RelaxationSuggestionResponse": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "subjects": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Subjects"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          },
+          "priority": {
+            "type": "integer",
+            "title": "Priority"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "subjects",
+          "message",
+          "priority"
+        ],
+        "title": "RelaxationSuggestionResponse",
+        "description": "One ranked, directly derived configuration change that may restore feasibility.\n\nFields:\n    kind: Category of configuration relaxation being suggested.\n    subjects: Courses, faculty, days, or resources affected by the change.\n    message: Human-readable proposed change and rationale.\n    priority: Relative ranking, with lower values presented first."
+      },
+      "RepairSetDiagnosticResponse": {
+        "properties": {
+          "relaxed_constraints": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Relaxed Constraints"
+          },
+          "verified": {
+            "type": "boolean",
+            "title": "Verified"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "relaxed_constraints",
+          "verified",
+          "message"
+        ],
+        "title": "RepairSetDiagnosticResponse",
+        "description": "A combination of hard-rule relaxations tested for restored feasibility.\n\nFields:\n    relaxed_constraints: Rules omitted together during repair verification.\n    verified: Whether the solver confirmed feasibility under those relaxations.\n    message: Human-readable explanation of the repair result."
+      },
+      "ResourceUsageDiagnosticResponse": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "resource": {
+            "type": "string",
+            "title": "Resource"
+          },
+          "assignments": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Assignments"
+          },
+          "collisions": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Collisions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "resource",
+          "assignments",
+          "collisions"
+        ],
+        "title": "ResourceUsageDiagnosticResponse",
+        "description": "Assignment and collision summary for one room, lab, or faculty resource.\n\nFields:\n    kind: Resource category represented by this row.\n    resource: Configured resource identifier.\n    assignments: Course assignments consuming the resource.\n    collisions: Detected overlap violations involving the resource."
+      },
       "Room": {
         "type": "string",
         "description": "Room name",
         "example": "Room 101"
+      },
+      "ScheduleAuditResponse": {
+        "properties": {
+          "schedule_id": {
+            "type": "string",
+            "title": "Schedule Id"
+          },
+          "index": {
+            "type": "integer",
+            "title": "Index"
+          },
+          "is_valid": {
+            "type": "boolean",
+            "title": "Is Valid"
+          },
+          "constraint_violations": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Constraint Violations"
+          },
+          "faculty_workloads": {
+            "items": {
+              "$ref": "#/components/schemas/FacultyWorkloadDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Faculty Workloads"
+          },
+          "resource_usage": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceUsageDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Resource Usage"
+          },
+          "objective_scores": {
+            "items": {
+              "$ref": "#/components/schemas/ObjectiveScoreDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Objective Scores"
+          },
+          "preference_outcomes": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Preference Outcomes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "schedule_id",
+          "index",
+          "is_valid",
+          "constraint_violations",
+          "faculty_workloads",
+          "resource_usage",
+          "objective_scores",
+          "preference_outcomes"
+        ],
+        "title": "ScheduleAuditResponse",
+        "description": "Independent hard-rule verification and preference explanation for one schedule.\n\nFields:\n    schedule_id: Session containing the audited schedule.\n    index: Zero-based generated-schedule index.\n    is_valid: Whether independent auditing found no hard-rule violations.\n    constraint_violations: All hard-rule violations detected by the auditor.\n    faculty_workloads: Workload summaries for every configured faculty member.\n    resource_usage: Usage and collision summaries for shared resources.\n    objective_scores: Scores for enabled optimization objectives.\n    preference_outcomes: Per-assignment preference explanations."
       },
       "ScheduleCountResponse": {
         "properties": {
@@ -1403,6 +2128,195 @@
         ],
         "title": "ScheduleDetailsResponse",
         "description": "Response model for schedule details requests.\n\nInherits all fields from CombinedConfig and adds:\n\n**Usage:**\n```python\nScheduleDetailsResponse(schedule_id='...', total_generated=0, **combined.model_dump())\n```\n\n**Fields:**\n- schedule_id: Unique identifier for the schedule session\n- total_generated: Total number of schedules generated"
+      },
+      "ScheduleDiagnosisResponse": {
+        "properties": {
+          "schedule_id": {
+            "type": "string",
+            "title": "Schedule Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "conflicting_constraints": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Conflicting Constraints"
+          },
+          "alternative_conflict_sets": {
+            "items": {
+              "items": {
+                "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+              },
+              "type": "array"
+            },
+            "type": "array",
+            "title": "Alternative Conflict Sets"
+          },
+          "supporting_facts": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Supporting Facts"
+          },
+          "relaxation_suggestions": {
+            "items": {
+              "$ref": "#/components/schemas/RelaxationSuggestionResponse"
+            },
+            "type": "array",
+            "title": "Relaxation Suggestions"
+          },
+          "repair_sets": {
+            "items": {
+              "$ref": "#/components/schemas/RepairSetDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Repair Sets"
+          },
+          "candidate_domains": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateDomainDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Candidate Domains"
+          },
+          "capacity_analysis": {
+            "items": {
+              "$ref": "#/components/schemas/CapacityDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Capacity Analysis"
+          },
+          "day_feasibility": {
+            "items": {
+              "$ref": "#/components/schemas/DayFeasibilityDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Day Feasibility"
+          },
+          "preflight_findings": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Preflight Findings"
+          },
+          "provenance": {
+            "items": {
+              "$ref": "#/components/schemas/ProvenanceEdgeResponse"
+            },
+            "type": "array",
+            "title": "Provenance"
+          },
+          "configuration_fingerprint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Configuration Fingerprint"
+          },
+          "core_is_minimal": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Core Is Minimal"
+          },
+          "alternative_cores_complete": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alternative Cores Complete"
+          },
+          "repair_sets_complete": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repair Sets Complete"
+          },
+          "diagnostic_completeness": {
+            "type": "string",
+            "title": "Diagnostic Completeness"
+          },
+          "diagnostic_version": {
+            "type": "string",
+            "title": "Diagnostic Version"
+          },
+          "elapsed_ms": {
+            "type": "integer",
+            "title": "Elapsed Ms"
+          },
+          "solver_timeout_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Solver Timeout Ms"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "schedule_id",
+          "status",
+          "conflicting_constraints",
+          "alternative_conflict_sets",
+          "supporting_facts",
+          "relaxation_suggestions",
+          "repair_sets",
+          "candidate_domains",
+          "capacity_analysis",
+          "day_feasibility",
+          "preflight_findings",
+          "provenance",
+          "configuration_fingerprint",
+          "core_is_minimal",
+          "alternative_cores_complete",
+          "repair_sets_complete",
+          "diagnostic_completeness",
+          "diagnostic_version",
+          "elapsed_ms",
+          "solver_timeout_ms",
+          "reason"
+        ],
+        "title": "ScheduleDiagnosisResponse",
+        "description": "Structured hard-constraint feasibility analysis for a schedule session.\n\nFields:\n    schedule_id: Session whose configuration was diagnosed.\n    status: Solver feasibility status such as sat, unsat, or unknown.\n    conflicting_constraints: Minimal primary set of conflicting hard rules.\n    alternative_conflict_sets: Other independently discovered conflict cores.\n    supporting_facts: Relevant non-core facts that explain the conflict.\n    relaxation_suggestions: Ranked configuration changes derived from findings.\n    repair_sets: Solver-verified combinations of relaxations.\n    candidate_domains: Per-course candidate resources and eliminations.\n    capacity_analysis: Necessary resource and workload capacity calculations.\n    day_feasibility: Per-faculty, per-day availability feasibility facts.\n    preflight_findings: Static contradictions found before core extraction.\n    provenance: Edges linking facts, configuration, and conclusions.\n    configuration_fingerprint: Stable digest of the diagnosed configuration.\n    core_is_minimal: Whether the primary conflict core was proven minimal.\n    alternative_cores_complete: Whether alternative-core enumeration completed.\n    repair_sets_complete: Whether repair-set enumeration completed.\n    diagnostic_completeness: Overall completeness classification.\n    diagnostic_version: Version of the diagnostic response semantics.\n    elapsed_ms: Total diagnostic execution time in milliseconds.\n    solver_timeout_ms: Solver timeout used, or null when no timeout was set.\n    reason: Solver or diagnostic explanation for an indeterminate result."
       },
       "ScheduleResponse": {
         "properties": {
@@ -1636,6 +2550,104 @@
         "title": "SchedulerConfig",
         "description": "Represents a scheduler configuration.\n\n**Usage:**\n```python\nSchedulerConfig(rooms=[...], labs=[...], courses=[...], faculty=[...])\n```"
       },
+      "SessionDiagnosticResponse": {
+        "properties": {
+          "schedule_id": {
+            "type": "string",
+            "title": "Schedule Id"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "background_state": {
+            "type": "string",
+            "title": "Background State"
+          },
+          "background_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Background Error"
+          },
+          "completion_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Reason"
+          },
+          "generated_schedules": {
+            "type": "integer",
+            "title": "Generated Schedules"
+          },
+          "requested_schedule_limit": {
+            "type": "integer",
+            "title": "Requested Schedule Limit"
+          },
+          "enumeration_scope": {
+            "type": "string",
+            "title": "Enumeration Scope"
+          },
+          "known_distinct_schedules": {
+            "type": "integer",
+            "title": "Known Distinct Schedules"
+          },
+          "idle_seconds": {
+            "type": "integer",
+            "title": "Idle Seconds"
+          },
+          "session_ttl_seconds": {
+            "type": "integer",
+            "title": "Session Ttl Seconds"
+          },
+          "solver_timeout_ms": {
+            "type": "integer",
+            "title": "Solver Timeout Ms"
+          },
+          "max_courses": {
+            "type": "integer",
+            "title": "Max Courses"
+          },
+          "max_candidate_slots": {
+            "type": "integer",
+            "title": "Max Candidate Slots"
+          },
+          "max_schedules_per_session": {
+            "type": "integer",
+            "title": "Max Schedules Per Session"
+          }
+        },
+        "type": "object",
+        "required": [
+          "schedule_id",
+          "state",
+          "background_state",
+          "background_error",
+          "completion_reason",
+          "generated_schedules",
+          "requested_schedule_limit",
+          "enumeration_scope",
+          "known_distinct_schedules",
+          "idle_seconds",
+          "session_ttl_seconds",
+          "solver_timeout_ms",
+          "max_courses",
+          "max_candidate_slots",
+          "max_schedules_per_session"
+        ],
+        "title": "SessionDiagnosticResponse",
+        "description": "Operational state, resource safeguards, and completion metadata for a session.\n\nFields:\n    schedule_id: Unique identifier for the generation session.\n    state: Overall state: initializing, generating, complete, or ready.\n    background_state: Lifecycle state of the generate-all background task.\n    background_error: Last background failure text, if generation failed.\n    completion_reason: Machine-oriented explanation for terminal generation.\n    generated_schedules: Number of schedules currently retained.\n    requested_schedule_limit: Client-requested maximum enumeration count.\n    enumeration_scope: Whether results exhausted the space or stopped at a bound.\n    known_distinct_schedules: Distinct schedules observed in this session.\n    idle_seconds: Rounded seconds since the session was last accessed.\n    session_ttl_seconds: Configured idle expiry threshold.\n    solver_timeout_ms: Configured timeout for each solver check.\n    max_courses: Configured course-count submission limit.\n    max_candidate_slots: Configured candidate-slot estimate limit.\n    max_schedules_per_session: Configured per-session enumeration limit."
+      },
       "SubmitResponse": {
         "properties": {
           "schedule_id": {
@@ -1803,7 +2815,7 @@
           },
           "classes": {
             "items": {
-              "$ref": "#/components/schemas/ClassPattern-Input"
+              "$ref": "#/components/schemas/ClassPattern"
             },
             "type": "array",
             "title": "Classes",
@@ -1854,7 +2866,7 @@
           },
           "classes": {
             "items": {
-              "$ref": "#/components/schemas/ClassPattern-Output"
+              "$ref": "#/components/schemas/ClassPattern"
             },
             "type": "array",
             "title": "Classes",

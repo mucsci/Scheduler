@@ -1,9 +1,9 @@
 ---
 name: sched-maintain-scripts
 description: >-
-  Maintains or extends repository scripts under scripts/ for OpenAPI export,
-  JSON Schema export, and Python API MDX generation. Use when changing export
-  pipelines or adding codegen steps for documentation.
+  Maintains or extends repository scripts under scripts/ for OpenAPI and JSON
+  Schema export. Use when changing export pipelines or adding codegen steps for
+  documentation.
 ---
 
 # scripts/
@@ -12,7 +12,12 @@ description: >-
 |--------|------|
 | `export_openapi.py` | Refresh **`fern/openapi.json`** from the FastAPI app |
 | `export_config_schema.py` | Refresh **`fern/docs/assets/combined-config.schema.json`** |
-| `gen_python_api_mdx.py` | Refresh **`fern/docs/pages/python/reference.mdx`** from docstrings |
+
+Python library reference generation is owned by Fern itself:
+
+```bash
+fern docs md generate --local --library scheduler-python
+```
 
 Run with:
 

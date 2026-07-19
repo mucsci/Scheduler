@@ -143,18 +143,29 @@ class TimeSlotGenerator:
     @cache
     def time_slots(self, credits: int) -> list[TimeSlot]:
         """
-        Generate all possible time slots for a given credit level.
+        Generate every distinct valid meeting arrangement for a credit value.
 
-        **Usage:**
-        ```python
-        generator.time_slots(credits=3)
-        ```
+        Args:
+            credits: Course credit value used to select enabled class patterns.
 
-        **Args:**
-        - credits: The course credit count to generate time slots for
+        Returns:
+            A deterministic list of distinct ``TimeSlot`` values. An empty list is
+            returned when no enabled pattern matches the requested credits.
 
-        **Returns:**
-        A list of TimeSlot objects
+        Raises:
+            ValueError: If a configured meeting start time cannot be parsed as an
+                ``HH:MM`` clock value.
+            ValidationError: If generated time or duration model values violate
+                their invariants.
+
+        Behavior:
+            For each matching enabled pattern, the generator builds each meeting's
+            domain from the configured day blocks. A meeting-level start time takes
+            precedence over the pattern start; otherwise block spacing enumerates
+            starts. Cartesian products are retained only when meetings do not
+            overlap, meet cross-day overlap and matching-start rules, and produce a
+            new slot. The pattern's lab-marked meeting determines ``lab_index``.
+            Results are cached by credit value on this generator instance.
         """
         # Find matching class patterns for the requested credits
         matching_patterns = [p for p in self.config.classes if p.credits == credits and not p.disabled]

@@ -102,7 +102,11 @@ curl -X POST "http://localhost:8000/schedules/f9f2.../next"
 curl -X GET "http://localhost:8000/schedules/f9f2.../count"
 
 # Optional endpoints
+curl -X POST "http://localhost:8000/validate" -H "Content-Type: application/json" -d @example.json
 curl -X GET "http://localhost:8000/schedules/f9f2.../details"
+curl -X GET "http://localhost:8000/schedules/f9f2.../diagnosis"
+curl -X GET "http://localhost:8000/schedules/f9f2.../audit/0"
+curl -X GET "http://localhost:8000/schedules/f9f2.../status"
 curl -X GET "http://localhost:8000/schedules/f9f2.../index/0"
 curl -X DELETE "http://localhost:8000/schedules/f9f2.../delete"
 ```
@@ -142,23 +146,25 @@ The `/submit` request body matches `CombinedConfig` (same JSON as the CLI and Py
 
 ### Local Fern preview
 
-With [Node.js](https://nodejs.org/) and dev dependencies installed:
+With [Node.js 22](https://nodejs.org/), Docker, and the Python development dependencies installed:
 
 ```console
-npm install -g fern-api
+npm install -g fern-api@5.75.4
 uv run python scripts/export_openapi.py
 uv run python scripts/export_config_schema.py
-uv run python scripts/gen_python_api_mdx.py
+fern docs md generate --local --library scheduler-python
+fern check --warnings
 fern docs dev
 ```
 
-Generated artifacts used by Fern:
+Tracked generated artifacts used by Fern:
 
 - `fern/openapi.json` (from FastAPI routes/models)
 - `fern/docs/assets/combined-config.schema.json` (from `CombinedConfig`)
-- `fern/docs/pages/python/reference.mdx` (from public docstrings)
 
-Regenerate these with the scripts above after API/config/docstring changes.
+The Python library reference is generated from `src/scheduler` into the ignored
+`fern/static/python-reference/` directory. Regenerate it with the Fern command above after public API or
+docstring changes. CI performs the same generation before validating or publishing the site.
 
 ### Configuration quick link
 
@@ -271,6 +277,15 @@ uv sync
 # Run tests
 uv run pytest
 
+# Fast unit tests only
+uv run pytest -m "not integration and not slow" --no-cov
+
+# Integration and golden compatibility tests
+uv run pytest -m "integration and not slow" --no-cov
+
+# Long-running full-example tests
+uv run pytest -m slow --no-cov
+
 # Run linting
 uv run ruff check .
 ```
@@ -287,12 +302,18 @@ The scheduler does not configure logging on import. The CLI (`scheduler`) and HT
 tests/                     # Pytest suite
 src/scheduler/
 ├── __init__.py              # Main package exports with all types
+├── audit.py                 # Independent schedule validation and objective scoring
 ├── config.py                # Configuration models with strict validation and type definitions
+├── configuration.py         # Raw and combined configuration helpers
+├── contracts.py             # Z3-free public diagnostic result contracts
+├── diagnostics.py           # Feasibility analysis, unsat cores, and repair sets
 ├── json_types.py            # TypedDict definitions for JSON structures
 ├── logging.py               # Logging setup
 ├── main.py                  # Command-line interface
-├── scheduler.py             # Core scheduling logic with Z3 integration
+├── problem.py               # Normalized, solver-independent scheduling problem
+├── scheduler.py             # Stable public façade
 ├── server.py                # REST API server with session management
+├── solver.py                # Z3 constraints, optimization, decoding, and enumeration
 ├── time_slot_generator.py   # Utility for generating valid time slots
 ├── models/                  # Enhanced data models
 │   ├── __init__.py          # Model exports

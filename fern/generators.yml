@@ -2,3 +2,5 @@
 api:
   specs:
     - openapi: openapi.json
+      settings:
+        disambiguate-request-names: false

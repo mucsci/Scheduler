@@ -11,6 +11,16 @@ on:
       - "fern/**"
       - "scripts/**"
       - "src/scheduler/**"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/docs.yml"
+  pull_request:
+    paths:
+      - "fern/**"
+      - "scripts/**"
+      - "src/scheduler/**"
+      - "pyproject.toml"
+      - "uv.lock"
       - ".github/workflows/docs.yml"
   workflow_dispatch:
 
@@ -37,24 +47,40 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Install the project
         run: uv sync --locked --group dev
 
-      - name: Generate OpenAPI, JSON Schema, and Python API reference
+      - name: Generate OpenAPI and JSON Schema
         run: |
           uv run python scripts/export_openapi.py
           uv run python scripts/export_config_schema.py
-          uv run python scripts/gen_python_api_mdx.py
+
+      - name: Verify tracked generated artifacts
+        run: git diff --exit-code -- fern/openapi.json fern/docs/assets/combined-config.schema.json
 
       - name: Install Fern CLI
-        run: npm install -g fern-api@4.35.0
+        run: npm install -g fern-api@5.75.4
+
+      - name: Generate Python library reference
+        run: fern docs md generate --local --library scheduler-python
+
+      - name: Verify Python library reference coverage
+        run: |
+          test -f fern/static/python-reference/scheduler-python/scheduler/index.mdx
+          grep -Fq "class scheduler.scheduler.Scheduler" fern/static/python-reference/scheduler-python/scheduler/scheduler.mdx
+          grep -Fq "class scheduler.config.CombinedConfig" fern/static/python-reference/scheduler-python/scheduler/config.mdx
+          grep -Fq "class scheduler.models.course.CourseInstance" fern/static/python-reference/scheduler-python/scheduler/models/course.mdx
+          grep -Fq "class scheduler.contracts.ScheduleDiagnosis" fern/static/python-reference/scheduler-python/scheduler/contracts.mdx
 
       - name: Fern check
-        run: fern check
+        env:
+          FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
+        run: fern check --warnings
 
       - name: Publish docs to Fern
+        if: github.event_name != 'pull_request'
         env:
           FERN_TOKEN: ${{ secrets.FERN_TOKEN }}
         run: fern generate --docs

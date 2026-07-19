@@ -33,6 +33,18 @@ favicon: docs/assets/favicon.svg
 
 css: docs/styles.css
 
+redirects:
+  - source: /python-api/reference
+    destination: /python-api/reference/scheduler
+
+libraries:
+  scheduler-python:
+    input:
+      path: ..
+    output:
+      path: ./static/python-reference
+    lang: python
+
 navigation:
   - section: Introduction
     contents:
@@ -60,8 +72,9 @@ navigation:
     contents:
       - page: Using the library
         path: docs/pages/python/overview.mdx
-      - page: Reference
-        path: docs/pages/python/reference.mdx
+      - folder: ./static/python-reference
+        title: Reference
+        slug: reference
   - section: REST API
     contents:
       - page: Integration quickstart

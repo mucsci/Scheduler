@@ -7,7 +7,7 @@ This directory holds **task-focused playbooks** for anyone (or any automated ass
 | [sched-cli-main](sched-cli-main/SKILL.md) | CLI (`main.py`, Click, `--format`, output) |
 | [sched-domain-z3-config](sched-domain-z3-config/SKILL.md) | Solver, Z3, config vs models, time slots |
 | [sched-fastapi-server](sched-fastapi-server/SKILL.md) | REST API, `server.py`, OpenAPI |
-| [sched-fern-openapi-docs](sched-fern-openapi-docs/SKILL.md) | Fern site, regenerating openapi/schema/MDX |
+| [sched-fern-openapi-docs](sched-fern-openapi-docs/SKILL.md) | Fern site, OpenAPI/schema artifacts, and Python library reference generation |
 | [sched-github-ci](sched-github-ci/SKILL.md) | GitHub Actions, CI failures |
 | [sched-json-types](sched-json-types/SKILL.md) | `json_types.py`, wire shapes |
 | [sched-maintain-scripts](sched-maintain-scripts/SKILL.md) | `scripts/*.py` exporters |

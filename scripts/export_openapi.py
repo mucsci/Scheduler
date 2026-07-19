@@ -16,7 +16,7 @@ from scheduler.server import app  # noqa: E402
 
 def main() -> None:
     out = ROOT / "fern" / "openapi.json"
-    out.write_text(json.dumps(app.openapi(), indent=2), encoding="utf-8")
+    out.write_text(json.dumps(app.openapi(), indent=2) + "\n", encoding="utf-8")
     print(f"Wrote {out}")
 
 

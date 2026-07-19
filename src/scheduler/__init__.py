@@ -17,12 +17,45 @@ from .config import (
     TimeSlotConfig,
     TimeString,
 )
-from .scheduler import Scheduler, load_config_from_file
+from .scheduler import (
+    CandidateDomainDiagnostic,
+    CapacityDiagnostic,
+    ConfigurationDiagnostic,
+    ConfigurationValidationResult,
+    ConstraintDiagnostic,
+    DayFeasibilityDiagnostic,
+    FacultyWorkloadDiagnostic,
+    ObjectiveScoreDiagnostic,
+    ProvenanceEdge,
+    RelaxationSuggestion,
+    RepairSetDiagnostic,
+    ResourceUsageDiagnostic,
+    ScheduleAudit,
+    ScheduleDiagnosis,
+    Scheduler,
+    load_config_from_file,
+    validate_combined_config_data,
+)
 
 __all__ = [
     # scheduler
     "Scheduler",
+    "ScheduleDiagnosis",
+    "ConfigurationDiagnostic",
+    "ConfigurationValidationResult",
+    "DayFeasibilityDiagnostic",
+    "CandidateDomainDiagnostic",
+    "CapacityDiagnostic",
+    "FacultyWorkloadDiagnostic",
+    "ResourceUsageDiagnostic",
+    "ObjectiveScoreDiagnostic",
+    "ProvenanceEdge",
+    "ScheduleAudit",
+    "RepairSetDiagnostic",
+    "ConstraintDiagnostic",
+    "RelaxationSuggestion",
     "load_config_from_file",
+    "validate_combined_config_data",
     # config module
     "config",
     # json types module

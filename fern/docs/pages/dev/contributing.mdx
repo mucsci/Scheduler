@@ -13,7 +13,7 @@ Thank you for helping improve the Course Constraint Scheduler.
 - Regenerate artifacts when needed before pushing doc-sensitive PRs:
   - `uv run python scripts/export_openapi.py`
   - `uv run python scripts/export_config_schema.py`
-  - `uv run python scripts/gen_python_api_mdx.py`
+  - `fern docs md generate --local --library scheduler-python`
 
 ## Full guide
 
@@ -23,10 +23,13 @@ The canonical contributor documentation (code style, hooks, commit messages, rel
 
 ## Documentation site
 
-This site is built with **Fern**. Local preview:
+This site is built with **Fern 5.75.4**. Install Node.js 22 and Docker before generating the Python library
+reference and starting a local preview:
 
 ```bash
-npm install -g fern-api
+npm install -g fern-api@5.75.4
+fern docs md generate --local --library scheduler-python
+fern check --warnings
 fern docs dev
 ```
 

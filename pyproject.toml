@@ -46,7 +46,6 @@ dev = [
   "pytest>=8,<10",
   "twine~=6.2",
   "ty~=0.0",
-  "pydoc-markdown~=4.8",
 ]
 
 [tool.uv]
@@ -96,6 +95,8 @@ unused-type-ignore-comment = "ignore"
 testpaths = ["tests"]
 pythonpath = ["src"]
 markers = [
+  "integration: tests that exercise multiple scheduler components or HTTP boundaries",
+  "characterization: golden compatibility tests for stable public outputs",
   "slow: tests that load full example.json or run long solver paths",
 ]
 addopts = [

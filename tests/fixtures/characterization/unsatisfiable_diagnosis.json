@@ -1,0 +1,550 @@
+{
+  "alternative_conflict_sets": [],
+  "alternative_cores_complete": true,
+  "candidate_domains": [
+    {
+      "availability_by_faculty": [
+        {
+          "code": "SCHED.FACULTY.CANDIDATE.AVAILABILITY",
+          "kind": "faculty_candidate_availability",
+          "locations": [
+            "/config/courses/0",
+            "/config/faculty/0"
+          ],
+          "message": "Faculty F1 can teach course CS101.01 in 11 of 11 compatible meeting patterns",
+          "subjects": [
+            "CS101.01",
+            "F1"
+          ]
+        }
+      ],
+      "compatible_time_patterns": [
+        "MON 08:00-09:50^,WED 08:00-09:50",
+        "MON 09:00-10:50^,WED 09:00-10:50",
+        "MON 10:00-11:50^,WED 10:00-11:50",
+        "MON 11:00-12:50^,WED 11:00-12:50",
+        "MON 12:00-13:50^,WED 12:00-13:50",
+        "MON 13:00-14:50^,WED 13:00-14:50",
+        "MON 14:00-15:50^,WED 14:00-15:50",
+        "MON 15:00-16:50^,WED 15:00-16:50",
+        "MON 16:00-17:50^,WED 16:00-17:50",
+        "MON 17:00-18:50^,WED 17:00-18:50",
+        "MON 18:00-19:50^,WED 18:00-19:50"
+      ],
+      "course": "CS101.01",
+      "faculty_candidates": [
+        "F1"
+      ],
+      "faculty_origin": "configured",
+      "lab_candidates": [
+        "L1"
+      ],
+      "locations": [
+        "/config/courses/0"
+      ],
+      "rejected_pattern_count": 0,
+      "rejected_patterns": [],
+      "rejected_patterns_truncated": false,
+      "room_candidates": [
+        "R1"
+      ]
+    },
+    {
+      "availability_by_faculty": [
+        {
+          "code": "SCHED.FACULTY.CANDIDATE.AVAILABILITY",
+          "kind": "faculty_candidate_availability",
+          "locations": [
+            "/config/courses/1",
+            "/config/faculty/0"
+          ],
+          "message": "Faculty F1 can teach course CS102.01 in 11 of 11 compatible meeting patterns",
+          "subjects": [
+            "CS102.01",
+            "F1"
+          ]
+        }
+      ],
+      "compatible_time_patterns": [
+        "MON 08:00-09:50^,WED 08:00-09:50",
+        "MON 09:00-10:50^,WED 09:00-10:50",
+        "MON 10:00-11:50^,WED 10:00-11:50",
+        "MON 11:00-12:50^,WED 11:00-12:50",
+        "MON 12:00-13:50^,WED 12:00-13:50",
+        "MON 13:00-14:50^,WED 13:00-14:50",
+        "MON 14:00-15:50^,WED 14:00-15:50",
+        "MON 15:00-16:50^,WED 15:00-16:50",
+        "MON 16:00-17:50^,WED 16:00-17:50",
+        "MON 17:00-18:50^,WED 17:00-18:50",
+        "MON 18:00-19:50^,WED 18:00-19:50"
+      ],
+      "course": "CS102.01",
+      "faculty_candidates": [
+        "F1"
+      ],
+      "faculty_origin": "configured",
+      "lab_candidates": [
+        "L1"
+      ],
+      "locations": [
+        "/config/courses/1"
+      ],
+      "rejected_pattern_count": 0,
+      "rejected_patterns": [],
+      "rejected_patterns_truncated": false,
+      "room_candidates": [
+        "R1"
+      ]
+    }
+  ],
+  "capacity_analysis": [
+    {
+      "available": 4,
+      "kind": "global_faculty_maximum_credits",
+      "locations": [
+        "/config/courses",
+        "/config/faculty"
+      ],
+      "message": "Total course credits compared with total faculty maximum credit capacity",
+      "required": 8,
+      "subjects": []
+    },
+    {
+      "available": 8,
+      "kind": "global_faculty_minimum_credits",
+      "locations": [
+        "/config/courses",
+        "/config/faculty"
+      ],
+      "message": "Total faculty minimum credit commitment compared with total course credits",
+      "required": 0,
+      "subjects": []
+    },
+    {
+      "available": 8,
+      "kind": "faculty_minimum_credit_coverage",
+      "locations": [
+        "/config/faculty/0/minimum_credits"
+      ],
+      "message": "Courses eligible for F1 can contribute at most the shown credits",
+      "required": 0,
+      "subjects": [
+        "F1"
+      ]
+    },
+    {
+      "available": 4,
+      "kind": "faculty_forced_credit_load",
+      "locations": [
+        "/config/faculty/0/maximum_credits"
+      ],
+      "message": "Courses with only F1 as a candidate require the shown credits",
+      "required": 8,
+      "subjects": [
+        "F1"
+      ]
+    },
+    {
+      "available": 2,
+      "kind": "faculty_forced_unique_courses",
+      "locations": [
+        "/config/faculty/0/unique_course_limit"
+      ],
+      "message": "Distinct courses forced onto F1 compared with their unique-course limit",
+      "required": 2,
+      "subjects": [
+        "F1"
+      ]
+    },
+    {
+      "available": 1,
+      "kind": "forced_shared_faculty_separation",
+      "locations": [
+        "/config/courses/0/faculty",
+        "/config/courses/1/faculty"
+      ],
+      "message": "non-overlapping pattern pairs for courses forced to faculty F1",
+      "required": 1,
+      "subjects": [
+        "CS101.01",
+        "CS102.01"
+      ]
+    },
+    {
+      "available": 1,
+      "kind": "forced_shared_room_separation",
+      "locations": [
+        "/config/courses/0/room",
+        "/config/courses/1/room"
+      ],
+      "message": "non-overlapping pattern pairs for courses forced to room R1",
+      "required": 1,
+      "subjects": [
+        "CS101.01",
+        "CS102.01"
+      ]
+    },
+    {
+      "available": 1,
+      "kind": "forced_shared_lab_separation",
+      "locations": [
+        "/config/courses/0/lab",
+        "/config/courses/1/lab"
+      ],
+      "message": "non-overlapping lab pattern pairs for courses forced to lab L1",
+      "required": 1,
+      "subjects": [
+        "CS101.01",
+        "CS102.01"
+      ]
+    }
+  ],
+  "configuration_fingerprint": "d1773703c35be6dcccc3b8aac82cfa7b9865c858fdb3a8109984385fdfef5b2a",
+  "conflicting_constraints": [
+    {
+      "code": "SCHED.FACULTY.CREDIT.RANGE",
+      "kind": "faculty_credit_range",
+      "locations": [
+        "/config/faculty/0"
+      ],
+      "message": "Faculty F1 must teach between 0 and 4 credits",
+      "subjects": [
+        "F1"
+      ]
+    }
+  ],
+  "core_is_minimal": true,
+  "day_feasibility": [
+    {
+      "availability_windows": [
+        "MON 08:00-20:00"
+      ],
+      "available_pattern_count": 22,
+      "compatible_pattern_count": 22,
+      "day": "MON",
+      "eligible_courses": [
+        "CS101.01",
+        "CS102.01"
+      ],
+      "faculty": "F1",
+      "is_mandatory": false,
+      "locations": [
+        "/config/faculty/0/times",
+        "/config/faculty/0/mandatory_days",
+        "/time_slot_config/classes"
+      ]
+    },
+    {
+      "availability_windows": [
+        "TUE 08:00-20:00"
+      ],
+      "available_pattern_count": 0,
+      "compatible_pattern_count": 0,
+      "day": "TUE",
+      "eligible_courses": [
+        "CS101.01",
+        "CS102.01"
+      ],
+      "faculty": "F1",
+      "is_mandatory": false,
+      "locations": [
+        "/config/faculty/0/times",
+        "/config/faculty/0/mandatory_days",
+        "/time_slot_config/classes"
+      ]
+    },
+    {
+      "availability_windows": [
+        "WED 08:00-20:00"
+      ],
+      "available_pattern_count": 22,
+      "compatible_pattern_count": 22,
+      "day": "WED",
+      "eligible_courses": [
+        "CS101.01",
+        "CS102.01"
+      ],
+      "faculty": "F1",
+      "is_mandatory": false,
+      "locations": [
+        "/config/faculty/0/times",
+        "/config/faculty/0/mandatory_days",
+        "/time_slot_config/classes"
+      ]
+    },
+    {
+      "availability_windows": [
+        "THU 08:00-20:00"
+      ],
+      "available_pattern_count": 0,
+      "compatible_pattern_count": 0,
+      "day": "THU",
+      "eligible_courses": [
+        "CS101.01",
+        "CS102.01"
+      ],
+      "faculty": "F1",
+      "is_mandatory": false,
+      "locations": [
+        "/config/faculty/0/times",
+        "/config/faculty/0/mandatory_days",
+        "/time_slot_config/classes"
+      ]
+    },
+    {
+      "availability_windows": [
+        "FRI 08:00-20:00"
+      ],
+      "available_pattern_count": 0,
+      "compatible_pattern_count": 0,
+      "day": "FRI",
+      "eligible_courses": [
+        "CS101.01",
+        "CS102.01"
+      ],
+      "faculty": "F1",
+      "is_mandatory": false,
+      "locations": [
+        "/config/faculty/0/times",
+        "/config/faculty/0/mandatory_days",
+        "/time_slot_config/classes"
+      ]
+    }
+  ],
+  "diagnostic_completeness": "bounded_unsat_cores",
+  "diagnostic_version": "1",
+  "elapsed_ms": 0,
+  "preflight_findings": [
+    {
+      "code": "SCHED.CAPACITY.SHORTFALL",
+      "kind": "capacity_shortfall",
+      "locations": [],
+      "message": "Total course credits compared with total faculty maximum credit capacity: required 8, available 4",
+      "subjects": []
+    },
+    {
+      "code": "SCHED.CAPACITY.SHORTFALL",
+      "kind": "capacity_shortfall",
+      "locations": [
+        "/config/faculty/0"
+      ],
+      "message": "Courses with only F1 as a candidate require the shown credits: required 8, available 4",
+      "subjects": [
+        "F1"
+      ]
+    }
+  ],
+  "provenance": [
+    {
+      "relationship": "defines_course_candidates",
+      "source": "/config/courses/0",
+      "subjects": [
+        "CS101.01"
+      ],
+      "target": "candidate-domain:CS101.01"
+    },
+    {
+      "relationship": "generates_compatible_patterns",
+      "source": "/time_slot_config/classes",
+      "subjects": [
+        "CS101.01"
+      ],
+      "target": "candidate-domain:CS101.01"
+    },
+    {
+      "relationship": "configured",
+      "source": "/config/courses/0/faculty",
+      "subjects": [
+        "CS101.01",
+        "F1"
+      ],
+      "target": "candidate:CS101.01:faculty:F1"
+    },
+    {
+      "relationship": "defines_course_candidates",
+      "source": "/config/courses/1",
+      "subjects": [
+        "CS102.01"
+      ],
+      "target": "candidate-domain:CS102.01"
+    },
+    {
+      "relationship": "generates_compatible_patterns",
+      "source": "/time_slot_config/classes",
+      "subjects": [
+        "CS102.01"
+      ],
+      "target": "candidate-domain:CS102.01"
+    },
+    {
+      "relationship": "configured",
+      "source": "/config/courses/1/faculty",
+      "subjects": [
+        "CS102.01",
+        "F1"
+      ],
+      "target": "candidate:CS102.01:faculty:F1"
+    },
+    {
+      "relationship": "contributes_to_unsat_core",
+      "source": "/config/faculty/0",
+      "subjects": [
+        "F1"
+      ],
+      "target": "core:SCHED.FACULTY.CREDIT.RANGE"
+    }
+  ],
+  "reason": null,
+  "relaxation_suggestions": [
+    {
+      "kind": "increase_faculty_maximum_credits",
+      "message": "Increase F1's maximum credits from 4 to at least 8",
+      "priority": 1,
+      "subjects": [
+        "F1"
+      ]
+    },
+    {
+      "kind": "add_faculty_candidate",
+      "message": "Add another eligible faculty candidate for course CS101.01",
+      "priority": 2,
+      "subjects": [
+        "CS101.01",
+        "F1"
+      ]
+    },
+    {
+      "kind": "add_faculty_candidate",
+      "message": "Add another eligible faculty candidate for course CS102.01",
+      "priority": 3,
+      "subjects": [
+        "CS102.01",
+        "F1"
+      ]
+    }
+  ],
+  "repair_sets": [
+    {
+      "message": "Relaxing these business rules makes the hard constraint system satisfiable; translate them into configuration edits before applying a change",
+      "relaxed_constraints": [
+        {
+          "code": "SCHED.FACULTY.CREDIT.RANGE",
+          "kind": "faculty_credit_range",
+          "locations": [
+            "/config/faculty/0"
+          ],
+          "message": "Faculty F1 must teach between 0 and 4 credits",
+          "subjects": [
+            "F1"
+          ]
+        }
+      ],
+      "verified": true
+    }
+  ],
+  "repair_sets_complete": true,
+  "solver_timeout_ms": null,
+  "status": "unsatisfiable",
+  "supporting_facts": [
+    {
+      "code": "SCHED.FORCED.COURSE.FACULTY",
+      "kind": "forced_course_faculty",
+      "locations": [
+        "/config/courses/0",
+        "/config/faculty/0"
+      ],
+      "message": "Course CS101.01 can only be assigned to faculty F1",
+      "subjects": [
+        "CS101.01",
+        "F1"
+      ]
+    },
+    {
+      "code": "SCHED.FACULTY.WORKLOAD.CONTRIBUTION",
+      "kind": "faculty_workload_contribution",
+      "locations": [
+        "/config/faculty/0",
+        "/config/courses/0"
+      ],
+      "message": "Course CS101.01 contributes 4 credits to faculty F1",
+      "subjects": [
+        "F1",
+        "CS101.01"
+      ]
+    },
+    {
+      "code": "SCHED.FORCED.COURSE.ROOM",
+      "kind": "forced_course_room",
+      "locations": [
+        "/config/courses/0"
+      ],
+      "message": "Course CS101.01 can only use room R1",
+      "subjects": [
+        "CS101.01",
+        "R1"
+      ]
+    },
+    {
+      "code": "SCHED.FORCED.COURSE.LAB",
+      "kind": "forced_course_lab",
+      "locations": [
+        "/config/courses/0"
+      ],
+      "message": "Course CS101.01 can only use lab L1",
+      "subjects": [
+        "CS101.01",
+        "L1"
+      ]
+    },
+    {
+      "code": "SCHED.FORCED.COURSE.FACULTY",
+      "kind": "forced_course_faculty",
+      "locations": [
+        "/config/courses/1",
+        "/config/faculty/0"
+      ],
+      "message": "Course CS102.01 can only be assigned to faculty F1",
+      "subjects": [
+        "CS102.01",
+        "F1"
+      ]
+    },
+    {
+      "code": "SCHED.FACULTY.WORKLOAD.CONTRIBUTION",
+      "kind": "faculty_workload_contribution",
+      "locations": [
+        "/config/faculty/0",
+        "/config/courses/1"
+      ],
+      "message": "Course CS102.01 contributes 4 credits to faculty F1",
+      "subjects": [
+        "F1",
+        "CS102.01"
+      ]
+    },
+    {
+      "code": "SCHED.FORCED.COURSE.ROOM",
+      "kind": "forced_course_room",
+      "locations": [
+        "/config/courses/1"
+      ],
+      "message": "Course CS102.01 can only use room R1",
+      "subjects": [
+        "CS102.01",
+        "R1"
+      ]
+    },
+    {
+      "code": "SCHED.FORCED.COURSE.LAB",
+      "kind": "forced_course_lab",
+      "locations": [
+        "/config/courses/1"
+      ],
+      "message": "Course CS102.01 can only use lab L1",
+      "subjects": [
+        "CS102.01",
+        "L1"
+      ]
+    }
+  ]
+}

@@ -54,13 +54,15 @@ Objects from **`get_models()`** are **`CourseInstance`**; the embedded model cou
 
 ## Full API surface
 
-See **Reference** for auto-generated pages from package docstrings (all public modules under `scheduler`).
+See **Reference** for Fern-generated pages covering the public modules, classes, functions, methods, parameters,
+and cross-linked types under `scheduler`.
 
 ## Local regeneration
 
-After changing docstrings, refresh the reference page before `fern docs dev`:
+After changing a public API or docstring, regenerate the reference from the checked-out source before
+`fern docs dev`. Fern's local library parser requires Docker:
 
 ```bash
-uv sync
-uv run python scripts/gen_python_api_mdx.py
+npm install -g fern-api@5.75.4
+fern docs md generate --local --library scheduler-python
 ```
