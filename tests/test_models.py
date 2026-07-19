@@ -187,4 +187,4 @@ def test_time_point_serializer_roundtrip() -> None:
 
 def test_models_reject_extra_fields() -> None:
     with pytest.raises(ValidationError):
-        Duration(duration=1, extra=2)  # type: ignore[call-arg]
+        Duration(duration=1, extra=2)  # type: ignore[unknown-argument]

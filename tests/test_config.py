@@ -88,7 +88,7 @@ def test_meeting_with_start_time() -> None:
 
 def test_meeting_invalid_day() -> None:
     with pytest.raises(ValidationError):
-        Meeting(day="SAT", duration=50)  # type: ignore[arg-type]
+        Meeting(day="SAT", duration=50)  # type: ignore[invalid-argument-type]
 
 
 def test_class_pattern_valid() -> None:
