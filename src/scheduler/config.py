@@ -531,14 +531,20 @@ class CourseConfig(StrictBaseModel):
     List of course IDs that cannot be scheduled simultaneously
     """
 
-    faculty: list[Faculty] = Field(
-        min_length=1,
-        description="List of faculty names",
+    faculty: list[Faculty] | None = Field(
+        description="Faculty candidates, or null to derive candidates from faculty course preferences",
         json_schema_extra={"example": ["Dr. Smith"]},
     )
     """
-    List of faculty names
+    List of faculty names. `null` derives candidates from matching faculty course preferences.
     """
+
+    @field_validator("faculty")
+    @classmethod
+    def _validate_faculty_candidates(cls, value: list[Faculty] | None) -> list[Faculty] | None:
+        if value == []:
+            raise ValueError("Faculty candidates must be non-empty or null for preference-based assignment")
+        return value
 
 
 class FacultyConfig(StrictBaseModel):
@@ -807,10 +813,19 @@ class SchedulerConfig(StrictBaseModel):
             if course.course_id in course.conflicts:
                 errors.append(f'Course "{course.course_id}" cannot conflict with itself')
 
-            # Validate faculty references
-            invalid_faculty = [faculty for faculty in course.faculty if faculty not in valid_faculty]
-            if invalid_faculty:
-                errors.append(f'Course "{course.course_id}" references invalid faculty: {invalid_faculty}')
+            # Validate explicit faculty references or preference-based inference.
+            if course.faculty is None:
+                inferred_faculty = [
+                    faculty.name for faculty in self.faculty if course.course_id in faculty.course_preferences
+                ]
+                if not inferred_faculty:
+                    errors.append(
+                        f'Course "{course.course_id}" has null faculty but no faculty course preferences to derive from'
+                    )
+            else:
+                invalid_faculty = [faculty for faculty in course.faculty if faculty not in valid_faculty]
+                if invalid_faculty:
+                    errors.append(f'Course "{course.course_id}" references invalid faculty: {invalid_faculty}')
 
         # Validate FacultyConfig references
         for faculty in self.faculty:

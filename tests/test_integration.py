@@ -125,6 +125,15 @@ def test_unassigned_faculty_minimum_credits_makes_schedule_unsatisfiable(
     assert next(Scheduler(config).get_models(), None) is None
 
 
+def test_null_course_faculty_derives_candidates_from_preferences(minimal_config_path: Path) -> None:
+    data = json.loads(minimal_config_path.read_text(encoding="utf-8"))
+    data["config"]["courses"][0]["faculty"] = None
+    data["config"]["faculty"][0]["course_preferences"] = {"CS101": 10}
+    config = CombinedConfig(**data)
+    schedule = next(Scheduler(config).get_models())
+    assert schedule[0].faculty == "F1"
+
+
 def test_no_lab_schedule_uses_internal_no_lab_value(minimal_config_path: Path) -> None:
     data = json.loads(minimal_config_path.read_text(encoding="utf-8"))
     data["config"]["labs"] = []

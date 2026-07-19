@@ -104,16 +104,22 @@
           "type": "array"
         },
         "faculty": {
-          "description": "List of faculty names",
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Faculty"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Faculty candidates, or null to derive candidates from faculty course preferences",
           "example": [
             "Dr. Smith"
           ],
-          "items": {
-            "$ref": "#/$defs/Faculty"
-          },
-          "minItems": 1,
-          "title": "Faculty",
-          "type": "array"
+          "title": "Faculty"
         }
       },
       "required": [

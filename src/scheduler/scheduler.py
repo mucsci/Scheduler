@@ -190,6 +190,11 @@ class Scheduler:
         for c in config.courses:
             course_counts[c.course_id] += 1
             required_credits.add(c.credits)
+            course_faculty = (
+                list(c.faculty)
+                if c.faculty is not None
+                else [faculty.name for faculty in config.faculty if c.course_id in faculty.course_preferences]
+            )
             course = Course(
                 credits=c.credits,
                 course_id=c.course_id,
@@ -197,7 +202,7 @@ class Scheduler:
                 labs=c.lab,
                 rooms=c.room,
                 conflicts=c.conflicts,
-                faculties=list(c.faculty),
+                faculties=course_faculty,
             )
             courses.append(course)
 

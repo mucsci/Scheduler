@@ -532,6 +532,47 @@ def test_scheduler_config_invalid_course_faculty() -> None:
         SchedulerConfig(**kw)
 
 
+def test_scheduler_config_derives_null_course_faculty_from_preferences() -> None:
+    kwargs = _minimal_scheduler_kwargs()
+    kwargs["courses"] = [
+        CourseConfig(
+            course_id="CS101",
+            credits=3,
+            room=["R1"],
+            lab=["L1"],
+            conflicts=[],
+            faculty=None,
+        )
+    ]
+    kwargs["faculty"] = [
+        FacultyConfig(
+            name="F1",
+            maximum_credits=12,
+            minimum_credits=3,
+            unique_course_limit=1,
+            times=_faculty_times({"MON": ["09:00-17:00"]}),
+            course_preferences={"CS101": 5},
+        )
+    ]
+    SchedulerConfig(**kwargs)
+
+
+def test_scheduler_config_rejects_null_course_faculty_without_preferences() -> None:
+    kwargs = _minimal_scheduler_kwargs()
+    kwargs["courses"] = [
+        CourseConfig(
+            course_id="CS101",
+            credits=3,
+            room=["R1"],
+            lab=["L1"],
+            conflicts=[],
+            faculty=None,
+        )
+    ]
+    with pytest.raises(ValidationError, match="no faculty course preferences"):
+        SchedulerConfig(**kwargs)
+
+
 def test_scheduler_config_invalid_faculty_course_pref() -> None:
     kw = _minimal_scheduler_kwargs()
     kw["faculty"] = [
