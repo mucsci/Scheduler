@@ -1,17 +1,20 @@
 ---
 title: Using the Python library
-description: Load CombinedConfig, run Scheduler, and export schedules — plus important type naming notes.
+description: Validate configuration, enumerate schedules, diagnose feasibility, audit results, and export output.
 ---
 
 ## Install
-
-Use the same package as the CLI (see **Introduction → Welcome**):
 
 ```bash
 pip install course-constraint-scheduler
 ```
 
-## Minimal flow
+The package requires Python 3.12 or newer. The distribution name is `course-constraint-scheduler`; the import name
+is `scheduler`.
+
+## Load and validate configuration
+
+Use `load_config_from_file` when invalid JSON or configuration should raise its normal exception:
 
 ```python
 from scheduler import Scheduler, load_config_from_file
@@ -19,20 +22,88 @@ from scheduler.config import CombinedConfig
 
 config = load_config_from_file(CombinedConfig, "config.json")
 scheduler = Scheduler(config)
+```
 
+It can raise `OSError`, `json.JSONDecodeError`, or `pydantic.ValidationError`. For an untrusted in-memory mapping,
+use the non-throwing structured validator:
+
+```python
+from scheduler import validate_combined_config_data
+
+validation = validate_combined_config_data(payload)
+if not validation.is_valid:
+    for finding in validation.diagnostics:
+        print(finding.code, finding.path, finding.message)
+```
+
+Valid input includes a stable `configuration_fingerprint`. See **Diagnostics and auditing** for the validation
+contract.
+
+## Construct a scheduler
+
+```python
+scheduler = Scheduler(config, solver_timeout_ms=30_000)
+```
+
+`solver_timeout_ms` is optional for Python callers and applies to each Z3 check performed by generation or
+diagnosis. `None` leaves Z3 without a scheduler-supplied timeout. The REST server always supplies its configured
+API timeout.
+
+Construction normalizes the problem and builds hard constraints, but schedules are generated lazily.
+
+## Enumerate schedules
+
+```python
 for schedule in scheduler.get_models():
     for course_instance in schedule:
         print(course_instance.as_csv())
 ```
 
-If you are working from this repository, start with `example.json` for a richer scenario or `tests/fixtures/minimal_config.json` for a smaller fixture.
+`get_models()` returns a generator of complete `list[CourseInstance]` schedules. It stops when it reaches the
+configuration's `limit`, exhausts the solution space, or receives `unknown` from Z3. Each result is blocked before
+the next check, so one generator yields distinct schedules in deterministic model-blocking order. Calling
+`get_models()` again creates a fresh enumeration.
 
-- **`load_config_from_file`** — JSON from disk into any Pydantic model (usually `CombinedConfig`).
-- **`Scheduler`** — Builds the Z3 problem once; **`get_models()`** is a generator yielding each feasible schedule as a list of **`CourseInstance`** objects.
+Z3 construction, optimization, or evaluation failures can raise `z3.Z3Exception`.
+
+## Diagnose before generation
+
+```python
+diagnosis = scheduler.diagnose()
+if diagnosis.status == "unsatisfiable":
+    for rule in diagnosis.conflicting_constraints:
+        print(rule.code, rule.locations, rule.message)
+```
+
+`diagnose()` checks hard-constraint feasibility without running soft objectives or changing enumeration. The
+returned `ScheduleDiagnosis` includes candidate domains, capacity and day analysis, preflight findings, unsat
+cores, supporting facts, suggestions, verified repairs, provenance, completeness metadata, fingerprint, timing,
+and timeout information.
+
+## Audit a schedule
+
+```python
+schedule = next(scheduler.get_models())
+audit = scheduler.audit_schedule(schedule)
+if not audit.is_valid:
+    for violation in audit.constraint_violations:
+        print(violation.message)
+```
+
+`audit_schedule()` does not query Z3. The independent auditor validates the supplied decoded schedule against normalized policies
+and reports workload, resource use, enabled objective scores, and unmet preference outcomes. Unknown faculty names
+can raise `KeyError` while preference scoring is enabled.
+
+## Diagnostic contracts
+
+The root package exports the stable solver-independent contracts used by validation, diagnosis, and auditing,
+including `ConfigurationValidationResult`, `ScheduleDiagnosis`, `ConstraintDiagnostic`, `RepairSetDiagnostic`,
+`ScheduleAudit`, `FacultyWorkloadDiagnostic`, and `ObjectiveScoreDiagnostic`. Their complete field documentation is
+available under **Reference**.
 
 ## Writers
 
-JSON and CSV serializers live under **`scheduler.writers`**.
+JSON and CSV serializers live under `scheduler.writers`:
 
 ```python
 from scheduler.writers import CSVWriter, JSONWriter
@@ -43,24 +114,23 @@ with JSONWriter("schedules.json") as json_writer, CSVWriter("schedules.csv") as 
         csv_writer.add_schedule(schedule)
 ```
 
-Use writers when you need stable machine-readable output files instead of printing rows directly.
-
 ## Naming: two different `Course` concepts
 
-- **`scheduler.config`** exports a **`Course` type alias** — a **string** course id used in JSON (`course_id`, preferences, conflicts).
-- **`scheduler.models`** defines a **`Course` class** — meeting structure with credits and `course_id`.
-
-Objects from **`get_models()`** are **`CourseInstance`**; the embedded model course is **`.course`**. Use **`.course.course_id`** when you need the config-style id string.
+- `scheduler.config.Course` is a string course-id type alias used by JSON configuration.
+- `scheduler.models.Course` is the runtime class containing credits, section identity, and compatibility mirrors.
+- Generated values are `CourseInstance`; use `.course.course_id` for the base configuration id.
 
 ## Full API surface
 
-See **Reference** for Fern-generated pages covering the public modules, classes, functions, methods, parameters,
-and cross-linked types under `scheduler`.
+See **Reference** for Fern-generated pages covering importable modules, public callables, parameters, exceptions,
+execution semantics, and datatype fields. `Scheduler` is the stable façade; `SchedulingProblem`, `SolverEngine`,
+`DiagnosticEngine`, and `ScheduleAuditor` are internal architectural components despite being importable from their
+implementation modules.
 
 ## Local regeneration
 
-After changing a public API or docstring, regenerate the reference from the checked-out source before
-`fern docs dev`. Fern's local library parser requires Docker:
+After changing a public API or docstring, regenerate the ignored reference from the checked-out source. Fern's
+local library parser requires Node.js 22 and Docker:
 
 ```bash
 npm install -g fern-api@5.75.4

@@ -29,6 +29,8 @@ uv run python scripts/export_openapi.py
 2. Regenerate OpenAPI with `uv run python scripts/export_openapi.py`.
 3. Run validation (`uv run pytest` and/or focused API tests).
 4. Update Fern narrative docs in `fern/docs/pages/` when user-facing behavior changed.
+5. Keep every application route in the endpoint inventory at `fern/docs/pages/rest/quickstart.mdx`; the
+   source-driven documentation parity test will reject omissions.
 
 ## Integration tests
 
@@ -37,6 +39,8 @@ uv run python scripts/export_openapi.py
 ## Documentation
 
 - User-facing API narrative lives under **`fern/docs/pages/`**; machine-readable spec is **`fern/openapi.json`**.
+  Session states, completion reasons, concurrency, cleanup, limits, TTL, CORS, authentication expectations, and
+  error statuses belong in the REST integration guide when those behaviors change.
 
 Cross-skill references:
 

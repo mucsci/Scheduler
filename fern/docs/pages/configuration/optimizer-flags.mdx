@@ -25,13 +25,15 @@ description: Optional optimizer_flags that steer soft objectives on top of hard 
 | `faculty_course` | Prefer faculty–course assignment by course preferences. |
 | `faculty_room` | Prefer faculty–room preferences. |
 | `faculty_lab` | Prefer faculty–lab preferences. |
-| `same_room` | Prefer keeping a course in one room when possible. |
-| `same_lab` | Prefer keeping a course in one lab when possible. |
-| `pack_rooms` | Prefer fewer distinct rooms overall. |
-| `pack_labs` | Prefer fewer distinct labs overall. |
+| `same_room` | Prefer eligible course pairs taught by one faculty member to share a room. |
+| `same_lab` | Prefer eligible lab-course pairs taught by one faculty member to share a lab. |
+| `pack_rooms` | Prefer different courses to use the same room when any meeting pair is adjacent. |
+| `pack_labs` | Prefer different courses to use the same lab at adjacent lab times. |
 
 ## Practices
 
 - Start with `faculty_course` and add resource flags as needed.
 - More flags can **increase** solve time; tune for your instance size.
 - Hard constraints (availability, conflicts, etc.) are always enforced; flags affect **preferences**, not feasibility.
+- Objectives use Pareto priority and a fixed registration order; rearranging the flag strings does not change it.
+- Objective audit upper bounds score each item independently and may not be jointly attainable.

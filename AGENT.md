@@ -34,7 +34,7 @@ CLI help: `uv run python -m scheduler.main --help`, `uv run python -m scheduler.
 ## Layout (short)
 
 ```
-src/scheduler/     # Package: config, scheduler (Z3), server, models, writers, CLI
+src/scheduler/     # Package: problem/solver/diagnostics/audit engines, façade, config, REST, models, writers, CLI
 tests/             # pytest; @pytest.mark.slow for heavy cases
 scripts/           # export_openapi and export_config_schema
 fern/              # docs site; openapi.json and some assets are generated — do not hand-edit
@@ -47,6 +47,11 @@ skills/            # task playbooks (SKILL.md per subfolder) for assistants and 
 1. **`Course` naming**: `scheduler.config` uses `Course` as a **course-id string** type in JSON config. `scheduler.models` defines a **`Course` class** (credits, meetings, etc.). `CourseInstance.course` is the model; use **`.course.course_id`** for the config-style id. (See README “Note on naming”.)
 2. **Generated artifacts**: After changing **`src/scheduler/server.py`** or API-facing models, refresh **`fern/openapi.json`**. After **`CombinedConfig`** / config models change, refresh **`fern/docs/assets/combined-config.schema.json`**. Fern generates the Python library reference from public source and docstrings into the ignored **`fern/static/python-reference/`** directory; do not commit it. See CONTRIBUTING.
 3. **Style**: **Ruff** is authoritative (`pyproject.toml`: line length **120**, `py312`). CONTRIBUTING matches this; when in doubt follow **`pyproject.toml`**.
+4. **Architecture**: `scheduler.py` is orchestration only. Normalize shared policy in `problem.py`, own Z3 in
+   `solver.py`, put explanations/repairs in `diagnostics.py`, and mirror hard rules independently in `audit.py`.
+5. **Documentation parity**: Configuration fields, public façade methods, REST routes, API limit variables, and
+   canonical examples are checked by `tests/test_documentation_parity.py`; update the corresponding Fern guide
+   whenever one of those implementation surfaces changes.
 
 ## Skills
 

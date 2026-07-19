@@ -1106,7 +1106,7 @@ class SolverEngine:
                 for course in self._courses:
                     if course.course_id in preferences:
                         # Use preference value directly
-                        # (1-5 scale where 5 is strongly prefer, 1 is weakest)
+                        # Preference values use the configured 0-10 scale; zero contributes no objective points.
                         preference_value = preferences[course.course_id]
                         if preference_value == 0:
                             continue

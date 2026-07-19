@@ -42,7 +42,7 @@
             }
           ],
           "default": null,
-          "description": "Specific start time constraint"
+          "description": "Fixed start fallback for meetings without their own start time"
         }
       },
       "required": [
@@ -59,11 +59,11 @@
     },
     "CourseConfig": {
       "additionalProperties": false,
-      "description": "Represents a course configuration.\n\n**Usage:**\n```python\nCourseConfig(course_id=\"CS 101\", credits=3, room=[...], lab=[...], conflicts=[], faculty=[])\n```",
+      "description": "Represents a course configuration.\n\n**Usage:**\n```python\nCourseConfig(\n    course_id=\"CS 101\",\n    credits=3,\n    room=[\"Room 101\"],\n    lab=[],\n    conflicts=[],\n    faculty=[\"Dr. Smith\"],\n)\n```",
       "properties": {
         "course_id": {
           "$ref": "#/$defs/Course",
-          "description": "Unique identifier for the course"
+          "description": "Base course identifier; repeated values create separately numbered sections"
         },
         "credits": {
           "description": "Number of credit hours",
@@ -85,7 +85,7 @@
           "type": "array"
         },
         "lab": {
-          "description": "List of acceptable lab names",
+          "description": "Acceptable labs; an empty list means the course has no lab meeting",
           "example": [
             "Lab 101"
           ],
@@ -96,7 +96,7 @@
           "type": "array"
         },
         "conflicts": {
-          "description": "List of course IDs that cannot be scheduled simultaneously",
+          "description": "Base course IDs whose sections cannot overlap; an empty list means no declared conflicts",
           "items": {
             "$ref": "#/$defs/Course"
           },
@@ -115,7 +115,7 @@
               "type": "null"
             }
           ],
-          "description": "Faculty candidates, or null to derive candidates from faculty course preferences",
+          "description": "Non-empty faculty candidates, or null to derive candidates from faculty course-preference keys",
           "example": [
             "Dr. Smith"
           ],
@@ -194,7 +194,7 @@
             },
             "type": "array"
           },
-          "description": "Dictionary mapping day names to time ranges",
+          "description": "Availability ranges keyed by weekday; omitted days and empty lists mean unavailable",
           "example": {
             "MON": [
               "10:00-12:00"
@@ -297,7 +297,7 @@
             }
           ],
           "default": null,
-          "description": "Specific start time constraint"
+          "description": "Fixed start for this meeting; overrides the containing pattern start time"
         },
         "duration": {
           "description": "Duration of the meeting in minutes",
@@ -308,7 +308,7 @@
         },
         "lab": {
           "default": false,
-          "description": "Whether the meeting is in a lab",
+          "description": "Whether this is the pattern's single lab meeting",
           "title": "Lab",
           "type": "boolean"
         }
@@ -506,7 +506,7 @@
             },
             "type": "array"
           },
-          "description": "Dictionary mapping day names to time blocks",
+          "description": "Time blocks keyed by weekday; every Monday-Friday list must be non-empty",
           "propertyNames": {
             "$ref": "#/$defs/Day"
           },
@@ -514,7 +514,7 @@
           "type": "object"
         },
         "classes": {
-          "description": "List of class patterns",
+          "description": "Meeting patterns; at least one pattern must be enabled",
           "items": {
             "$ref": "#/$defs/ClassPattern"
           },
@@ -523,7 +523,7 @@
         },
         "max_time_gap": {
           "default": 30,
-          "description": "Maximum time gap between time slots to determine if they are adjacent",
+          "description": "Maximum gap in minutes used to determine whether meetings are adjacent",
           "example": 30,
           "exclusiveMinimum": 0,
           "minimum": 0,
@@ -532,7 +532,7 @@
         },
         "min_time_overlap": {
           "default": 45,
-          "description": "Minimum overlap between time slots",
+          "description": "Minimum clock-time overlap in minutes between meetings on different pattern days",
           "example": 45,
           "exclusiveMinimum": 0,
           "title": "Min Time Overlap",

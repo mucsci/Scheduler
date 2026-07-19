@@ -695,7 +695,7 @@
                 "type": "null"
               }
             ],
-            "description": "Specific start time constraint"
+            "description": "Fixed start fallback for meetings without their own start time"
           }
         },
         "additionalProperties": false,
@@ -983,7 +983,7 @@
         "properties": {
           "course_id": {
             "$ref": "#/components/schemas/Course",
-            "description": "Unique identifier for the course",
+            "description": "Base course identifier; repeated values create separately numbered sections",
             "example": "CS 101"
           },
           "credits": {
@@ -1011,7 +1011,7 @@
             },
             "type": "array",
             "title": "Lab",
-            "description": "List of acceptable lab names",
+            "description": "Acceptable labs; an empty list means the course has no lab meeting",
             "example": [
               "Lab 101"
             ]
@@ -1022,7 +1022,7 @@
             },
             "type": "array",
             "title": "Conflicts",
-            "description": "List of course IDs that cannot be scheduled simultaneously"
+            "description": "Base course IDs whose sections cannot overlap; an empty list means no declared conflicts"
           },
           "faculty": {
             "anyOf": [
@@ -1037,7 +1037,7 @@
               }
             ],
             "title": "Faculty",
-            "description": "Faculty candidates, or null to derive candidates from faculty course preferences",
+            "description": "Non-empty faculty candidates, or null to derive candidates from faculty course-preference keys",
             "example": [
               "Dr. Smith"
             ]
@@ -1053,13 +1053,13 @@
           "faculty"
         ],
         "title": "CourseConfig",
-        "description": "Represents a course configuration.\n\n**Usage:**\n```python\nCourseConfig(course_id=\"CS 101\", credits=3, room=[...], lab=[...], conflicts=[], faculty=[])\n```"
+        "description": "Represents a course configuration.\n\n**Usage:**\n```python\nCourseConfig(\n    course_id=\"CS 101\",\n    credits=3,\n    room=[\"Room 101\"],\n    lab=[],\n    conflicts=[],\n    faculty=[\"Dr. Smith\"],\n)\n```"
       },
       "CourseConfig-Output": {
         "properties": {
           "course_id": {
             "$ref": "#/components/schemas/Course",
-            "description": "Unique identifier for the course"
+            "description": "Base course identifier; repeated values create separately numbered sections"
           },
           "credits": {
             "type": "integer",
@@ -1086,7 +1086,7 @@
             },
             "type": "array",
             "title": "Lab",
-            "description": "List of acceptable lab names",
+            "description": "Acceptable labs; an empty list means the course has no lab meeting",
             "example": [
               "Lab 101"
             ]
@@ -1097,7 +1097,7 @@
             },
             "type": "array",
             "title": "Conflicts",
-            "description": "List of course IDs that cannot be scheduled simultaneously"
+            "description": "Base course IDs whose sections cannot overlap; an empty list means no declared conflicts"
           },
           "faculty": {
             "anyOf": [
@@ -1112,7 +1112,7 @@
               }
             ],
             "title": "Faculty",
-            "description": "Faculty candidates, or null to derive candidates from faculty course preferences",
+            "description": "Non-empty faculty candidates, or null to derive candidates from faculty course-preference keys",
             "example": [
               "Dr. Smith"
             ]
@@ -1128,7 +1128,7 @@
           "faculty"
         ],
         "title": "CourseConfig",
-        "description": "Represents a course configuration.\n\n**Usage:**\n```python\nCourseConfig(course_id=\"CS 101\", credits=3, room=[...], lab=[...], conflicts=[], faculty=[])\n```"
+        "description": "Represents a course configuration.\n\n**Usage:**\n```python\nCourseConfig(\n    course_id=\"CS 101\",\n    credits=3,\n    room=[\"Room 101\"],\n    lab=[],\n    conflicts=[],\n    faculty=[\"Dr. Smith\"],\n)\n```"
       },
       "CourseInstanceResponse": {
         "properties": {
@@ -1318,7 +1318,7 @@
             },
             "type": "object",
             "title": "Times",
-            "description": "Dictionary mapping day names to time ranges",
+            "description": "Availability ranges keyed by weekday; omitted days and empty lists mean unavailable",
             "example": {
               "MON": [
                 "10:00-12:00"
@@ -1444,7 +1444,7 @@
             },
             "type": "object",
             "title": "Times",
-            "description": "Dictionary mapping day names to time ranges",
+            "description": "Availability ranges keyed by weekday; omitted days and empty lists mean unavailable",
             "example": {
               "MON": [
                 "10:00-12:00"
@@ -1662,7 +1662,7 @@
                 "type": "null"
               }
             ],
-            "description": "Specific start time constraint"
+            "description": "Fixed start for this meeting; overrides the containing pattern start time"
           },
           "duration": {
             "type": "integer",
@@ -1674,7 +1674,7 @@
           "lab": {
             "type": "boolean",
             "title": "Lab",
-            "description": "Whether the meeting is in a lab",
+            "description": "Whether this is the pattern's single lab meeting",
             "default": false
           }
         },
@@ -2316,7 +2316,7 @@
           "reason"
         ],
         "title": "ScheduleDiagnosisResponse",
-        "description": "Structured hard-constraint feasibility analysis for a schedule session.\n\nFields:\n    schedule_id: Session whose configuration was diagnosed.\n    status: Solver feasibility status such as sat, unsat, or unknown.\n    conflicting_constraints: Minimal primary set of conflicting hard rules.\n    alternative_conflict_sets: Other independently discovered conflict cores.\n    supporting_facts: Relevant non-core facts that explain the conflict.\n    relaxation_suggestions: Ranked configuration changes derived from findings.\n    repair_sets: Solver-verified combinations of relaxations.\n    candidate_domains: Per-course candidate resources and eliminations.\n    capacity_analysis: Necessary resource and workload capacity calculations.\n    day_feasibility: Per-faculty, per-day availability feasibility facts.\n    preflight_findings: Static contradictions found before core extraction.\n    provenance: Edges linking facts, configuration, and conclusions.\n    configuration_fingerprint: Stable digest of the diagnosed configuration.\n    core_is_minimal: Whether the primary conflict core was proven minimal.\n    alternative_cores_complete: Whether alternative-core enumeration completed.\n    repair_sets_complete: Whether repair-set enumeration completed.\n    diagnostic_completeness: Overall completeness classification.\n    diagnostic_version: Version of the diagnostic response semantics.\n    elapsed_ms: Total diagnostic execution time in milliseconds.\n    solver_timeout_ms: Solver timeout used, or null when no timeout was set.\n    reason: Solver or diagnostic explanation for an indeterminate result."
+        "description": "Structured hard-constraint feasibility analysis for a schedule session.\n\nFields:\n    schedule_id: Session whose configuration was diagnosed.\n    status: Solver feasibility status: satisfiable, unsatisfiable, or unknown.\n    conflicting_constraints: Minimal primary set of conflicting hard rules.\n    alternative_conflict_sets: Other independently discovered conflict cores.\n    supporting_facts: Relevant non-core facts that explain the conflict.\n    relaxation_suggestions: Ranked configuration changes derived from findings.\n    repair_sets: Solver-verified combinations of relaxations.\n    candidate_domains: Per-course candidate resources and eliminations.\n    capacity_analysis: Necessary resource and workload capacity calculations.\n    day_feasibility: Per-faculty, per-day availability feasibility facts.\n    preflight_findings: Static contradictions found before core extraction.\n    provenance: Edges linking facts, configuration, and conclusions.\n    configuration_fingerprint: Stable digest of the diagnosed configuration.\n    core_is_minimal: Whether the primary conflict core was proven minimal.\n    alternative_cores_complete: Whether alternative-core enumeration completed.\n    repair_sets_complete: Whether repair-set enumeration completed.\n    diagnostic_completeness: Overall completeness classification.\n    diagnostic_version: Version of the diagnostic response semantics.\n    elapsed_ms: Total diagnostic execution time in milliseconds.\n    solver_timeout_ms: Solver timeout used, or null when no timeout was set.\n    reason: Solver or diagnostic explanation for an indeterminate result."
       },
       "ScheduleResponse": {
         "properties": {
@@ -2811,7 +2811,7 @@
             },
             "type": "object",
             "title": "Times",
-            "description": "Dictionary mapping day names to time blocks"
+            "description": "Time blocks keyed by weekday; every Monday-Friday list must be non-empty"
           },
           "classes": {
             "items": {
@@ -2819,14 +2819,14 @@
             },
             "type": "array",
             "title": "Classes",
-            "description": "List of class patterns"
+            "description": "Meeting patterns; at least one pattern must be enabled"
           },
           "max_time_gap": {
             "type": "integer",
             "minimum": 0.0,
             "exclusiveMinimum": 0.0,
             "title": "Max Time Gap",
-            "description": "Maximum time gap between time slots to determine if they are adjacent",
+            "description": "Maximum gap in minutes used to determine whether meetings are adjacent",
             "default": 30,
             "example": 30
           },
@@ -2834,7 +2834,7 @@
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Min Time Overlap",
-            "description": "Minimum overlap between time slots",
+            "description": "Minimum clock-time overlap in minutes between meetings on different pattern days",
             "default": 45,
             "example": 45
           }
@@ -2862,7 +2862,7 @@
             },
             "type": "object",
             "title": "Times",
-            "description": "Dictionary mapping day names to time blocks"
+            "description": "Time blocks keyed by weekday; every Monday-Friday list must be non-empty"
           },
           "classes": {
             "items": {
@@ -2870,14 +2870,14 @@
             },
             "type": "array",
             "title": "Classes",
-            "description": "List of class patterns"
+            "description": "Meeting patterns; at least one pattern must be enabled"
           },
           "max_time_gap": {
             "type": "integer",
             "minimum": 0.0,
             "exclusiveMinimum": 0.0,
             "title": "Max Time Gap",
-            "description": "Maximum time gap between time slots to determine if they are adjacent",
+            "description": "Maximum gap in minutes used to determine whether meetings are adjacent",
             "default": 30,
             "example": 30
           },
@@ -2885,7 +2885,7 @@
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Min Time Overlap",
-            "description": "Minimum overlap between time slots",
+            "description": "Minimum clock-time overlap in minutes between meetings on different pattern days",
             "default": 45,
             "example": 45
           }

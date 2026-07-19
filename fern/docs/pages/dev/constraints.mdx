@@ -1,27 +1,61 @@
 ---
-title: Adding constraints
-description: Where Z3 constraints are built in scheduler.py and how they compose.
+title: Architecture and adding constraints
+description: How normalized problems, Z3 artifacts, diagnostics, auditing, and the public façade compose.
 ---
 
-Hard scheduling rules are expressed as Z3 boolean formulas in **`src/scheduler/scheduler.py`** on the **`Scheduler`** class.
+`Scheduler` is a stable orchestration façade. It constructs four components and delegates its three public methods:
 
-## Lifecycle
+1. `SchedulingProblem.from_config` normalizes validated configuration, faculty/course policies, source paths,
+   generated time domains, and cached compatibility queries without importing Z3.
+2. `SolverEngine` owns the Z3 context, deterministic enum symbols, `CourseVariables`, relation tables, hard
+   constraints, optimizer objectives, model decoding, and model blocking.
+3. `DiagnosticEngine` consumes the normalized problem and immutable `SolverArtifacts` to perform preflight
+   analysis, tracked hard-rule checks, unsat-core search, provenance, suggestions, and verified repairs.
+4. `ScheduleAuditor` independently reconstructs hard rules and objective scores without importing or querying Z3.
 
-1. **`__init__`** loads configuration, builds internal **`Course`** / time-slot structures, creates Z3 sorts and per-course variables, then assembles constraints.
-2. **`_build_function_constraints`** — Declares abstract functions over time slots (`overlaps`, `lab_overlaps`, `lecture_next_to`, `faculty_available`, `lab_next_to`) and wires them to concrete slot facts.
-3. **`_build_faculty_constraints`** — Credit totals, unique-course caps, optional max/mandatory days, availability.
-4. **`_build_course_constraints`** — Per-course room/lab choice, time choice, faculty choice, conflict exclusions, faculty availability linkage.
-5. **`_build_resource_constraints`** — No double-booking of rooms/labs/faculty; section adjacency rules for same vs different courses.
-6. **`_aggregate_constraints`** — Combines lists and attaches the optimizer (soft goals) from **`optimizer_flags`**.
+Public diagnostic result dataclasses live in `contracts.py`; raw loading and structured validation live in
+`configuration.py`. Do not move Z3 ownership back into `scheduler.py` or add parallel state to the façade.
 
-## Adding a new hard constraint
+## Add or change a hard rule
 
-1. Decide whether it is **local** (one course) or **cross-course** / **global**.
-2. Add a **`_build_*`** helper or extend an existing one, returning additional **`z3.BoolRef`** terms.
-3. Fold the result into **`_aggregate_constraints`** (or the appropriate caller) so every `check()` / `get_models()` sees it.
-4. Add **tests** under `tests/` with small configs that pass/fail as expected.
-5. If users must configure it, extend **`CombinedConfig`** / sub-models in **`config.py`** (see **Adding configuration options**).
+1. Decide which normalized policy or compatibility data the rule needs. Add it to `SchedulingProblem` only when it
+   is shared by solving, diagnosis, or auditing.
+2. Encode the authoritative Z3 rule in the appropriate `SolverEngine._build_*_constraints` family.
+3. Add a `DiagnosticConstraintArtifact` with a stable `kind`, precise subjects, and source locations so diagnosis
+   can track the business rule rather than an opaque aggregate formula.
+4. Mirror the rule independently in `ScheduleAuditor`; do not reuse a Z3 expression as the audit implementation.
+5. Add static candidate/capacity/day analysis in `DiagnosticEngine` when the rule has a useful necessary condition.
+6. Update **Scheduling rules and objectives**, relevant configuration pages, and diagnostic guidance.
 
-## Performance
+Keep tracked constraints granular enough that a subset-minimal core identifies one actionable business rule.
+Aggregating unrelated faculty, course, or resource rules under one tracker makes cores and repair sets less useful.
 
-Constraint count grows with courses × slots × faculty. Prefer batched implications (the file already batches several patterns) over naive pairwise loops when you touch large loops.
+## Add or change an objective
+
+1. Add or reuse an `OptimizerFlags` value in configuration.
+2. Register the Z3 objective in `SolverEngine.get_models` without changing established ordering for existing flags.
+3. Recalculate the same contribution in `ScheduleAuditor._objective_diagnostics`, including an independent upper
+   bound and unmet-outcome explanation.
+4. Add optimized solver tests, audit-score tests, and documentation for exact point contribution.
+
+## Compatibility requirements
+
+- Preserve `Scheduler(full_config, *, solver_timeout_ms=None)` and the behavior of `get_models()`, `diagnose()`, and
+  `audit_schedule()`.
+- Preserve root exports and legacy imports from `scheduler.scheduler`.
+- Keep generated ordering, timeout handling, no-lab decoding, deterministic symbols, and model blocking covered by
+  characterization tests.
+- `Course.time`, `faculty`, `room`, and `lab` remain compatibility mirrors; new internal logic uses
+  `CourseVariables` from solver artifacts.
+
+## Testing layers
+
+- Problem normalization and compatible-domain caching: `test_problem.py`.
+- Constraint families, objectives, decoding, and timeouts: `test_solver_engine.py`.
+- Preflight, cores, repairs, and completeness: `test_diagnostic_engine.py`.
+- Independent rules and scoring: `test_schedule_auditor.py`.
+- Cross-component and HTTP workflows: integration and ASGI suites.
+- Stable outputs and imports: characterization, public API, and architecture suites.
+
+Constraint volume grows with courses, candidate slots, faculty, and cross-course pairs. Keep bounded diagnostic
+searches explicit and preserve the candidate-comparison caps when extending preflight analysis.

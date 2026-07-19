@@ -1,0 +1,72 @@
+---
+title: Scheduling rules and objectives
+description: The complete hard-constraint and soft-objective behavior enforced by the scheduler.
+---
+
+The scheduler first enforces every hard rule below. When `optimizer_flags` are enabled, it then searches the
+feasible schedules for Pareto-optimal objective values. An optimizer flag can rank feasible schedules, but it can
+never relax a hard rule.
+
+## Course assignments
+
+Every configured course section receives exactly one faculty member, room, and compatible meeting pattern.
+
+- Faculty and rooms must come from the course's eligible lists.
+- `faculty: null` derives eligibility from faculty members who have a `course_preferences` key for the course.
+- A course with a non-empty `lab` list receives exactly one listed lab for its single lab-marked meeting.
+- A course with `lab: []` uses a no-lab pattern and its generated `lab` and `lab_index` values are `null`.
+- The meeting pattern must have matching credits and matching lab presence.
+- The assigned pattern must fit entirely within the assigned faculty member's availability.
+
+Repeated `course_id` values are separate sections, numbered in configuration order (`CS101.01`, `CS101.02`, and
+so on). A `conflicts` entry names the base course id and therefore applies to every matching section.
+
+## Faculty workload
+
+The following rules are evaluated for every configured faculty member, even when that person is not eligible for
+any course:
+
+- Assigned credits must remain between `minimum_credits` and `maximum_credits`, inclusive.
+- The number of distinct base course ids must not exceed `unique_course_limit`.
+- The number of teaching weekdays must not exceed `maximum_days`.
+- Every `mandatory_days` value must contain at least one assigned meeting.
+- Every assigned meeting must fit within a configured availability range.
+
+Consequently, a faculty member with no eligible courses cannot satisfy a positive minimum-credit requirement or a
+mandatory teaching day.
+
+## Conflicts and shared resources
+
+- Courses that declare a conflict cannot overlap.
+- Different sections of the same base course cannot overlap.
+- Two assignments using the same room cannot have any overlapping meetings, including lab-marked meetings.
+- Two assignments using the same lab cannot have overlapping lab meetings.
+- Courses taught by the same faculty member cannot overlap.
+
+Additional same-faculty rules use `max_time_gap` to decide whether two meetings are adjacent:
+
+- Sections of the same course taught by one faculty member use the same room or lab when their corresponding
+  candidate lists intersect, and have adjacent meeting and lab pairs.
+- Different courses taught by one faculty member must not have adjacent meeting pairs; when both use labs,
+  their lab meetings must not be adjacent.
+
+## Optimizer objectives
+
+Enabled objectives are registered in a fixed order and optimized with Z3's Pareto priority. The order of strings
+inside `optimizer_flags` does not change that registration order.
+
+| Flag | Score added |
+|---|---|
+| `faculty_course` | The assigned faculty member's configured score for the course id. |
+| `faculty_room` | The assigned faculty member's configured score for the selected room. |
+| `faculty_lab` | The assigned faculty member's configured score for the selected lab. No-lab courses add zero. |
+| `same_room` | One point for each eligible course pair taught by the same faculty member in the same room. |
+| `same_lab` | One point for each eligible lab-course pair taught by the same faculty member in the same lab. |
+| `pack_rooms` | One point for different-course pairs using the same room when any meeting pair is adjacent. |
+| `pack_labs` | One point for different-course pairs using the same lab at adjacent lab times. |
+
+Missing preference keys and explicit preference value `0` contribute zero. Each generated schedule is blocked
+before the next solver check, so enumeration yields distinct complete assignments until `limit`, solver exhaustion,
+or an indeterminate solver result is reached.
+
+Use **Diagnostics and auditing** to inspect why a configuration is infeasible or how a generated schedule scores.

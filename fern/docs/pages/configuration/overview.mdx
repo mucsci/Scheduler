@@ -17,6 +17,8 @@ The Course Constraint Scheduler uses a **JSON** configuration that defines the s
 - **Cross-references** — Course rooms/labs/faculty/conflicts must name entities that exist in `config`.
 - **Business rules** — e.g. faculty min/max credits, mandatory days, no self-conflicts.
 - **Strict types** — Times and ranges use fixed string patterns (see below).
+- **No unknown keys** — Every model uses `extra="forbid"`; misspelled or future fields fail validation.
+- **No coercion** — `strict=True` rejects values such as a numeric string where an integer is required.
 
 ## Type aliases (conceptual)
 
@@ -28,7 +30,7 @@ These are enforced in JSON via patterns and constraints:
 | `TimeRangeString` | `HH:MM-HH:MM` |
 | `Preference` | Integer `0`–`10` |
 | `Day` | `MON`, `TUE`, `WED`, `THU`, or `FRI` |
-| Room / lab / course / faculty ids | Strings; rooms/labs/faculty names must be unique where required |
+| Room / lab / course / faculty ids | Strings; room, lab, and faculty names are unique; repeated course ids create sections |
 
 ## JSON Schema
 
@@ -47,74 +49,15 @@ uv run python scripts/export_config_schema.py
 
 The **REST API** `POST /submit` body matches this shape (same model as `CombinedConfig`).
 
-## Full example
+## Valid complete examples
 
-```json
-{
-  "config": {
-    "rooms": ["Room A", "Room B", "Room C"],
-    "labs": ["Lab 1", "Lab 2"],
-    "courses": [
-      {
-        "course_id": "CS101",
-        "credits": 3,
-        "room": ["Room A", "Room B"],
-        "lab": ["Lab 1"],
-        "conflicts": ["CS102"],
-        "faculty": ["Dr. Smith", "Dr. Johnson"]
-      },
-      {
-        "course_id": "CS102",
-        "credits": 4,
-        "room": ["Room B", "Room C"],
-        "lab": ["Lab 2"],
-        "conflicts": ["CS101"],
-        "faculty": ["Dr. Johnson", "Dr. Brown"]
-      }
-    ],
-    "faculty": [
-      {
-        "name": "Dr. Smith",
-        "maximum_credits": 12,
-        "minimum_credits": 6,
-        "unique_course_limit": 3,
-        "maximum_days": 4,
-        "mandatory_days": ["MON", "WED"],
-        "times": {
-          "MON": ["09:00-17:00"],
-          "TUE": ["09:00-17:00"],
-          "WED": ["09:00-17:00"],
-          "THU": ["09:00-17:00"],
-          "FRI": ["09:00-17:00"]
-        },
-        "course_preferences": { "CS101": 10, "CS102": 5 },
-        "room_preferences": { "Room A": 10, "Room B": 7, "Room C": 3 },
-        "lab_preferences": { "Lab 1": 8, "Lab 2": 5 }
-      }
-    ]
-  },
-  "time_slot_config": {
-    "times": {
-      "MON": [{ "start": "09:00", "spacing": 60, "end": "17:00" }],
-      "TUE": [{ "start": "09:00", "spacing": 60, "end": "17:00" }]
-    },
-    "classes": [
-      {
-        "credits": 3,
-        "meetings": [{ "day": "MON", "duration": 150, "lab": false }]
-      },
-      {
-        "credits": 4,
-        "meetings": [
-          { "day": "TUE", "duration": 150, "lab": true },
-          { "day": "THU", "duration": 150, "lab": false }
-        ]
-      }
-    ]
-  },
-  "limit": 10,
-  "optimizer_flags": ["faculty_course", "pack_rooms", "same_room"]
-}
-```
+The repository keeps complete configurations executable instead of duplicating untested JSON in several guides:
+
+- [`tests/fixtures/minimal_config.json`](https://github.com/mucsci/scheduler/blob/main/tests/fixtures/minimal_config.json)
+  is the canonical minimal configuration used by unit, integration, Python, and REST tests.
+- [`example.json`](https://github.com/mucsci/scheduler/blob/main/example.json) is a larger multi-course example,
+  including repeated sections and preference-derived faculty candidates.
+
+Both files are validated as `CombinedConfig` in the documentation parity tests.
 
 Continue with **Rooms and labs**, **Courses**, **Faculty**, and **Time slots** for field-level detail.

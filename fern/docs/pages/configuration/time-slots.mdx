@@ -1,78 +1,82 @@
 ---
 title: Time slots
-description: time_slot_config.times grids and classes patterns that define legal meeting shapes per credit hour.
+description: Time grids, meeting patterns, fixed starts, overlap alignment, and adjacency settings.
 ---
 
-**`time_slot_config`** has two parts:
+`time_slot_config` has four fields:
 
-1. **`times`** — For each weekday, one or more blocks `{ start, spacing, end }` that define discrete start times (spacing in minutes).
-2. **`classes`** — Allowed **meeting patterns** per credit value: lists of `{ day, duration, lab }` meetings.
+| Field | Required | Default | Meaning |
+|---|---:|---:|---|
+| `times` | Yes | — | A non-empty list of time blocks for every weekday. |
+| `classes` | Yes | — | Enabled and disabled meeting patterns grouped by credit value. |
+| `max_time_gap` | No | `30` | Maximum minutes between meetings for adjacency checks. |
+| `min_time_overlap` | No | `45` | Required clock-time overlap between meetings on different days in one pattern. |
 
-The solver only assigns courses to slots that match a **class pattern** whose `credits` equals the course’s credits.
+Both numeric settings are positive integers. `max_time_gap` is used by same-faculty hard rules and the packing
+objectives described under **Scheduling rules and objectives**.
 
 ## Time blocks
 
+Each of `MON`, `TUE`, `WED`, `THU`, and `FRI` must be present with at least one block:
+
 ```json
 {
-  "times": {
-    "MON": [
-      { "start": "09:00", "spacing": 60, "end": "17:00" }
-    ],
-    "TUE": [
-      { "start": "08:00", "spacing": 60, "end": "16:00" }
-    ]
-  }
+  "MON": [{ "start": "09:00", "spacing": 60, "end": "17:00" }],
+  "TUE": [{ "start": "09:00", "spacing": 60, "end": "17:00" }],
+  "WED": [{ "start": "09:00", "spacing": 60, "end": "17:00" }],
+  "THU": [{ "start": "09:00", "spacing": 60, "end": "17:00" }],
+  "FRI": [{ "start": "09:00", "spacing": 60, "end": "17:00" }]
 }
 ```
 
 | Field | Description |
-|-------|-------------|
-| `start` | First slot start (`HH:MM`). |
-| `spacing` | Minutes between consecutive starts. |
-| `end` | End of the block; last start must still fit a full meeting. |
+|---|---|
+| `start` | First candidate start in 24-hour `HH:MM`. |
+| `spacing` | Positive minutes between consecutive candidate starts. |
+| `end` | Exclusive fitting boundary; a meeting must end at or before this value. |
 
-**Rules:** `end` must be after `start`; spacing is a positive integer.
+`end` must be later than `start`. Multiple blocks per day are allowed. Candidate starts advance from `start` by
+`spacing` until the complete meeting would no longer fit.
 
 ## Class patterns
 
 ```json
 {
-  "credits": 3,
+  "credits": 4,
   "meetings": [
-    { "day": "MON", "duration": 150, "lab": false }
+    { "day": "MON", "duration": 110, "lab": true },
+    { "day": "WED", "start_time": "10:00", "duration": 110, "lab": false }
   ],
+  "start_time": "09:00",
   "disabled": false
 }
 ```
 
-| Field | Description |
-|-------|-------------|
-| `credits` | Credit hours for this shape; must match courses using it. |
-| `meetings` | Non-empty; each meeting has `day`, `duration` (minutes), optional `lab` (default false). |
-| `disabled` | If true, pattern is ignored (default false). |
-| `start_time` | Optional fixed start `HH:MM` for tighter placement. |
+| Field | Required | Default | Description |
+|---|---:|---:|---|
+| `credits` | Yes | — | Positive credit value matched against courses. |
+| `meetings` | Yes | — | Non-empty meetings with distinct weekdays. |
+| `disabled` | No | `false` | Excludes the complete pattern when true. |
+| `start_time` | No | `null` | Pattern-level fixed `HH:MM` start fallback. |
 
-**Rules:**
+Each meeting has required `day` and positive `duration`, plus optional `lab` (default `false`) and `start_time`
+(default `null`). A meeting-level start overrides the pattern-level start for that meeting. Meetings without either
+fixed start use the day's block spacing.
 
-- No duplicate `day` in the same pattern’s `meetings`.
-- `day` ∈ `MON` … `FRI`.
-- Durations are positive integers.
+## Generated combinations
 
-## Multi-day example
+For each enabled pattern with matching credits, the generator forms the Cartesian product of each meeting's legal
+starts, then retains combinations that satisfy all of these rules:
 
-```json
-{
-  "credits": 4,
-  "meetings": [
-    { "day": "MON", "duration": 75, "lab": false },
-    { "day": "WED", "duration": 75, "lab": false },
-    { "day": "FRI", "duration": 150, "lab": true }
-  ]
-}
-```
+- Every meeting fits completely inside one block for its weekday.
+- Pattern weekdays are distinct, so same-day meeting overlap is rejected defensively rather than normally used.
+- Every pair of meetings on different days overlaps in clock time by at least `min_time_overlap` minutes.
+- A multi-meeting pattern has at least two meetings sharing the same clock start. A one-meeting pattern always
+  satisfies this rule.
+- Duplicate complete `TimeSlot` values are removed while preserving generation order.
 
-## Practices
+A pattern may mark at most one meeting with `lab: true`. Courses with non-empty lab candidates can use only
+patterns with one lab meeting; courses with `lab: []` can use only patterns with no lab meeting. Every course credit
+value must have at least one enabled pattern with matching lab presence.
 
-- Align **durations** and **spacing** with your registrar’s standard lengths (e.g. 50, 75, 150 minutes).
-- Every **credit** value that appears on a course must have at least one enabled **class** pattern.
-- Use `disabled` to retire patterns without deleting them.
+Use `disabled` to retain a historical pattern without making it available to the solver.

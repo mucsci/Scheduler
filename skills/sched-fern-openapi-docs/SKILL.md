@@ -31,7 +31,14 @@ Quick decision guide:
 ## Authoring
 
 - **Guides / prose**: `fern/docs/pages/` (MDX), navigation in `fern/docs.yml`.
+- **Behavior contracts**: keep `concepts/scheduling-rules.mdx` aligned with solver/auditor rules and
+  `concepts/diagnostics-auditing.mdx` aligned with diagnostic contracts and search bounds.
 - **Site config**: `fern/fern.config.json`, `fern/generators.yml`.
+- **Parity enforcement**: `tests/test_documentation_parity.py` discovers config fields, FastAPI routes, façade
+  methods, compatibility exports, API environment limits, architecture claims, and canonical examples.
+
+Use `tests/fixtures/minimal_config.json` and `example.json` as the complete validated examples. Do not copy another
+full configuration into MDX or README unless a test parses and validates that copy.
 
 ## Local preview
 

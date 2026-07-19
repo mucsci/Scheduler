@@ -1,65 +1,20 @@
 ---
-title: REST API quickstart
-description: Submit a config, iterate generated schedules, and manage session lifecycle from the HTTP API.
+title: REST API integration
+description: Validate input, manage schedule sessions, generate models, diagnose feasibility, audit results, and clean up.
 ---
 
-The REST API is session-based. You submit a configuration once, receive a `schedule_id`, then use that id to generate and inspect schedules.
+The REST API stores sessions in one process's memory. Submit a configuration once, receive a `schedule_id`, and use
+that id for generation, diagnosis, auditing, and lifecycle operations.
 
 ## Start the server
 
 ```bash
-scheduler-server --port 8000 --host 0.0.0.0 --log-level info
+scheduler-server --port 8000 --host 0.0.0.0 --log-level info --workers 16
 ```
 
-Interactive docs are available at `http://localhost:8000/docs/`.
-
-## 1) Submit a configuration
-
-```bash
-curl -X POST "http://localhost:8000/submit" \
-  -H "Content-Type: application/json" \
-  -d @example.json
-```
-
-Example response:
-
-```json
-{
-  "schedule_id": "f9f2c906-5a00-4b78-a0dd-31f3240fbf4b",
-  "endpoint": "/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b"
-}
-```
-
-The `schedule_id` is the key for all follow-up requests.
-
-## 2) Generate schedules
-
-```bash
-curl -X POST "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/next"
-```
-
-- Call `next` repeatedly to enumerate feasible schedules.
-- Once generation is exhausted, the endpoint returns an error indicating no additional schedules are available.
-
-## 3) Inspect progress and existing schedules
-
-```bash
-curl -X GET "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/count"
-curl -X GET "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/index/0"
-curl -X GET "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/details"
-curl -X GET "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/diagnosis"
-curl -X GET "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/audit/0"
-curl -X GET "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/status"
-```
-
-Useful endpoints:
-
-- `count`: Current generated count, configured limit, completion status.
-- `index/{index}`: Retrieve a previously generated schedule by index.
-- `details`: Return the original combined config plus generation metadata.
-- `diagnosis`: Check hard-constraint feasibility. It returns source paths, a configuration fingerprint, candidate domains and rejected patterns, workload/resource capacity checks, provenance edges, subset-minimal unsat cores, bounded alternative cores, and solver-verified rule-level repair sets. `unknown` responses include the solver reason, elapsed time, and configured timeout.
-- `audit/{index}`: Independently verify one generated schedule, including hard-rule compliance, faculty workloads, room/lab use, enabled objective scores, and unmet preference/objective outcomes.
-- `status`: Report initialization/background generation state, completion or failure reason, generated-model count, enumeration scope (exhausted or request-bounded), idle TTL, and active API resource limits.
+`--workers` controls the shared Z3 thread pool, not Uvicorn processes. The server always runs one Uvicorn process,
+because sessions are not shared across processes. Interactive OpenAPI documentation is available at
+`http://localhost:8000/docs/`.
 
 ## Validate before submitting
 
@@ -69,41 +24,154 @@ curl -X POST "http://localhost:8000/validate" \
   -d @example.json
 ```
 
-Unlike `/submit`, this endpoint always returns a structured validation result. Each invalid field has a stable code and JSON Pointer path; a valid payload returns its configuration fingerprint.
+Configuration failures return a structured `200` response with `is_valid: false`, stable diagnostic codes, and
+JSON Pointer paths. Valid input returns its canonical configuration fingerprint. `/validate` does not create a
+session, consume session capacity, or invoke Z3. A body that is not a JSON object can still be rejected by FastAPI
+with `422` before configuration validation runs.
 
-## Optional: background generation
+## Submit a configuration
+
+```bash
+curl -X POST "http://localhost:8000/submit" \
+  -H "Content-Type: application/json" \
+  -d @example.json
+```
+
+```json
+{
+  "schedule_id": "f9f2c906-5a00-4b78-a0dd-31f3240fbf4b",
+  "endpoint": "/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b"
+}
+```
+
+Scheduler construction is queued in the shared solver executor. Follow-up operations await initialization when
+they require the scheduler. Failed initialization removes the session and returns `422`.
+
+## Generate schedules
+
+```bash
+curl -X POST "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/next"
+```
+
+`next` generates, retains, and returns one schedule. Generated indices are zero-based and append-only. Reaching the
+requested limit or exhausting the solution space returns `400`; unexpected generation failures return `500`.
+
+To enumerate the remainder in the background:
 
 ```bash
 curl -X POST "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/generate_all"
 ```
 
-This starts background generation for all remaining schedules.
+The response confirms the current and target count without waiting for generation. At most one background run is
+active per session. While it is active, another `generate_all` or `next` returns `409 Conflict`. A single session
+lock serializes generator advancement, diagnosis, and auditing; diagnosis and auditing wait for the lock rather
+than returning a generation-conflict response.
 
-Only one generation operation may run for a session. While `generate_all` is active, another `generate_all` call or a `next` call returns `409 Conflict`.
+## Inspect and explain
 
-## Cleanup
+```bash
+curl "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/count"
+curl "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/status"
+curl "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/index/0"
+curl "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/details"
+curl "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/diagnosis"
+curl "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/audit/0"
+```
+
+- `count` is a non-blocking count and completion snapshot.
+- `status` reports initialization/background state, counts, terminal reason, enumeration scope, idle age, TTL, and
+  active server limits.
+- `index/{index}` returns a retained schedule without advancing generation.
+- `details` returns the submitted `CombinedConfig`, session id, and current generated count.
+- `diagnosis` checks hard feasibility without consuming a model.
+- `audit/{index}` independently validates and scores an existing retained model.
+
+See **Diagnostics and auditing** for the diagnostic and audit contracts.
+
+### Session status values
+
+`state` is `initializing`, `generating`, `ready`, or `complete`. `background_state` is `not_started`, `running`,
+`cancelled`, `failed`, or `completed`.
+
+Terminal `completion_reason` values include `requested_schedule_limit_reached`, `solution_space_exhausted`,
+`generation_error`, `background_generation_cancelled`, and `background_generation_failed`. `enumeration_scope` is
+`exhausted` only after proven solution-space exhaustion; otherwise it is `bounded_by_requested_limit`.
+
+## Endpoint inventory
+
+| Method | Path | Behavior |
+|---|---|---|
+| `POST` | `/validate` | Validate raw JSON without creating a session. |
+| `POST` | `/submit` | Queue scheduler initialization and create a session. |
+| `GET` | `/schedules/{schedule_id}/details` | Return submitted configuration and retained count. |
+| `GET` | `/schedules/{schedule_id}/diagnosis` | Diagnose hard-constraint feasibility. |
+| `GET` | `/schedules/{schedule_id}/audit/{index}` | Audit one retained decoded model. |
+| `POST` | `/schedules/{schedule_id}/next` | Generate and retain one model. |
+| `POST` | `/schedules/{schedule_id}/generate_all` | Start one background enumeration task. |
+| `GET` | `/schedules/{schedule_id}/count` | Return count and completion snapshot. |
+| `GET` | `/schedules/{schedule_id}/status` | Return operational state and active limits. |
+| `GET` | `/schedules/{schedule_id}/index/{index}` | Return one retained serialized model. |
+| `DELETE` | `/schedules/{schedule_id}/delete` | Queue deletion after the response; unknown ids return `404`. |
+| `POST` | `/schedules/{schedule_id}/cleanup` | Remove immediately; the operation is idempotent. |
+| `GET` | `/health` | Return process responsiveness and active-session count. |
+
+The generated **REST API reference** contains every request and response schema.
+
+## Cleanup and expiry
+
+Deferred deletion:
 
 ```bash
 curl -X DELETE "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/delete"
 ```
 
-Sessions are stored in-memory and are not shared across processes. Restarting the server clears active sessions. Idle sessions expire automatically (30 minutes by default).
+Immediate, idempotent cleanup:
+
+```bash
+curl -X POST "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf4b/cleanup"
+```
+
+Cleanup removes the session and requests cancellation of queued initialization or background generation. Work
+already running in a solver thread may finish internally, but the session is no longer addressable.
+
+Idle sessions expire after 30 minutes by default. Active initialization and background generation are not reaped.
+The lifespan-managed reaper checks at least once per minute, or more frequently when the configured TTL is shorter.
+Restarting the process clears every session.
 
 ## Built-in request limits
 
-The server provides defensive limits for unauthenticated deployments. Override these environment variables to match your capacity:
+Environment values must be positive integers. Missing, invalid, and non-positive values fall back to the defaults.
 
 | Variable | Default | Purpose |
 |---|---:|---|
-| `SCHEDULER_API_MAX_ACTIVE_SESSIONS` | 16 | In-memory sessions allowed at once. |
-| `SCHEDULER_API_MAX_COURSES` | 100 | Courses accepted in one request. |
-| `SCHEDULER_API_MAX_SCHEDULES` | 100 | Maximum requested schedules per session. |
-| `SCHEDULER_API_MAX_CANDIDATE_SLOTS` | 10,000 | Upper bound on estimated generated time-slot candidates. |
-| `SCHEDULER_API_SOLVER_TIMEOUT_MS` | 30,000 | Z3 timeout for each solve check. |
+| `SCHEDULER_API_MAX_ACTIVE_SESSIONS` | 16 | In-memory sessions retained concurrently. |
+| `SCHEDULER_API_MAX_COURSES` | 100 | Courses accepted in one submitted configuration. |
+| `SCHEDULER_API_MAX_SCHEDULES` | 100 | Maximum requested `limit` for an API session. |
+| `SCHEDULER_API_MAX_CANDIDATE_SLOTS` | 10,000 | Bounded arithmetic preflight estimate of generated time-slot candidates. |
+| `SCHEDULER_API_SOLVER_TIMEOUT_MS` | 30,000 | Timeout applied to each API Z3 check. |
 | `SCHEDULER_API_SESSION_TTL_SECONDS` | 1,800 | Idle-session lifetime. |
 
-Requests that exceed a per-request limit return `422`; a full active-session pool returns `429`. These controls complement, rather than replace, reverse-proxy authentication and rate limiting.
+Course, requested-schedule, and candidate-slot limits return `422`. A full active-session pool returns `429`.
+These limits apply only to the REST server; CLI and direct Python callers remain bounded only by configuration and
+their own resources.
 
-## Request/response schema
+## Common HTTP failures
 
-The `POST /submit` request body matches `CombinedConfig` (same as CLI and Python API). The full endpoint contract is available under **REST API reference** in the sidebar.
+| Status | Meaning |
+|---:|---|
+| `400` | Generation reached its limit/solution-space end, or request setup failed. |
+| `404` | Session or retained schedule index was not found. |
+| `408` | Lazy generator initialization was cancelled. |
+| `409` | A conflicting background generation operation is active. |
+| `422` | Request validation, API limits, or asynchronous scheduler initialization failed. |
+| `429` | Active-session capacity is full. |
+| `500` | Unexpected scheduler, generator, or background failure. |
+
+## Deployment and security
+
+The server has no built-in authentication. Put internet-facing deployments behind a trusted reverse proxy, API
+gateway, or private network and apply authentication and rate limiting there.
+
+Set `CORS_ORIGINS` to a comma-separated allowlist when credentialed browser requests are needed. When unset, the
+server allows all origins without credentials. Do not run multiple independent server processes if callers expect
+to retrieve in-memory sessions through an arbitrary process.

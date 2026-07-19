@@ -3,7 +3,8 @@ title: Courses
 description: Course entries under config.courses — credits, rooms, labs, conflicts, and faculty.
 ---
 
-Each object in **`config.courses`** describes one course section family the solver may schedule.
+The required **`courses`** list at `config.courses` contains each course section the solver must schedule. The list
+itself may be empty, although a normal scheduling problem contains at least one course.
 
 ## Example
 
@@ -22,11 +23,11 @@ Each object in **`config.courses`** describes one course section family the solv
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `course_id` | Yes | Unique string id for the course. |
+| `course_id` | Yes | Base string id. Repeated values create separately numbered sections. |
 | `credits` | Yes | Positive integer; must match an allowed pattern in `time_slot_config.classes`. |
 | `room` | Yes | Non-empty list of allowed **room** names (subset of `config.rooms`). |
-| `lab` | No | List of allowed **lab** names (subset of `config.labs`); may be empty. |
-| `conflicts` | No | Other `course_id` values that must not overlap in time with this course. |
+| `lab` | No | Allowed lab names; defaults to `[]`, which means the course has no lab meeting. |
+| `conflicts` | Yes | Other base `course_id` values that must not overlap; use `[]` for none. |
 | `faculty` | Yes | Non-empty list of faculty names, or `null` to derive candidates from matching faculty `course_preferences`. |
 
 ## Validation rules
@@ -36,9 +37,12 @@ Each object in **`config.courses`** describes one course section family the solv
 - Every course credit value needs at least one enabled class pattern. A course with labs needs a pattern with one lab meeting; a course without labs needs a pattern with none.
 - Every `conflicts` entry must be a valid `course_id` of another course (not yourself).
 - A course cannot list itself in `conflicts`.
+- A conflict names the base id, so it applies to every section with that id. Conflict declarations need not be
+  symmetric: either course listing the other is sufficient for solver separation.
 
 ## Practices
 
 - Use consistent `course_id` naming (e.g. subject + number).
+- Repeat a complete course entry when multiple sections must be scheduled; sections are numbered in input order.
 - Multiple rooms/labs give the solver flexibility and often improve feasibility.
 - Model real registration conflicts explicitly in `conflicts`.

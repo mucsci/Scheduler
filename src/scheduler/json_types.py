@@ -1,8 +1,9 @@
 """
-TypedDict definitions for JSON structures used throughout the scheduler.
+Supplemental TypedDict definitions for serialized schedule rows.
 
-This module provides type-safe definitions for all JSON data structures,
-including configuration, API requests/responses, and schedule outputs.
+Runtime configuration and REST validation are owned by Pydantic models in
+``scheduler.config`` and ``scheduler.server``. These types describe the JSON rows
+emitted by ``JSONWriter`` and are not runtime validators.
 
 **Usage:**
 ```python
@@ -20,26 +21,26 @@ class TimeInstanceJSON(TypedDict):
 
     **Usage:**
     ```python
-    {"day": 0, "start": 480, "duration": 90}
+    {"day": 1, "start": 480, "duration": 90}
     ```
     """
 
     day: int
     """
-    Day enum value (e.g., 0)
+    Day enum value (1 for Monday through 5 for Friday)
 
     **Usage:**
     ```python
-    {"day": 0, "start": 480, "duration": 90}
+    {"day": 1, "start": 480, "duration": 90}
     ```
     """
     start: int
     """
-    Timepoint in minutes (e.g., 0)
+    Start time in minutes since midnight
 
     **Usage:**
     ```python
-    {"day": 0, "start": 480, "duration": 90}
+    {"day": 1, "start": 480, "duration": 90}
     ```
     """
 
@@ -49,7 +50,7 @@ class TimeInstanceJSON(TypedDict):
 
     **Usage:**
     ```python
-    {"day": 0, "start": 480, "duration": 120}
+    {"day": 1, "start": 480, "duration": 120}
     ```
     """
 
@@ -106,11 +107,11 @@ class CourseInstanceJSON(TypedDict):
 
     times: list[TimeInstanceJSON]
     """
-    List of time instances (e.g., `[{"day": 0, "start": 0, "duration": 120}]`)
+    Ordered serialized meeting instances
 
     **Usage:**
     ```python
-    {"course": "CS101.01", "faculty": "Dr. Smith", "times": [{"day": 0, "start": 0, "duration": 120}]}
+    {"course": "CS101.01", "faculty": "Dr. Smith", "times": [{"day": 1, "start": 480, "duration": 120}]}
     ```
     """
 

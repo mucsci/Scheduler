@@ -3,7 +3,8 @@ title: Faculty
 description: Faculty workload, availability, day caps, and preference maps under config.faculty.
 ---
 
-Each object in **`config.faculty`** describes one instructor and their rules.
+The required **`faculty`** list at `config.faculty` contains instructor policies. The list may be empty only for a
+configuration with no courses requiring an explicit or derived faculty candidate.
 
 ## Example
 
@@ -33,12 +34,12 @@ Each object in **`config.faculty`** describes one instructor and their rules.
 | Field | Required | Description |
 |-------|----------|-------------|
 | `name` | Yes | Unique display id; referenced from courses. |
-| `maximum_credits` | Yes | Upper bound on total credits taught. |
-| `minimum_credits` | Yes | Lower bound on total credits taught. |
-| `unique_course_limit` | Yes | Max number of distinct courses they may teach. |
-| `maximum_days` | No | Max distinct weekdays they teach (default 5). |
+| `maximum_credits` | Yes | Inclusive upper bound on total credits; integer `0` or greater. |
+| `minimum_credits` | Yes | Inclusive lower bound on total credits; integer `0` or greater. |
+| `unique_course_limit` | Yes | Positive maximum number of distinct base course ids they may teach. |
+| `maximum_days` | No | Integer `0`–`5`; maximum distinct teaching weekdays (default `5`). |
 | `mandatory_days` | No | Weekdays on which they must teach at least once (default none). |
-| `times` | Yes | Map day → list of `HH:MM-HH:MM` availability ranges (non-empty per listed day). |
+| `times` | Yes | Map day → list of `HH:MM-HH:MM` availability ranges; omitted days and empty lists mean unavailable. |
 | `course_preferences` | No | Map `course_id` → score `0`–`10`. |
 | `room_preferences` | No | Map room name → score `0`–`10`. |
 | `lab_preferences` | No | Map lab name → score `0`–`10`. |
@@ -50,6 +51,7 @@ Each object in **`config.faculty`** describes one instructor and their rules.
 - `maximum_days` ≥ number of `mandatory_days`.
 - Preference keys must reference existing courses / rooms / labs.
 - Faculty `name` values must be unique.
+- Availability ranges require `end` later than `start`; ranges are not merged or inferred.
 
 ## Time format
 
@@ -58,7 +60,10 @@ Each object in **`config.faculty`** describes one instructor and their rules.
 
 ## Preference scale
 
-- **0** — no preference (default if omitted).
+- **0** — no objective contribution. An omitted key also contributes zero.
 - **1–3** — low, **4–6** — medium, **7–8** — high, **9–10** — very high.
 
 Preferences interact with **optimizer flags** (see **Optimizer flags**).
+
+For a course with `faculty: null`, the presence of the course id as a `course_preferences` key makes this faculty
+eligible even when its score is `0`. Explicit course faculty lists are never expanded from preferences.

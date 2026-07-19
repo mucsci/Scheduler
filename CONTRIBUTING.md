@@ -21,6 +21,7 @@ Thank you for your interest in contributing to the Course Constraint Scheduler! 
 - **Python 3.12+**: The project requires Python 3.12 or higher
 - **Git**: For version control
 - **uv**: Modern Python package manager (recommended)
+- **Node.js 22 and Docker**: Required for Fern's local Python library parser
 
 ### Installing uv
 
@@ -122,9 +123,15 @@ uv run pytest
 src/scheduler/
 ├── __init__.py             # Main package exports
 ├── config.py               # Configuration models and validation
-├── json_types.py           # TypedDict definitions for JSON structures
+├── configuration.py        # Raw loading and structured validation helpers
+├── contracts.py            # Z3-free public diagnostic/audit contracts
+├── problem.py              # Normalized solver-independent scheduling problem
+├── solver.py               # Z3 constraints, objectives, decoding, enumeration
+├── diagnostics.py          # Feasibility, unsat cores, provenance, repairs
+├── audit.py                # Independent schedule validation and scoring
+├── json_types.py           # Supplemental TypedDicts for serialized schedule rows
 ├── main.py                 # Command-line interface
-├── scheduler.py            # Core scheduling logic and Z3 integration
+├── scheduler.py            # Stable public orchestration façade
 ├── server.py               # FastAPI REST server
 ├── logging.py              # Logging configuration
 ├── models/                 # Data models
@@ -254,15 +261,19 @@ from .config import SchedulerConfig
 def generate_schedule(config: SchedulerConfig) -> List[CourseInstance]:
     """Generate a course schedule based on configuration.
 
-    **Args:**
-    - config: The scheduler configuration containing courses, faculty, and constraints.
+    Args:
+        config: The scheduler configuration containing courses, faculty, and constraints.
 
-    **Returns:**
-    A list of course instances representing the generated schedule.
+    Returns:
+        A list of course instances representing the generated schedule.
 
-    **Raises:**
-    - ValueError: If the configuration is invalid.
-    - RuntimeError: If no valid schedule can be generated.
+    Raises:
+        ValueError: If the configuration is invalid.
+        RuntimeError: If no valid schedule can be generated.
+
+    Behavior:
+        Normalize the input, solve hard constraints, optimize enabled objectives,
+        and decode one complete schedule without mutating the configuration.
 
     **Example:**
         >>> from scheduler.config import CombinedConfig
@@ -306,8 +317,9 @@ if not faculty_available:
 
 - All public functions and classes must have docstrings
 - Use Google-style docstrings for consistency
-- Include examples for complex functions
-- Document exceptions and error conditions
+- Include a high-level description plus `Args`, `Returns`, `Raises`, and `Behavior` for public callables
+- Describe every public datatype field
+- Keep exception, status, timeout, and execution-semantics documentation aligned with implementation
 
 ### API Documentation
 
@@ -321,6 +333,7 @@ if not faculty_available:
 ### User Documentation
 
 - Update **Fern** pages under **`fern/docs/pages/`** (configuration, welcome, development)
+- Update scheduling-rule and diagnostics concept pages when solver, diagnosis, audit, or objective behavior changes
 - Update README.md for new features
 - Regenerate **`fern/docs/assets/combined-config.schema.json`** with `uv run python scripts/export_config_schema.py` when `CombinedConfig` changes
 - Keep tracked Fern artifacts committed when they are used by docs publishing (`fern/openapi.json` and
