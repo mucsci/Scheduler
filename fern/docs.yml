@@ -68,6 +68,12 @@ navigation:
         path: docs/pages/configuration/limit.mdx
       - page: Troubleshooting
         path: docs/pages/configuration/troubleshooting.mdx
+  - section: Concepts
+    contents:
+      - page: Scheduling rules and objectives
+        path: docs/pages/concepts/scheduling-rules.mdx
+      - page: Diagnostics and auditing
+        path: docs/pages/concepts/diagnostics-auditing.mdx
   - section: Python API
     contents:
       - page: Using the library

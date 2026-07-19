@@ -119,7 +119,7 @@ class SchedulingProblem:
         slot_ranges: Inclusive slot-index range for each credit value.
         course_config_paths: Course display names mapped to source JSON Pointers.
         course_faculty_origins: Course display names mapped to faculty derivation mode.
-        optimizer_flags: Enabled optimization objectives in configured order.
+        optimizer_flags: Enabled optimization objectives as supplied; the solver registers them in fixed order.
         limit: Maximum number of schedules requested by the caller.
     """
 

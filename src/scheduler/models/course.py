@@ -19,7 +19,7 @@ class Course:
 
     course_id: str
     """
-    The unique identifier for the course
+    The base course identifier; repeated configured values are distinguished by section
     """
 
     credits: int

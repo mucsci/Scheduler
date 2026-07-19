@@ -15,8 +15,9 @@ description: >-
 
 ## Role
 
-- Central place for **JSON structure typing** used across parsing, API, and docs.
-- Keep **`TypedDict`** / aliases aligned with **Pydantic** models in **`config.py`** and FastAPI schemas.
+- Supplemental **TypedDict** descriptions for JSON-shaped values used by callers and writers.
+- Runtime configuration and REST validation remain authoritative in Pydantic models from **`config.py`** and
+  **`server.py`**; do not treat duplicated TypedDicts as runtime schema.
 
 ## Practices
 

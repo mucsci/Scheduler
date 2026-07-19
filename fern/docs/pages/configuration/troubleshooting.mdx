@@ -5,10 +5,11 @@ description: Validation errors, performance, and incremental debugging for JSON 
 
 ## Required sections
 
-These must be present and non-empty where noted:
+These must be present. Only the collections explicitly described as non-empty have that requirement:
 
-- `config.rooms`, `config.courses`, `config.faculty`
-- `time_slot_config.times`, `time_slot_config.classes`
+- `config.rooms` (non-empty), `config.labs`, `config.courses`, `config.faculty`
+- `time_slot_config.times` (every weekday has a non-empty block list), `time_slot_config.classes` (at least one
+  enabled pattern)
 
 ## Common validation errors
 
@@ -82,7 +83,8 @@ logging.basicConfig(level=logging.DEBUG)
 
 ## Incremental authoring
 
-1. Start from a minimal config (see repository `tests/fixtures/minimal_config.json`).
+1. Start from the validated
+   [`tests/fixtures/minimal_config.json`](https://github.com/mucsci/scheduler/blob/main/tests/fixtures/minimal_config.json).
 2. Add courses one at a time and re-validate.
 3. Add faculty and time patterns before enabling optimizations.
 
@@ -93,55 +95,5 @@ logging.basicConfig(level=logging.DEBUG)
 3. Document institutional rules in `conflicts`, `mandatory_days`, and availability.
 4. Match **credits** on courses to **class patterns** exactly.
 
-### Basic template
-
-```json
-{
-  "config": {
-    "rooms": ["Room 1", "Room 2"],
-    "labs": ["Lab 1"],
-    "courses": [
-      {
-        "course_id": "COURSE101",
-        "credits": 3,
-        "room": ["Room 1", "Room 2"],
-        "lab": ["Lab 1"],
-        "conflicts": [],
-        "faculty": ["Faculty1"]
-      }
-    ],
-    "faculty": [
-      {
-        "name": "Faculty1",
-        "maximum_credits": 12,
-        "minimum_credits": 6,
-        "unique_course_limit": 3,
-        "times": {
-          "MON": ["09:00-17:00"],
-          "TUE": ["09:00-17:00"],
-          "WED": ["09:00-17:00"],
-          "THU": ["09:00-17:00"],
-          "FRI": ["09:00-17:00"]
-        }
-      }
-    ]
-  },
-  "time_slot_config": {
-    "times": {
-      "MON": [{ "start": "09:00", "spacing": 60, "end": "17:00" }],
-      "TUE": [{ "start": "09:00", "spacing": 60, "end": "17:00" }],
-      "WED": [{ "start": "09:00", "spacing": 60, "end": "17:00" }],
-      "THU": [{ "start": "09:00", "spacing": 60, "end": "17:00" }],
-      "FRI": [{ "start": "09:00", "spacing": 60, "end": "17:00" }]
-    },
-    "classes": [
-      {
-        "credits": 3,
-        "meetings": [{ "day": "MON", "duration": 150, "lab": false }]
-      }
-    ]
-  },
-  "limit": 10,
-  "optimizer_flags": ["faculty_course"]
-}
-```
+The **Configuration overview** links both the canonical minimal fixture and the larger executable `example.json`;
+use those files instead of copying an unvalidated template.

@@ -2,15 +2,19 @@
 name: sched-domain-z3-config
 description: >-
   Implements or debugs scheduling logic, Z3 constraints, and JSON configuration
-  for the course constraint scheduler. Use when working in scheduler.py,
-  config models, time slots, or solver behavior.
+  for the course constraint scheduler. Use when working in normalized problems,
+  solver/diagnostic/audit engines, config models, time slots, or solver behavior.
 ---
 
 # Domain: Z3, config, models
 
 ## Core files
 
-- **`src/scheduler/scheduler.py`**: Z3 problem construction, solving, optimization flags.
+- **`src/scheduler/problem.py`**: Z3-free normalized policies, time domains, provenance paths, and cached queries.
+- **`src/scheduler/solver.py`**: Z3 context, symbols, constraints, objectives, decoding, and enumeration.
+- **`src/scheduler/diagnostics.py`**: Preflight facts, cores, provenance, suggestions, and verified repairs.
+- **`src/scheduler/audit.py`**: Independent hard-rule validation and objective scoring.
+- **`src/scheduler/scheduler.py`**: Stable public façade and compatibility re-exports; keep it orchestration-only.
 - **`src/scheduler/config.py`**: Pydantic models, validation, loading (`CombinedConfig`, etc.).
 - **`src/scheduler/time_slot_generator.py`**: Time slot generation utilities.
 - **`src/scheduler/models/`**: Runtime schedule representations (`CourseInstance`, `TimeSlot`, ...).
@@ -31,3 +35,5 @@ When touching types or docs, preserve this distinction to avoid breaking configs
 
 - Prefer clear, testable encodings; watch performance on large inputs.
 - Respect existing **caching** patterns; do not remove `@cache` on hot paths without analysis (Ruff **B019** is suppressed on intentional method caches).
+- Track each actionable hard rule with a granular `DiagnosticConstraintArtifact`, then mirror it independently in
+  `ScheduleAuditor` and document it under Fern's **Scheduling rules and objectives** page.

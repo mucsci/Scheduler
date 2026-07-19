@@ -304,7 +304,7 @@ class ScheduleDiagnosisResponse(BaseModel):
 
     Fields:
         schedule_id: Session whose configuration was diagnosed.
-        status: Solver feasibility status such as sat, unsat, or unknown.
+        status: Solver feasibility status: satisfiable, unsatisfiable, or unknown.
         conflicting_constraints: Minimal primary set of conflicting hard rules.
         alternative_conflict_sets: Other independently discovered conflict cores.
         supporting_facts: Relevant non-core facts that explain the conflict.

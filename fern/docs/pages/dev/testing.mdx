@@ -1,42 +1,63 @@
 ---
 title: Testing
-description: pytest layout, coverage, and slow markers for the scheduler codebase.
+description: Unit, integration, characterization, documentation, coverage, and marker conventions.
 ---
 
-## Run tests
-
-From the repository root with dev dependencies:
+## Run the complete suite
 
 ```bash
 uv sync
 uv run pytest
 ```
 
-## Layout
+`pyproject.toml` enables branch coverage for `scheduler` and requires at least 75% total coverage.
 
-- **`tests/`** — Pytest modules mirroring features (config, scheduler, server, etc.).
-- **`tests/conftest.py`** — Shared fixtures and hooks.
-- **`tests/fixtures/`** — JSON configs such as **`minimal_config.json`**.
+## Test layers
 
-## Coverage
+- Focused unit tests cover configuration, models, time-slot generation, normalized problems, solver constraints,
+  diagnostics, auditing, writers, and server helpers.
+- `@pytest.mark.integration` covers cross-component solver and HTTP boundaries.
+- `@pytest.mark.characterization` compares stable public schedules, diagnoses, audits, serialization, imports, and
+  signatures against golden compatibility artifacts.
+- `@pytest.mark.slow` is reserved for the full `example.json` and genuinely long solver paths.
+- Architecture tests enforce Z3-free layers and façade delegation.
+- Documentation tests enforce complete public docstrings, datatype fields, Fern generation, and narrative parity.
 
-`pyproject.toml` enables **`--cov=scheduler`** with a **75%** minimum line coverage (`--cov-fail-under=75`). Keep new code exercised.
+Shared fixtures live in `tests/conftest.py`; reusable configuration builders live in `tests/scenario_builders.py`;
+golden data lives under `tests/fixtures/characterization/`.
 
-## Markers
-
-**`@pytest.mark.slow`** — Reserved for tests that load large configs (e.g. full `example.json`) or long solver runs. Run the fast subset:
+## Useful subsets
 
 ```bash
-uv run pytest -m "not slow"
+uv run pytest -m "not integration and not slow" --no-cov
+uv run pytest -m "integration and not slow" --no-cov
+uv run pytest -m characterization --no-cov
+uv run pytest -m slow --no-cov
 ```
 
-## CI parity
+Keep the normal `uv run pytest` invocation as the acceptance command because it applies the coverage gate.
 
-Install **prek** hooks to mirror CI locally:
+## Documentation checks
+
+After public APIs, configuration, routes, docstrings, or narrative docs change:
+
+```bash
+uv run python scripts/export_openapi.py
+uv run python scripts/export_config_schema.py
+fern docs md generate --local --library scheduler-python
+fern check --warnings
+```
+
+OpenAPI and the configuration schema are tracked and must be deterministic. The Fern Python library output is an
+ignored build artifact.
+
+## CI parity
 
 ```bash
 uv run prek install
 uv run prek run --all-files
+git diff --check
 ```
 
-Also run **`ruff`** and **`ty`** as in **`CONTRIBUTING.md`**.
+The hook suite runs Ruff and ty in addition to repository hygiene checks. CI runs the full test suite on every
+supported Python version.

@@ -16,6 +16,9 @@ description: Top-level limit — maximum schedules to generate in the Python API
 - **CLI** — `--limit` can override; align it with your JSON if you use both.
 - **REST API** — Session stores up to `limit` schedules via `.../next` and `generate_all`; `.../count` compares progress to `limit`.
 
+The REST server additionally rejects values above `SCHEDULER_API_MAX_SCHEDULES` (default `100`). That safeguard is
+server-only; direct Python and CLI use the positive `limit` from configuration or the CLI override.
+
 ## Practices
 
 - Lower **`limit`** for faster turnaround while prototyping.

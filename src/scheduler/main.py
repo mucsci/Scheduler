@@ -71,7 +71,7 @@ def main(
         OSError: If configuration input or schedule output cannot be accessed.
         json.JSONDecodeError: If the configuration file is not valid JSON.
         ValidationError: If the combined configuration is invalid.
-        SchedulerInitializationError: If solver construction fails.
+        z3.Z3Exception: If Z3 rejects scheduler construction, optimization, or evaluation.
 
     Behavior:
         Logging is configured, configuration is loaded, and explicit limit and

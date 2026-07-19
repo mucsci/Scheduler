@@ -10,12 +10,18 @@ User-visible JSON is defined by **`src/scheduler/config.py`** using Pydantic v2 
 1. **Model** — Add fields to the appropriate nested model (`SchedulerConfig`, `FacultyConfig`, `CourseConfig`, `TimeSlotConfig`, etc.) or top-level **`CombinedConfig`**.
 2. **Types** — Reuse **`TimeString`**, **`TimeRangeString`**, **`Preference`**, **`Day`**, or add new **`Annotated[..., Field(...)]`** aliases for reuse and JSON Schema quality.
 3. **Validators** — Use **`field_validator`** / **`model_validator`** for cross-field rules; keep error messages explicit.
-4. **Consumption** — Read the new fields from **`Scheduler`** (or **`TimeSlotGenerator`**, server, CLI) where behavior should change.
-5. **Docs** — Update the **Configuration** pages in this site and add/fix tests.
+4. **Normalization** — Add solver-independent policy state or cached queries to **`SchedulingProblem`** when more
+   than one engine consumes the value.
+5. **Consumption** — Implement Z3 behavior in **`SolverEngine`**, diagnostics in **`DiagnosticEngine`**, and an
+   independent verification path in **`ScheduleAuditor`** where applicable. Keep `Scheduler` as delegation only.
+6. **Docs** — Update the **Configuration** pages, executable examples, schema, and parity tests.
 
 ## Strictness
 
 Because **`extra="forbid"`**, clients get errors on unknown keys — document new keys in the changelog and configuration pages when you ship them.
+
+Combined rules that depend on multiple sub-models belong on `CombinedConfig`. Raw non-throwing validation is
+adapted by `validate_combined_config_data`; do not create a separate set of REST-only validation semantics.
 
 ## JSON Schema
 

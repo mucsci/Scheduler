@@ -297,7 +297,7 @@ class TimeSlot(BaseModel):
 
     model_config = ConfigDict(extra="forbid", strict=True)
     """
-    Configuration for the model which allows extra fields and is not strict (@private)
+    Configuration that forbids extra fields and requires strict values (@private)
     """
 
     times: list[TimeInstance] = Field(description="The list of time instances in the time slot")
@@ -305,14 +305,20 @@ class TimeSlot(BaseModel):
     The list of time instances in the time slot
     """
 
-    lab_index: int | None = Field(default=None, description="The index of the lab in the time slot")
+    lab_index: int | None = Field(
+        default=None,
+        description="Index of the single lab-marked meeting, or null for a no-lab pattern",
+    )
     """
-    The index of the lab in the time slot
+    Index of the single lab-marked meeting, or null for a no-lab pattern
     """
 
-    max_time_gap: Duration = Field(default=Duration(duration=30), description="The maximum time gap between time slots")
+    max_time_gap: Duration = Field(
+        default=Duration(duration=30),
+        description="Maximum gap used by lecture and lab adjacency checks",
+    )
     """
-    The maximum time gap between time slots
+    Maximum gap used by meeting and lab adjacency checks
     """
 
     def __hash__(self) -> int:

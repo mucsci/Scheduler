@@ -19,10 +19,15 @@ uv run pytest
 
 ## Markers
 
-- **`@pytest.mark.slow`**: Heavy tests (e.g. full `example.json`, long solver paths). Use for anything that would slow routine `pytest` runs; document in the test docstring when appropriate.
+- **`@pytest.mark.integration`**: Cross-component solver or HTTP boundary tests.
+- **`@pytest.mark.characterization`**: Golden public compatibility outputs and signatures.
+- **`@pytest.mark.slow`**: Heavy tests (e.g. full `example.json`, long solver paths).
 
 ## Conventions
 
 - Shared fixtures: `tests/conftest.py`.
+- Reusable config builders: `tests/scenario_builders.py`; golden outputs: `tests/fixtures/characterization/`.
 - Prefer testing **public behavior** of `scheduler` modules; reach into internals only when necessary for Z3 or config edge cases.
 - After behavior changes, update or add tests near related modules under `tests/`.
+- Keep source-driven docs coverage in `tests/test_documentation_parity.py` aligned with new configuration fields,
+  façade methods, routes, environment limits, and canonical examples.

@@ -18,11 +18,11 @@ A powerful constraint satisfaction solver for generating academic course schedul
 
 The Course Constraint Scheduler is designed to solve complex academic scheduling problems by modeling them as constraint satisfaction problems. It can handle:
 
-- **Faculty Constraints**: Availability, credit limits, course preferences
-- **Room Constraints**: Room assignments, lab requirements, capacity limits
-- **Time Constraints**: Time slot conflicts, meeting patterns, duration requirements
-- **Course Constraints**: Prerequisites, conflicts, section limits
-- **Optimization**: Multiple optimization strategies for better schedules
+- **Faculty constraints**: Availability, credit ranges, teaching-day rules, distinct-course limits, and preferences
+- **Resource constraints**: Eligible room/lab assignment and collision prevention
+- **Time constraints**: Credit/lab-compatible meeting patterns, fixed starts, alignment, overlap, and adjacency
+- **Course constraints**: Repeated sections, declared conflicts, faculty eligibility, and no-lab schedules
+- **Diagnostics and optimization**: Unsat cores, verified repairs, independent audits, and Pareto objectives
 
 ## Features
 
@@ -31,9 +31,9 @@ The Course Constraint Scheduler is designed to solve complex academic scheduling
 - **Multiple Output Formats**: JSON and CSV output support with type-safe serialization
 - **REST API**: Full HTTP API for integration with web applications
 - **Asynchronous Processing**: Background schedule generation for large problems
-- **Session Management**: Persistent sessions for iterative schedule generation
+- **Session Management**: In-memory, expiring sessions for iterative schedule generation
 - **Optimization Flags**: Configurable optimization strategies
-- **Type Safety**: Comprehensive TypedDict definitions for all JSON structures
+- **Type Safety**: Strict Pydantic configuration and response models plus typed runtime objects
 - **Enhanced Validation**: Cross-reference validation and business logic constraints
 - **Improved Error Handling**: Detailed error messages for configuration debugging
 - **Strict Type Validation**: Pydantic models with strict validation and custom type definitions
@@ -79,9 +79,20 @@ for schedule in scheduler.get_models():
     print("Schedule:")
     for course in schedule:
         print(f"{course.as_csv()}")
+
+# Diagnose hard-constraint feasibility without consuming a model
+diagnosis = scheduler.diagnose()
+
+# Independently validate and score a decoded schedule
+first_schedule = next(scheduler.get_models())
+audit = scheduler.audit_schedule(first_schedule)
 ```
 
 **Note on naming:** `scheduler.config` defines `Course` as a **course-id string** type alias (used in JSON config). `scheduler.models` defines a `Course` **class** representing a course with credits and meetings. Schedules from `get_models()` yield `CourseInstance` objects whose `.course` attribute is the models `Course`; use `.course.course_id` to get the config-style course id.
+
+`Scheduler(config, solver_timeout_ms=...)` applies an optional timeout to each Z3 check. Structured raw validation
+is available through `validate_combined_config_data`. The published **Diagnostics and auditing** guide documents
+status, core, repair, provenance, completeness, and audit-score semantics.
 
 ### REST API
 
@@ -182,78 +193,21 @@ The scheduler uses a JSON configuration file that defines:
 - **Time Slots**: Available time blocks and class patterns
 - **Optimization**: Flags for different optimization strategies
 
-Example configuration:
-
-```json
-{
-  "config": {
-    "rooms": ["Room A", "Room B"],
-    "labs": ["Lab 1"],
-    "courses": [
-      {
-        "course_id": "CS101",
-        "credits": 3,
-        "room": ["Room A"],
-        "lab": ["Lab 1"],
-        "conflicts": [],
-        "faculty": ["Dr. Smith"]
-      }
-    ],
-    "faculty": [
-      {
-        "name": "Dr. Smith",
-        "maximum_credits": 12,
-        "minimum_credits": 6,
-        "unique_course_limit": 3,
-        "times": {
-          "MON": ["09:00-17:00"],
-          "TUE": ["09:00-17:00"],
-          "WED": ["09:00-17:00"],
-          "THU": ["09:00-17:00"],
-          "FRI": ["09:00-17:00"]
-        }
-      }
-    ]
-  },
-  "time_slot_config": {
-    "times": {
-      "MON": [
-        {
-          "start": "09:00",
-          "spacing": 60,
-          "end": "17:00"
-        }
-      ]
-    },
-    "classes": [
-      {
-        "credits": 3,
-        "meetings": [
-          {
-            "day": "MON",
-            "duration": 150,
-            "lab": false
-          }
-        ]
-      }
-    ]
-  },
-  "limit": 10,
-  "optimizer_flags": ["faculty_course", "pack_rooms"]
-}
-```
+Use the validated [`tests/fixtures/minimal_config.json`](tests/fixtures/minimal_config.json) as the canonical small
+example and [`example.json`](example.json) for a larger scheduling problem. The Fern configuration guide documents
+every required field, default, validation rule, lab semantic, and time-slot generation rule.
 
 ## Architecture
 
 The scheduler is built with a modular architecture:
 
-- **Core Solver**: Z3-based constraint satisfaction engine
-- **Configuration Management**: Pydantic-based configuration validation with comprehensive error handling
-- **Model Classes**: Enhanced data structures for courses, faculty, and time slots with improved serialization
-- **JSON Types**: Comprehensive TypedDict definitions for type-safe JSON handling
-- **Output Writers**: JSON and CSV output formatters with context manager support
-- **REST Server**: FastAPI-based HTTP API with asynchronous processing and session management
-- **Session Management**: Persistent session handling for large problems with background task support
+- **SchedulingProblem**: Z3-free normalized policies, resources, time domains, source paths, and compatibility cache
+- **SolverEngine**: Z3 symbols, relation tables, hard constraints, objectives, decoding, and model blocking
+- **DiagnosticEngine**: Preflight analysis, provenance, unsat cores, suggestions, and verified repairs
+- **ScheduleAuditor**: Independent hard-rule verification, summaries, and objective scoring
+- **Scheduler**: Stable façade delegating enumeration, diagnosis, and auditing
+- **Configuration and output**: Strict Pydantic validation plus JSON/CSV writers
+- **REST server**: FastAPI sessions, serialized generation, background work, limits, and idle expiry
 
 ## Performance
 
@@ -307,7 +261,7 @@ src/scheduler/
 ├── configuration.py         # Raw and combined configuration helpers
 ├── contracts.py             # Z3-free public diagnostic result contracts
 ├── diagnostics.py           # Feasibility analysis, unsat cores, and repair sets
-├── json_types.py            # TypedDict definitions for JSON structures
+├── json_types.py            # Supplemental TypedDicts for serialized schedule rows
 ├── logging.py               # Logging setup
 ├── main.py                  # Command-line interface
 ├── problem.py               # Normalized, solver-independent scheduling problem
@@ -348,34 +302,17 @@ For questions, issues, or feature requests:
 - Create a new issue with detailed information
 - Include configuration examples and error messages
 
-## Recent Updates
+## Current diagnostic capabilities
 
-### Enhanced Configuration Validation
-- Comprehensive cross-reference validation ensures all IDs exist
-- Business logic validation prevents impossible constraints
-- Detailed error messages for easier debugging
-- Support for preference scores (0-10) with improved validation
-
-### Improved Type Safety
-- New `json_types.py` module with comprehensive TypedDict definitions
-- Type-safe JSON handling throughout the application
-- Enhanced serialization with computed fields
-- Better integration with modern Python type checking
-
-### Enhanced REST API
-- Improved session management with background task support
-- Better error handling and status codes
-- Enhanced command-line options for server configuration
-- Comprehensive API documentation with examples
-
-### Model Improvements
-- Enhanced Course and TimeSlot models with better methods
-- Improved serialization with computed fields
-- Better time handling with IntEnum for days
-- Context manager support for writers
+- Structured validation codes and JSON Pointer locations
+- Per-course candidate domains and rejected-pattern explanations
+- Faculty/resource capacity and mandatory-day feasibility analysis
+- Subset-minimal primary and bounded alternative unsat cores
+- Ranked relaxation suggestions and solver-verified repair sets
+- Provenance edges, configuration fingerprints, completeness flags, and timeout reasons
+- Independent schedule, workload, resource, preference, and objective audits
 
 ## Roadmap
 
 - [ ] Web-based configuration interface
 - [ ] Schedule visualization tools
-- [ ] Multi-objective optimization support

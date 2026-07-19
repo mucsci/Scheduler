@@ -51,3 +51,21 @@ def test_docs_workflow_generates_and_validates_without_publishing_pull_requests(
     assert "git diff --exit-code -- fern/openapi.json fern/docs/assets/combined-config.schema.json" in workflow
     assert "fern check --warnings" in workflow
     assert "if: github.event_name != 'pull_request'" in workflow
+
+
+def test_docs_workflow_checks_complete_scheduler_reference_surface() -> None:
+    """Require CI coverage for façade methods, helpers, and diagnostic/audit contracts."""
+    workflow = (ROOT / ".github" / "workflows" / "docs.yml").read_text(encoding="utf-8")
+
+    required_reference_terms = (
+        "Scheduler.diagnose",
+        "Scheduler.audit_schedule",
+        "validate_combined_config_data",
+        "load_config_from_file",
+        "ScheduleDiagnosis",
+        "ScheduleAudit",
+        "ConstraintDiagnostic",
+        "CourseInstance",
+    )
+    for term in required_reference_terms:
+        assert term in workflow

@@ -350,9 +350,12 @@ class Meeting(StrictBaseModel):
     Day of the week
     """
 
-    start_time: TimeString | None = Field(default=None, description="Specific start time constraint")
+    start_time: TimeString | None = Field(
+        default=None,
+        description="Fixed start for this meeting; overrides the containing pattern start time",
+    )
     """
-    Specific start time constraint
+    Fixed meeting start that takes precedence over the containing pattern start
     """
 
     duration: PositiveInt = Field(description="Duration of the meeting in minutes", json_schema_extra={"example": 150})
@@ -360,9 +363,9 @@ class Meeting(StrictBaseModel):
     Duration of the meeting in minutes
     """
 
-    lab: bool = Field(default=False, description="Whether the meeting is in a lab")
+    lab: bool = Field(default=False, description="Whether this is the pattern's single lab meeting")
     """
-    Whether the meeting is in a lab
+    Whether this meeting is the pattern's single lab meeting
     """
 
 
@@ -394,9 +397,12 @@ class ClassPattern(StrictBaseModel):
     Whether the pattern is disabled
     """
 
-    start_time: TimeString | None = Field(default=None, description="Specific start time constraint")
+    start_time: TimeString | None = Field(
+        default=None,
+        description="Fixed start fallback for meetings without their own start time",
+    )
     """
-    Specific start time constraint
+    Fixed start used by meetings that do not specify their own start
     """
 
     @field_validator("meetings", mode="after")
@@ -439,34 +445,36 @@ class TimeSlotConfig(StrictBaseModel):
     ```
     """
 
-    times: dict[Day, list[TimeBlock]] = Field(description="Dictionary mapping day names to time blocks")
+    times: dict[Day, list[TimeBlock]] = Field(
+        description="Time blocks keyed by weekday; every Monday-Friday list must be non-empty"
+    )
     """
-    Dictionary mapping day names to time blocks
+    Time blocks for every weekday; each weekday list must be non-empty
     """
 
-    classes: list[ClassPattern] = Field(description="List of class patterns")
+    classes: list[ClassPattern] = Field(description="Meeting patterns; at least one pattern must be enabled")
     """
-    List of class patterns
+    Class patterns, with at least one enabled pattern
     """
 
     max_time_gap: PositiveInt = Field(
         default=30,
-        description="Maximum time gap between time slots to determine if they are adjacent",
+        description="Maximum gap in minutes used to determine whether meetings are adjacent",
         json_schema_extra={"example": 30},
         ge=0,
     )
     """
-    Maximum time gap between time slots to determine if they are adjacent (default: 30)
+    Maximum gap in minutes used to determine whether meetings are adjacent (default: 30)
     """
 
     min_time_overlap: PositiveInt = Field(
         default=45,
-        description="Minimum overlap between time slots",
+        description="Minimum clock-time overlap in minutes between meetings on different pattern days",
         json_schema_extra={"example": 45},
         gt=0,
     )
     """
-    Minimum time overlap between time slots (default: 45)
+    Minimum clock-time overlap between meetings on different pattern days (default: 45)
     """
 
     @model_validator(mode="after")
@@ -527,13 +535,23 @@ class CourseConfig(StrictBaseModel):
 
     **Usage:**
     ```python
-    CourseConfig(course_id="CS 101", credits=3, room=[...], lab=[...], conflicts=[], faculty=[])
+    CourseConfig(
+        course_id="CS 101",
+        credits=3,
+        room=["Room 101"],
+        lab=[],
+        conflicts=[],
+        faculty=["Dr. Smith"],
+    )
     ```
     """
 
-    course_id: Course = Field(description="Unique identifier for the course", json_schema_extra={"example": "CS 101"})
+    course_id: Course = Field(
+        description="Base course identifier; repeated values create separately numbered sections",
+        json_schema_extra={"example": "CS 101"},
+    )
     """
-    Unique identifier for the course
+    Base identifier for the course; repeated values create sections in configuration order
     """
 
     credits: PositiveInt = Field(description="Number of credit hours", json_schema_extra={"example": 3})
@@ -552,20 +570,22 @@ class CourseConfig(StrictBaseModel):
 
     lab: list[Lab] = Field(
         default_factory=list,
-        description="List of acceptable lab names",
+        description="Acceptable labs; an empty list means the course has no lab meeting",
         json_schema_extra={"example": ["Lab 101"]},
     )
     """
-    List of acceptable lab names
+    Acceptable labs; empty means the course has no lab meeting
     """
 
-    conflicts: list[Course] = Field(description="List of course IDs that cannot be scheduled simultaneously")
+    conflicts: list[Course] = Field(
+        description="Base course IDs whose sections cannot overlap; an empty list means no declared conflicts"
+    )
     """
-    List of course IDs that cannot be scheduled simultaneously
+    Base course IDs whose sections cannot overlap
     """
 
     faculty: list[Faculty] | None = Field(
-        description="Faculty candidates, or null to derive candidates from faculty course preferences",
+        description=("Non-empty faculty candidates, or null to derive candidates from faculty course-preference keys"),
         json_schema_extra={"example": ["Dr. Smith"]},
     )
     """
@@ -628,11 +648,11 @@ class FacultyConfig(StrictBaseModel):
     """
 
     times: dict[Day, list[TimeRange]] = Field(
-        description="Dictionary mapping day names to time ranges",
+        description="Availability ranges keyed by weekday; omitted days and empty lists mean unavailable",
         json_schema_extra={"example": {"MON": ["10:00-12:00"], "TUE": ["10:00-12:00"]}},
     )
     """
-    Dictionary mapping day names to time ranges
+    Availability ranges by weekday; omitted days and empty lists are unavailable
     """
 
     course_preferences: dict[Course, Preference] = Field(
@@ -944,7 +964,7 @@ class OptimizerFlags(StrEnum):
     **Usage:**
     ```python
     OptimizerFlags.FACULTY_COURSE
-    ["FACULTY_COURSE"]  # accepted in CombinedConfig JSON
+    ["faculty_course"]  # accepted in CombinedConfig JSON
     ```
     """
 
@@ -955,7 +975,7 @@ class OptimizerFlags(StrEnum):
     **Usage:**
     ```python
     OptimizerFlags.FACULTY_ROOM
-    ["FACULTY_ROOM"]  # accepted in CombinedConfig JSON
+    ["faculty_room"]  # accepted in CombinedConfig JSON
     ```
     """
 
@@ -966,51 +986,51 @@ class OptimizerFlags(StrEnum):
     **Usage:**
     ```python
     OptimizerFlags.FACULTY_LAB
-    ["FACULTY_LAB"]  # accepted in CombinedConfig JSON
+    ["faculty_lab"]  # accepted in CombinedConfig JSON
     ```
     """
 
     SAME_ROOM = "same_room"
     """
-    Force same room usage for courses taught by the same faculty
+    Prefer eligible course pairs taught by the same faculty to share a room
 
     **Usage:**
     ```python
     OptimizerFlags.SAME_ROOM
-    ["SAME_ROOM"]  # accepted in CombinedConfig JSON
+    ["same_room"]  # accepted in CombinedConfig JSON
     ```
     """
 
     SAME_LAB = "same_lab"
     """
-    Force same lab usage for courses taught by the same faculty
+    Prefer eligible lab-course pairs taught by the same faculty to share a lab
 
     **Usage:**
     ```python
     OptimizerFlags.SAME_LAB
-    ["SAME_LAB"]  # accepted in CombinedConfig JSON
+    ["same_lab"]  # accepted in CombinedConfig JSON
     ```
     """
 
     PACK_ROOMS = "pack_rooms"
     """
-    Optimize packing of rooms for courses taught
+    Prefer different courses to share a room when any meeting pair is adjacent
 
     **Usage:**
     ```python
     OptimizerFlags.PACK_ROOMS
-    ["PACK_ROOMS"]  # accepted in CombinedConfig JSON
+    ["pack_rooms"]  # accepted in CombinedConfig JSON
     ```
     """
 
     PACK_LABS = "pack_labs"
     """
-    Optimize packing of labs for courses taught
+    Prefer different courses to share a lab at adjacent lab times
 
     **Usage:**
     ```python
     OptimizerFlags.PACK_LABS
-    ["PACK_LABS"]  # accepted in CombinedConfig JSON
+    ["pack_labs"]  # accepted in CombinedConfig JSON
     ```
     """
 

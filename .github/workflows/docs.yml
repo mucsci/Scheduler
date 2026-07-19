@@ -73,6 +73,12 @@ jobs:
           grep -Fq "class scheduler.config.CombinedConfig" fern/static/python-reference/scheduler-python/scheduler/config.mdx
           grep -Fq "class scheduler.models.course.CourseInstance" fern/static/python-reference/scheduler-python/scheduler/models/course.mdx
           grep -Fq "class scheduler.contracts.ScheduleDiagnosis" fern/static/python-reference/scheduler-python/scheduler/contracts.mdx
+          grep -Fq "Scheduler.diagnose" fern/static/python-reference/scheduler-python/scheduler/scheduler.mdx
+          grep -Fq "Scheduler.audit_schedule" fern/static/python-reference/scheduler-python/scheduler/scheduler.mdx
+          grep -Fq "validate_combined_config_data" fern/static/python-reference/scheduler-python/scheduler/configuration.mdx
+          grep -Fq "load_config_from_file" fern/static/python-reference/scheduler-python/scheduler/configuration.mdx
+          grep -Fq "class scheduler.contracts.ScheduleAudit" fern/static/python-reference/scheduler-python/scheduler/contracts.mdx
+          grep -Fq "class scheduler.contracts.ConstraintDiagnostic" fern/static/python-reference/scheduler-python/scheduler/contracts.mdx
 
       - name: Fern check
         env:
