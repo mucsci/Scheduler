@@ -7,6 +7,34 @@ description: Auto-generated from docstrings for the scheduler package.
 
 # scheduler
 
+<a id="scheduler.configuration"></a>
+
+# scheduler.configuration
+
+Configuration loading and non-throwing validation helpers.
+
+<a id="scheduler.configuration.load_config_from_file"></a>
+
+#### load\_config\_from\_file
+
+```python
+def load_config_from_file(config_cls: type[T],
+                          filename: str | os.PathLike[str]) -> T
+```
+
+Load and validate one JSON configuration file.
+
+<a id="scheduler.configuration.validate_combined_config_data"></a>
+
+#### validate\_combined\_config\_data
+
+```python
+def validate_combined_config_data(
+        payload: Mapping[str, Any]) -> ConfigurationValidationResult
+```
+
+Validate raw configuration data without raising a Pydantic exception.
+
 <a id="scheduler.logging"></a>
 
 # scheduler.logging
@@ -1236,6 +1264,156 @@ Maximum number of schedules to generate (default: 10)
 
 List of optimizer flags to pass to the scheduler
 
+<a id="scheduler.audit"></a>
+
+# scheduler.audit
+
+Independent schedule validation, summaries, and objective scoring.
+
+<a id="scheduler.audit.ScheduleAuditor"></a>
+
+## ScheduleAuditor Objects
+
+```python
+class ScheduleAuditor()
+```
+
+Audit decoded schedules without consulting a Z3 model.
+
+<a id="scheduler.audit.ScheduleAuditor.audit_schedule"></a>
+
+#### audit\_schedule
+
+```python
+def audit_schedule(schedule: list["CourseInstance"]) -> ScheduleAudit
+```
+
+Independently audit one emitted schedule and explain its soft scores.
+
+This accepts a schedule returned by :meth:`get_models`; it does not
+trust the solver model and therefore also catches serialization or
+downstream mutation errors.
+
+<a id="scheduler.solver"></a>
+
+# scheduler.solver
+
+Z3-backed constraint construction, optimization, and model enumeration.
+
+<a id="scheduler.solver.RelationTables"></a>
+
+## RelationTables Objects
+
+```python
+@dataclass(frozen=True)
+class RelationTables()
+```
+
+Structured data for function constraints and their references.
+
+**Usage:**
+```python
+# Built by Scheduler._build_function_constraints
+```
+
+<a id="scheduler.solver.Z3Symbols"></a>
+
+## Z3Symbols Objects
+
+```python
+@dataclass(frozen=True)
+class Z3Symbols()
+```
+
+Structured data for Z3 sorts and their corresponding constant mappings.
+
+**Usage:**
+```python
+# Built by Scheduler._create_z3_enumsorts
+```
+
+<a id="scheduler.solver.CourseVariables"></a>
+
+## CourseVariables Objects
+
+```python
+@dataclass(frozen=True)
+class CourseVariables()
+```
+
+Z3 variables for one course, independent of compatibility mirrors.
+
+<a id="scheduler.solver.SolverArtifacts"></a>
+
+## SolverArtifacts Objects
+
+```python
+@dataclass(frozen=True)
+class SolverArtifacts()
+```
+
+Read-only solver structures needed for feasibility diagnostics.
+
+<a id="scheduler.solver.SolverEngine"></a>
+
+## SolverEngine Objects
+
+```python
+class SolverEngine()
+```
+
+Own the complete Z3 lifecycle for one normalized problem.
+
+<a id="scheduler.solver.SolverEngine.artifacts"></a>
+
+#### artifacts
+
+```python
+@property
+def artifacts() -> SolverArtifacts
+```
+
+Immutable view of solver state consumed by diagnostics.
+
+<a id="scheduler.solver.SolverEngine.__init__"></a>
+
+#### \_\_init\_\_
+
+```python
+def __init__(problem: SchedulingProblem,
+             *,
+             solver_timeout_ms: int | None = None)
+```
+
+Build all Z3 state for a normalized problem.
+
+``solver_timeout_ms`` applies to each solver check. Library callers are
+uncapped when it is omitted.
+
+<a id="scheduler.solver.SolverEngine.get_models"></a>
+
+#### get\_models
+
+```python
+def get_models() -> Generator[list[CourseInstance], None, None]
+```
+
+Generate schedules one-at-a-time using the Z3 solver.
+
+**Returns:**
+Generator of lists of `CourseInstance` objects representing complete schedules
+
+**Example:**
+>>> full_config = load_config_from_file(CombinedConfig, "config.json")
+>>> scheduler = Scheduler(full_config)
+>>> for model in scheduler.get_models():
+...     for course in model:
+...         print(course.as_csv())
+```python
+for schedule in sched.get_models():
+    ...
+```
+
 <a id="scheduler.writers"></a>
 
 # scheduler.writers
@@ -1561,6 +1739,32 @@ Lab index (e.g., 0)
 ```python
 {"course": "CS101.01", "faculty": "Dr. Smith", "times": [], "lab_index": 0}
 ```
+
+<a id="scheduler.diagnostics"></a>
+
+# scheduler.diagnostics
+
+Feasibility diagnostics, provenance, unsat cores, and verified repairs.
+
+<a id="scheduler.diagnostics.DiagnosticEngine"></a>
+
+## DiagnosticEngine Objects
+
+```python
+class DiagnosticEngine()
+```
+
+Explain feasibility using normalized data and immutable solver artifacts.
+
+<a id="scheduler.diagnostics.DiagnosticEngine.diagnose"></a>
+
+#### diagnose
+
+```python
+def diagnose() -> ScheduleDiagnosis
+```
+
+Explain hard-constraint feasibility without running soft optimization objectives.
 
 <a id="scheduler.models.course"></a>
 
@@ -2196,37 +2400,83 @@ False otherwise
 slot.in_time_ranges(availability_instances)
 ```
 
-<a id="scheduler.scheduler"></a>
+<a id="scheduler.problem"></a>
 
-# scheduler.scheduler
+# scheduler.problem
 
-<a id="scheduler.scheduler.load_config_from_file"></a>
+Normalized, solver-independent scheduling problem representation.
 
-#### load\_config\_from\_file
+<a id="scheduler.problem.get_faculty_availability"></a>
+
+#### get\_faculty\_availability
 
 ```python
-def load_config_from_file(config_cls: type[T],
-                          filename: str | os.PathLike[str]) -> T
+def get_faculty_availability(
+        faculty_config: FacultyConfig) -> list[TimeInstance]
 ```
 
-Load scheduler configuration from a JSON file.
+Expand configured faculty time ranges into domain time instances.
 
-**Args:**
-- config_cls: The class of the configuration to load
-- filename: Path to the file (str or pathlib.Path)
+<a id="scheduler.problem.FacultyPolicy"></a>
 
-**Returns:**
-The loaded configuration
+## FacultyPolicy Objects
 
-**Example:**
->>> load_config_from_file(CombinedConfig, "config.json")
->>> load_config_from_file(CombinedConfig, Path("config.json"))
 ```python
-from scheduler import CombinedConfig, load_config_from_file
-cfg = load_config_from_file(CombinedConfig, "config.json")
+@dataclass(frozen=True)
+class FacultyPolicy()
 ```
 
-<a id="scheduler.scheduler.ConfigurationDiagnostic"></a>
+Normalized workload, availability, and preference policy for one faculty member.
+
+<a id="scheduler.problem.CoursePolicy"></a>
+
+## CoursePolicy Objects
+
+```python
+@dataclass(frozen=True)
+class CoursePolicy()
+```
+
+Normalized, immutable eligibility and provenance policy for one course section.
+
+<a id="scheduler.problem.SchedulingProblem"></a>
+
+## SchedulingProblem Objects
+
+```python
+@dataclass
+class SchedulingProblem()
+```
+
+All normalized scheduling data shared by solving, diagnostics, and auditing.
+
+<a id="scheduler.problem.SchedulingProblem.compatible_slots"></a>
+
+#### compatible\_slots
+
+```python
+def compatible_slots(course: Course) -> tuple[TimeSlot, ...]
+```
+
+Return and cache time slots matching one course's credits and lab requirement.
+
+<a id="scheduler.problem.SchedulingProblem.configuration_fingerprint"></a>
+
+#### configuration\_fingerprint
+
+```python
+def configuration_fingerprint() -> str
+```
+
+Return the stable fingerprint used by diagnostic responses.
+
+<a id="scheduler.contracts"></a>
+
+# scheduler.contracts
+
+Public, solver-independent diagnostic result contracts.
+
+<a id="scheduler.contracts.ConfigurationDiagnostic"></a>
 
 ## ConfigurationDiagnostic Objects
 
@@ -2237,7 +2487,7 @@ class ConfigurationDiagnostic()
 
 One schema or cross-reference validation error with a JSON Pointer path.
 
-<a id="scheduler.scheduler.ConfigurationValidationResult"></a>
+<a id="scheduler.contracts.ConfigurationValidationResult"></a>
 
 ## ConfigurationValidationResult Objects
 
@@ -2248,7 +2498,7 @@ class ConfigurationValidationResult()
 
 Structured result of validating an untrusted scheduler configuration payload.
 
-<a id="scheduler.scheduler.ProvenanceEdge"></a>
+<a id="scheduler.contracts.ProvenanceEdge"></a>
 
 ## ProvenanceEdge Objects
 
@@ -2259,42 +2509,7 @@ class ProvenanceEdge()
 
 A directed explanation edge from input data to a derived diagnostic fact.
 
-<a id="scheduler.scheduler.validate_combined_config_data"></a>
-
-#### validate\_combined\_config\_data
-
-```python
-def validate_combined_config_data(
-        payload: Mapping[str, Any]) -> ConfigurationValidationResult
-```
-
-Validate raw configuration data without raising a Pydantic exception.
-
-Use this at API boundaries when callers need actionable diagnostics rather
-than an exception payload.  A valid result retains only a stable input
-fingerprint; callers can construct :class:`CombinedConfig` separately.
-
-<a id="scheduler.scheduler.get_faculty_availability"></a>
-
-#### get\_faculty\_availability
-
-```python
-def get_faculty_availability(
-        faculty_config: FacultyConfig) -> list[TimeInstance]
-```
-
-Calculate the availability of a faculty as a list of `TimeInstance` objects.
-
-**Args:**
-- faculty_config: The configuration of the faculty
-
-**Returns:**
-The availability of the faculty as a list of `TimeInstance` objects
-```python
-slots = get_faculty_availability(faculty_config)
-```
-
-<a id="scheduler.scheduler.ScheduleDiagnosis"></a>
+<a id="scheduler.contracts.ScheduleDiagnosis"></a>
 
 ## ScheduleDiagnosis Objects
 
@@ -2305,7 +2520,7 @@ class ScheduleDiagnosis()
 
 Result of checking the hard scheduling constraints without optimization.
 
-<a id="scheduler.scheduler.ConstraintDiagnostic"></a>
+<a id="scheduler.contracts.ConstraintDiagnostic"></a>
 
 ## ConstraintDiagnostic Objects
 
@@ -2316,7 +2531,7 @@ class ConstraintDiagnostic()
 
 One business rule participating in an unsatisfiable core.
 
-<a id="scheduler.scheduler.CandidateDomainDiagnostic"></a>
+<a id="scheduler.contracts.CandidateDomainDiagnostic"></a>
 
 ## CandidateDomainDiagnostic Objects
 
@@ -2327,7 +2542,7 @@ class CandidateDomainDiagnostic()
 
 The remaining candidate domain for one course after static filtering.
 
-<a id="scheduler.scheduler.CapacityDiagnostic"></a>
+<a id="scheduler.contracts.CapacityDiagnostic"></a>
 
 ## CapacityDiagnostic Objects
 
@@ -2338,7 +2553,7 @@ class CapacityDiagnostic()
 
 A necessary-condition capacity check, independent of solver search.
 
-<a id="scheduler.scheduler.DayFeasibilityDiagnostic"></a>
+<a id="scheduler.contracts.DayFeasibilityDiagnostic"></a>
 
 ## DayFeasibilityDiagnostic Objects
 
@@ -2349,7 +2564,7 @@ class DayFeasibilityDiagnostic()
 
 One cell of the faculty/day availability and pattern-feasibility matrix.
 
-<a id="scheduler.scheduler.RepairSetDiagnostic"></a>
+<a id="scheduler.contracts.RepairSetDiagnostic"></a>
 
 ## RepairSetDiagnostic Objects
 
@@ -2360,7 +2575,7 @@ class RepairSetDiagnostic()
 
 A verified minimal set of business rules whose relaxation restores feasibility.
 
-<a id="scheduler.scheduler.FacultyWorkloadDiagnostic"></a>
+<a id="scheduler.contracts.FacultyWorkloadDiagnostic"></a>
 
 ## FacultyWorkloadDiagnostic Objects
 
@@ -2371,7 +2586,7 @@ class FacultyWorkloadDiagnostic()
 
 A faculty member's assigned load with its configured bounds.
 
-<a id="scheduler.scheduler.ResourceUsageDiagnostic"></a>
+<a id="scheduler.contracts.ResourceUsageDiagnostic"></a>
 
 ## ResourceUsageDiagnostic Objects
 
@@ -2382,7 +2597,7 @@ class ResourceUsageDiagnostic()
 
 One resource's assignments and any detected collisions.
 
-<a id="scheduler.scheduler.ObjectiveScoreDiagnostic"></a>
+<a id="scheduler.contracts.ObjectiveScoreDiagnostic"></a>
 
 ## ObjectiveScoreDiagnostic Objects
 
@@ -2393,7 +2608,7 @@ class ObjectiveScoreDiagnostic()
 
 Score and independent upper bound for one enabled soft objective.
 
-<a id="scheduler.scheduler.ScheduleAudit"></a>
+<a id="scheduler.contracts.ScheduleAudit"></a>
 
 ## ScheduleAudit Objects
 
@@ -2404,7 +2619,7 @@ class ScheduleAudit()
 
 Independent post-generation hard-rule and objective audit.
 
-<a id="scheduler.scheduler.RelaxationSuggestion"></a>
+<a id="scheduler.contracts.RelaxationSuggestion"></a>
 
 ## RelaxationSuggestion Objects
 
@@ -2415,6 +2630,12 @@ class RelaxationSuggestion()
 
 A targeted configuration change that may restore feasibility.
 
+<a id="scheduler.scheduler"></a>
+
+# scheduler.scheduler
+
+Public scheduler façade and compatibility re-exports.
+
 <a id="scheduler.scheduler.Scheduler"></a>
 
 ## Scheduler Objects
@@ -2423,87 +2644,7 @@ A targeted configuration change that may restore feasibility.
 class Scheduler()
 ```
 
-Scheduler class for generating schedules.
-
-**Usage:**
-```python
-sched = Scheduler(full_config)
-next(sched.get_models())
-```
-
-<a id="scheduler.scheduler.Scheduler.__init__"></a>
-
-#### \_\_init\_\_
-
-```python
-def __init__(full_config: CombinedConfig,
-             *,
-             solver_timeout_ms: int | None = None)
-```
-
-Initializes the scheduler with all the necessary constraints and variables.
-
-**Args:**
-- full_config: `CombinedConfig` object containing all the configuration
-settings including the scheduler config, time slot config,
-limit, and optimizer flags
-- solver_timeout_ms: Optional per-check Z3 timeout in milliseconds.
-The REST API supplies this as a deployment safeguard; library callers
-remain uncapped by default.
-
-**Raises:**
-- ValueError: If the optimizer flags are invalid
-```python
-Scheduler(full_config)
-```
-
-<a id="scheduler.scheduler.Scheduler.diagnose"></a>
-
-#### diagnose
-
-```python
-def diagnose() -> ScheduleDiagnosis
-```
-
-Explain hard-constraint feasibility without running soft optimization objectives.
-
-<a id="scheduler.scheduler.Scheduler.audit_schedule"></a>
-
-#### audit\_schedule
-
-```python
-def audit_schedule(schedule: list["CourseInstance"]) -> ScheduleAudit
-```
-
-Independently audit one emitted schedule and explain its soft scores.
-
-This accepts a schedule returned by :meth:`get_models`; it does not
-trust the solver model and therefore also catches serialization or
-downstream mutation errors.
-
-<a id="scheduler.scheduler.Scheduler.get_models"></a>
-
-#### get\_models
-
-```python
-def get_models() -> Generator[list[CourseInstance], None, None]
-```
-
-Generate schedules one-at-a-time using the Z3 solver.
-
-**Returns:**
-Generator of lists of `CourseInstance` objects representing complete schedules
-
-**Example:**
->>> full_config = load_config_from_file(CombinedConfig, "config.json")
->>> scheduler = Scheduler(full_config)
->>> for model in scheduler.get_models():
-...     for course in model:
-...         print(course.as_csv())
-```python
-for schedule in sched.get_models():
-    ...
-```
+Stable public façade over problem, solver, diagnostics, and auditing.
 
 <a id="scheduler.main"></a>
 

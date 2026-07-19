@@ -291,12 +291,18 @@ The scheduler does not configure logging on import. The CLI (`scheduler`) and HT
 tests/                     # Pytest suite
 src/scheduler/
 ├── __init__.py              # Main package exports with all types
+├── audit.py                 # Independent schedule validation and objective scoring
 ├── config.py                # Configuration models with strict validation and type definitions
+├── configuration.py         # Raw and combined configuration helpers
+├── contracts.py             # Z3-free public diagnostic result contracts
+├── diagnostics.py           # Feasibility analysis, unsat cores, and repair sets
 ├── json_types.py            # TypedDict definitions for JSON structures
 ├── logging.py               # Logging setup
 ├── main.py                  # Command-line interface
-├── scheduler.py             # Core scheduling logic with Z3 integration
+├── problem.py               # Normalized, solver-independent scheduling problem
+├── scheduler.py             # Stable public façade
 ├── server.py                # REST API server with session management
+├── solver.py                # Z3 constraints, optimization, decoding, and enumeration
 ├── time_slot_generator.py   # Utility for generating valid time slots
 ├── models/                  # Enhanced data models
 │   ├── __init__.py          # Model exports

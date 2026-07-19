@@ -202,7 +202,11 @@ def test_diagnosis_reports_unknown_solver_result(
     minimal_combined_config: CombinedConfig, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     scheduler = Scheduler(minimal_combined_config, solver_timeout_ms=1)
-    monkeypatch.setattr(scheduler, "_diagnostic_core", lambda: ("unknown", (), frozenset(), "timeout"))
+    monkeypatch.setattr(
+        scheduler._diagnostics,
+        "_diagnostic_core",
+        lambda: ("unknown", (), frozenset(), "timeout"),
+    )
     diagnosis = scheduler.diagnose()
     assert diagnosis.status == "unknown"
     assert diagnosis.reason == "timeout"
