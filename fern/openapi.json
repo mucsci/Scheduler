@@ -360,6 +360,7 @@
         "properties": {
           "credits": {
             "type": "integer",
+            "exclusiveMinimum": 0.0,
             "title": "Credits",
             "description": "Number of credit hours",
             "example": 3
@@ -410,6 +411,7 @@
         "properties": {
           "credits": {
             "type": "integer",
+            "exclusiveMinimum": 0.0,
             "title": "Credits",
             "description": "Number of credit hours",
             "example": 3
@@ -615,6 +617,7 @@
           },
           "credits": {
             "type": "integer",
+            "exclusiveMinimum": 0.0,
             "title": "Credits",
             "description": "Number of credit hours",
             "example": 3
@@ -624,6 +627,7 @@
               "$ref": "#/components/schemas/Room"
             },
             "type": "array",
+            "minItems": 1,
             "title": "Room",
             "description": "List of acceptable room names",
             "example": [
@@ -654,6 +658,7 @@
               "$ref": "#/components/schemas/Faculty"
             },
             "type": "array",
+            "minItems": 1,
             "title": "Faculty",
             "description": "List of faculty names",
             "example": [
@@ -667,7 +672,6 @@
           "course_id",
           "credits",
           "room",
-          "lab",
           "conflicts",
           "faculty"
         ],
@@ -682,6 +686,7 @@
           },
           "credits": {
             "type": "integer",
+            "exclusiveMinimum": 0.0,
             "title": "Credits",
             "description": "Number of credit hours",
             "example": 3
@@ -691,6 +696,7 @@
               "$ref": "#/components/schemas/Room"
             },
             "type": "array",
+            "minItems": 1,
             "title": "Room",
             "description": "List of acceptable room names",
             "example": [
@@ -721,6 +727,7 @@
               "$ref": "#/components/schemas/Faculty"
             },
             "type": "array",
+            "minItems": 1,
             "title": "Faculty",
             "description": "List of faculty names",
             "example": [
@@ -734,7 +741,6 @@
           "course_id",
           "credits",
           "room",
-          "lab",
           "conflicts",
           "faculty"
         ],
@@ -1437,6 +1443,7 @@
               "$ref": "#/components/schemas/Room"
             },
             "type": "array",
+            "minItems": 1,
             "title": "Rooms",
             "description": "List of available room names",
             "example": [
@@ -1536,6 +1543,7 @@
               "$ref": "#/components/schemas/Room"
             },
             "type": "array",
+            "minItems": 1,
             "title": "Rooms",
             "description": "List of available room names",
             "example": [

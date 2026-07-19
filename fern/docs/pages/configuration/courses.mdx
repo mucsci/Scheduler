@@ -27,11 +27,13 @@ Each object in **`config.courses`** describes one course section family the solv
 | `room` | Yes | Non-empty list of allowed **room** names (subset of `config.rooms`). |
 | `lab` | No | List of allowed **lab** names (subset of `config.labs`); may be empty. |
 | `conflicts` | No | Other `course_id` values that must not overlap in time with this course. |
-| `faculty` | Yes | Non-empty list of faculty names (subset of `config.faculty` names). |
+| `faculty` | Yes | Non-empty list of faculty names, or `null` to derive candidates from matching faculty `course_preferences`. |
 
 ## Validation rules
 
 - Room, lab, and faculty names must exist in the corresponding global lists.
+- `faculty: null` requires at least one faculty member with a `course_preferences` entry for that course; `faculty: []` is invalid.
+- Every course credit value needs at least one enabled class pattern. A course with labs needs a pattern with one lab meeting; a course without labs needs a pattern with none.
 - Every `conflicts` entry must be a valid `course_id` of another course (not yourself).
 - A course cannot list itself in `conflicts`.
 

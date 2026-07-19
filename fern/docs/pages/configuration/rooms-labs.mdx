@@ -21,10 +21,11 @@ Every room and lab name used in **courses** or **faculty preferences** must appe
 
 ## Course usage
 
-Each course lists acceptable **rooms** and **labs** (see **Courses**). The solver picks one room and one lab assignment per course instance subject to availability and constraints.
+Each course lists acceptable **rooms** and **labs** (see **Courses**). The solver always picks a room. A non-empty lab list requires a class pattern with exactly one `lab: true` meeting; the solver reserves one of the listed labs for that meeting. Courses with an empty lab list must use a pattern with no lab meeting.
 
 ## Practices
 
 - Use stable, human-readable names; they appear in output and APIs.
 - If a course has no lab requirement, its `lab` list can be empty.
+- A lab list is a requirement, not merely a preference: include only the labs that can host the designated lab meeting.
 - Keep the global lists aligned with your registrar or facilities data to avoid validation errors on unknown names.

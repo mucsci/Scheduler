@@ -35,6 +35,17 @@ configure_logging()
 
 # scheduler.server
 
+<a id="scheduler.server.ApiLimits"></a>
+
+## ApiLimits Objects
+
+```python
+@dataclass(frozen=True)
+class ApiLimits()
+```
+
+Runtime safeguards for unauthenticated schedule-generation requests.
+
 <a id="scheduler.server.TimeInstanceResponse"></a>
 
 ## TimeInstanceResponse Objects
@@ -244,6 +255,16 @@ Remove a session from memory and clean up associated resources.
 ```python
 cleanup_session(schedule_id)
 ```
+
+<a id="scheduler.server.cleanup_expired_sessions"></a>
+
+#### cleanup\_expired\_sessions
+
+```python
+def cleanup_expired_sessions() -> None
+```
+
+Remove idle sessions without interrupting an active solver task.
 
 <a id="scheduler.server.ensure_scheduler_initialized"></a>
 
@@ -793,7 +814,7 @@ List of course IDs that cannot be scheduled simultaneously
 
 #### faculty
 
-List of faculty names
+List of faculty names. `null` derives candidates from matching faculty course preferences.
 
 <a id="scheduler.config.FacultyConfig"></a>
 
@@ -2106,7 +2127,9 @@ next(sched.get_models())
 #### \_\_init\_\_
 
 ```python
-def __init__(full_config: CombinedConfig)
+def __init__(full_config: CombinedConfig,
+             *,
+             solver_timeout_ms: int | None = None)
 ```
 
 Initializes the scheduler with all the necessary constraints and variables.
@@ -2115,6 +2138,9 @@ Initializes the scheduler with all the necessary constraints and variables.
 - full_config: `CombinedConfig` object containing all the configuration
 settings including the scheduler config, time slot config,
 limit, and optimizer flags
+- solver_timeout_ms: Optional per-check Z3 timeout in milliseconds.
+The REST API supplies this as a deployment safeguard; library callers
+remain uncapped by default.
 
 **Raises:**
 - ValueError: If the optimizer flags are invalid
