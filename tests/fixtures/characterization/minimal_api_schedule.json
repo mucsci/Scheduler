@@ -1,0 +1,22 @@
+[
+  {
+    "course": "CS101.01",
+    "faculty": "F1",
+    "lab": "L1",
+    "lab_index": 0,
+    "room": "R1",
+    "times": [
+      {
+        "day": 1,
+        "duration": 110,
+        "start": 840
+      },
+      {
+        "day": 3,
+        "duration": 110,
+        "start": 840
+      }
+    ]
+  }
+]
+

@@ -29,6 +29,8 @@ from scheduler.server import (
     submit_schedule,
 )
 
+pytestmark = pytest.mark.integration
+
 
 def _course_key_from_instance(ci: CourseInstance) -> str:
     """Base course id without section (matches config conflict keys)."""

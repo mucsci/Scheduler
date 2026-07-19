@@ -275,6 +275,15 @@ uv sync
 # Run tests
 uv run pytest
 
+# Fast unit tests only
+uv run pytest -m "not integration and not slow" --no-cov
+
+# Integration and golden compatibility tests
+uv run pytest -m "integration and not slow" --no-cov
+
+# Long-running full-example tests
+uv run pytest -m slow --no-cov
+
 # Run linting
 uv run ruff check .
 ```

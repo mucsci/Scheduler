@@ -1,0 +1,44 @@
+{
+  "constraint_violations": [],
+  "faculty_workloads": [
+    {
+      "credits": 4,
+      "distinct_courses": 1,
+      "faculty": "F1",
+      "locations": [
+        "/config/faculty/0"
+      ],
+      "mandatory_days_satisfied": true,
+      "maximum_credits": 4,
+      "maximum_days": 5,
+      "minimum_credits": 4,
+      "teaching_days": [
+        "MON",
+        "WED"
+      ],
+      "unique_course_limit": 1
+    }
+  ],
+  "is_valid": true,
+  "objective_scores": [],
+  "preference_outcomes": [],
+  "resource_usage": [
+    {
+      "assignments": [
+        "CS101.01"
+      ],
+      "collisions": [],
+      "kind": "room",
+      "resource": "R1"
+    },
+    {
+      "assignments": [
+        "CS101.01"
+      ],
+      "collisions": [],
+      "kind": "lab",
+      "resource": "L1"
+    }
+  ]
+}
+

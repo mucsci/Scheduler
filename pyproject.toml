@@ -96,6 +96,8 @@ unused-type-ignore-comment = "ignore"
 testpaths = ["tests"]
 pythonpath = ["src"]
 markers = [
+  "integration: tests that exercise multiple scheduler components or HTTP boundaries",
+  "characterization: golden compatibility tests for stable public outputs",
   "slow: tests that load full example.json or run long solver paths",
 ]
 addopts = [
