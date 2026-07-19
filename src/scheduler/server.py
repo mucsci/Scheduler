@@ -599,7 +599,7 @@ async def get_schedule_details(schedule_id: str):
 
 
 @app.post("/schedules/{schedule_id}/next", response_model=ScheduleResponse)
-async def get_next_schedule(schedule_id: str):
+async def get_next_schedule(schedule_id: str) -> ScheduleResponse:
     """
     Get the next generated schedule.
 

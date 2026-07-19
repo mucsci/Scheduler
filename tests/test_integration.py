@@ -233,7 +233,7 @@ def test_server_cleanup_unknown_session_no_crash(client: TestClient) -> None:
 def test_server_serializes_concurrent_next_requests(minimal_combined_config: CombinedConfig) -> None:
     config = minimal_combined_config.model_copy(update={"limit": 2})
 
-    async def generate_two() -> list[object]:
+    async def generate_two() -> tuple[ScheduleResponse | BaseException, ScheduleResponse | BaseException]:
         submitted = await submit_schedule(config)
         try:
             return await asyncio.gather(
