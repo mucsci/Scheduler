@@ -7,6 +7,7 @@
         "credits": {
           "description": "Number of credit hours",
           "example": 3,
+          "exclusiveMinimum": 0,
           "title": "Credits",
           "type": "integer"
         },
@@ -67,6 +68,7 @@
         "credits": {
           "description": "Number of credit hours",
           "example": 3,
+          "exclusiveMinimum": 0,
           "title": "Credits",
           "type": "integer"
         },
@@ -78,6 +80,7 @@
           "items": {
             "$ref": "#/$defs/Room"
           },
+          "minItems": 1,
           "title": "Room",
           "type": "array"
         },
@@ -101,22 +104,28 @@
           "type": "array"
         },
         "faculty": {
-          "description": "List of faculty names",
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/Faculty"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Faculty candidates, or null to derive candidates from faculty course preferences",
           "example": [
             "Dr. Smith"
           ],
-          "items": {
-            "$ref": "#/$defs/Faculty"
-          },
-          "title": "Faculty",
-          "type": "array"
+          "title": "Faculty"
         }
       },
       "required": [
         "course_id",
         "credits",
         "room",
-        "lab",
         "conflicts",
         "faculty"
       ],
@@ -348,6 +357,7 @@
           "items": {
             "$ref": "#/$defs/Room"
           },
+          "minItems": 1,
           "title": "Rooms",
           "type": "array"
         },

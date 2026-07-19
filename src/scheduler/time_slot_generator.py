@@ -71,7 +71,14 @@ class TimeSlotGenerator:
                 pattern_start = self._parse_time(start_time)
                 if pattern_start < block_start or pattern_start + duration > block_end:
                     continue
-                block_start = pattern_start
+                day_slots.append(
+                    TimeInstance(
+                        day=Day[day],
+                        start=TimePoint.make_from(pattern_start // 60, pattern_start % 60),
+                        duration=Duration(duration=duration),
+                    )
+                )
+                continue
 
             current_start = block_start
             while current_start + duration <= block_end:
@@ -163,7 +170,7 @@ class TimeSlotGenerator:
                     day=meeting.day,
                     duration=meeting.duration,
                     time_blocks=self.config.times.get(meeting.day, []),
-                    start_time=pattern.start_time,
+                    start_time=meeting.start_time or pattern.start_time,
                 )
                 meeting_slots.append(day_slots)
 

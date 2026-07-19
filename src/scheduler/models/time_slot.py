@@ -77,8 +77,8 @@ class Duration(BaseModel):
     def __str__(self) -> str:
         return str(self.value)
 
-    def __repr__(self):
-        return self.value
+    def __repr__(self) -> str:
+        return f"Duration(duration={self.value})"
 
 
 class TimePoint(BaseModel):

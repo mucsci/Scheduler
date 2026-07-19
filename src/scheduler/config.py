@@ -355,7 +355,7 @@ class ClassPattern(StrictBaseModel):
     ```
     """
 
-    credits: int = Field(description="Number of credit hours", json_schema_extra={"example": 3})
+    credits: PositiveInt = Field(description="Number of credit hours", json_schema_extra={"example": 3})
     """
     Number of credit hours
     """
@@ -399,6 +399,13 @@ class ClassPattern(StrictBaseModel):
             raise ValueError(f"Duplicate meeting days found: {duplicates}")
 
         return v
+
+    @model_validator(mode="after")
+    def _validate_lab_meetings(self):
+        """A pattern can reserve at most one lab meeting."""
+        if sum(meeting.lab for meeting in self.meetings) > 1:
+            raise ValueError("A class pattern can contain at most one lab meeting")
+        return self
 
 
 class TimeSlotConfig(StrictBaseModel):
@@ -496,17 +503,25 @@ class CourseConfig(StrictBaseModel):
     Unique identifier for the course
     """
 
-    credits: int = Field(description="Number of credit hours", json_schema_extra={"example": 3})
+    credits: PositiveInt = Field(description="Number of credit hours", json_schema_extra={"example": 3})
     """
     Number of credit hours
     """
 
-    room: list[Room] = Field(description="List of acceptable room names", json_schema_extra={"example": ["Room 101"]})
+    room: list[Room] = Field(
+        min_length=1,
+        description="List of acceptable room names",
+        json_schema_extra={"example": ["Room 101"]},
+    )
     """
     List of acceptable room names
     """
 
-    lab: list[Lab] = Field(description="List of acceptable lab names", json_schema_extra={"example": ["Lab 101"]})
+    lab: list[Lab] = Field(
+        default_factory=list,
+        description="List of acceptable lab names",
+        json_schema_extra={"example": ["Lab 101"]},
+    )
     """
     List of acceptable lab names
     """
@@ -516,10 +531,20 @@ class CourseConfig(StrictBaseModel):
     List of course IDs that cannot be scheduled simultaneously
     """
 
-    faculty: list[Faculty] = Field(description="List of faculty names", json_schema_extra={"example": ["Dr. Smith"]})
+    faculty: list[Faculty] | None = Field(
+        description="Faculty candidates, or null to derive candidates from faculty course preferences",
+        json_schema_extra={"example": ["Dr. Smith"]},
+    )
     """
-    List of faculty names
+    List of faculty names. `null` derives candidates from matching faculty course preferences.
     """
+
+    @field_validator("faculty")
+    @classmethod
+    def _validate_faculty_candidates(cls, value: list[Faculty] | None) -> list[Faculty] | None:
+        if value == []:
+            raise ValueError("Faculty candidates must be non-empty or null for preference-based assignment")
+        return value
 
 
 class FacultyConfig(StrictBaseModel):
@@ -684,7 +709,11 @@ class SchedulerConfig(StrictBaseModel):
     ```
     """
 
-    rooms: list[Room] = Field(description="List of available room names", json_schema_extra={"example": ["Room 101"]})
+    rooms: list[Room] = Field(
+        min_length=1,
+        description="List of available room names",
+        json_schema_extra={"example": ["Room 101"]},
+    )
     """
     List of available `Room` names
     """
@@ -784,10 +813,19 @@ class SchedulerConfig(StrictBaseModel):
             if course.course_id in course.conflicts:
                 errors.append(f'Course "{course.course_id}" cannot conflict with itself')
 
-            # Validate faculty references
-            invalid_faculty = [faculty for faculty in course.faculty if faculty not in valid_faculty]
-            if invalid_faculty:
-                errors.append(f'Course "{course.course_id}" references invalid faculty: {invalid_faculty}')
+            # Validate explicit faculty references or preference-based inference.
+            if course.faculty is None:
+                inferred_faculty = [
+                    faculty.name for faculty in self.faculty if course.course_id in faculty.course_preferences
+                ]
+                if not inferred_faculty:
+                    errors.append(
+                        f'Course "{course.course_id}" has null faculty but no faculty course preferences to derive from'
+                    )
+            else:
+                invalid_faculty = [faculty for faculty in course.faculty if faculty not in valid_faculty]
+                if invalid_faculty:
+                    errors.append(f'Course "{course.course_id}" references invalid faculty: {invalid_faculty}')
 
         # Validate FacultyConfig references
         for faculty in self.faculty:
@@ -1025,3 +1063,29 @@ class CombinedConfig(StrictBaseModel):
         if isinstance(v, list):
             return [OptimizerFlags(flag) if isinstance(flag, str) else flag for flag in v]
         return v
+
+    @model_validator(mode="after")
+    def _validate_course_patterns(self):
+        """Ensure every course has an enabled, resource-compatible class pattern."""
+        patterns_by_credit: dict[int, list[ClassPattern]] = {}
+        for pattern in self.time_slot_config.classes:
+            if not pattern.disabled:
+                patterns_by_credit.setdefault(pattern.credits, []).append(pattern)
+
+        errors = []
+        for course in self.config.courses:
+            patterns = patterns_by_credit.get(course.credits, [])
+            if not patterns:
+                errors.append(
+                    f'Course "{course.course_id}" has credits ({course.credits}) with no enabled class pattern'
+                )
+                continue
+
+            requires_lab = bool(course.lab)
+            if not any(any(meeting.lab for meeting in pattern.meetings) == requires_lab for pattern in patterns):
+                expected = "a lab meeting" if requires_lab else "no lab meeting"
+                errors.append(f'Course "{course.course_id}" has no enabled class pattern with {expected}')
+
+        if errors:
+            raise ValueError("Configuration validation errors:\n" + "\n".join(f"  - {error}" for error in errors))
+        return self
