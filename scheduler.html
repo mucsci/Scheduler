@@ -24,12 +24,16 @@ html,body {
                 <input id="prev" name="prev" type="button" value="<" />
                 <span id="curr"></span>
                 <input id="next" name="next" type="button" value=">" />
-            </div>
+            </span>
         </div>
         <div id="schedule">
 
         </div>
-        <script src="https://d3js.org/d3.v7.min.js"></script>
+        <script
+            src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"
+            integrity="sha384-CjloA8y00+1SDAUkjs099PVfnY2KmDC2BZnws9kh8D/lX1s46w6EPhpXdqMfjK6i"
+            crossorigin="anonymous"
+        ></script>
         <script type="text/javascript">
 var root_json = null;
 var locations = null;
@@ -58,11 +62,12 @@ const intToHSL = (val) => {
 
 function map_course(c) {
     var result = Array();
-    const {course, faculty, room, times, lab, lab_index} = c;
+    const {course, faculty, room, times, lab, lab_index, reserve_room_during_lab} = c;
     for (const t in times) {
         var entry = {...times[t]};
         entry['name'] = course;
-        entry['room'] = room;
+        const isLab = Number(t) === lab_index;
+        entry['room'] = entry.delivery === 'online' || (isLab && !reserve_room_during_lab) ? null : room;
         entry['faculty'] = faculty;
         result.push(entry);
     }
@@ -109,14 +114,25 @@ function load_index(index) {
                 .style("text-align", "center");
         }
 
+        const filtered = the_data.filter(x => x.room == room);
+        const minHour = filtered.length
+            ? Math.floor(Math.min(...filtered.map(x => x.start)) / 60)
+            : 8;
+        const maxHour = filtered.length
+            ? Math.ceil(Math.max(...filtered.map(x => x.start + x.duration)) / 60)
+            : 20;
+        const gridEndHour = Math.max(maxHour, minHour + 1);
+        const TIMES = Array.from(
+            {length: gridEndHour - minHour + 1},
+            (_, index) => minHour + index,
+        );
+
         const svg = div.append("svg")
             .attr("width", 800)
-            .attr("height", 720);
+            .attr("height", (gridEndHour - minHour) * 60);
 
         div.append("p")
             .style("page-break-after", "always");
-
-        const TIMES = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19];
 
         svg.selectAll('line')
             .data(TIMES)
@@ -124,28 +140,28 @@ function load_index(index) {
             .append('line')
             .style("stroke", "lightgrey")
             .style("stroke-width", 1)
-            .attr('x1', 0).attr('y1', d => (d - 8) * 60)
-            .attr('x2', 800).attr('y2', d => (d - 8) * 60);
+            .attr('x1', 0).attr('y1', d => (d - minHour) * 60)
+            .attr('x2', 800).attr('y2', d => (d - minHour) * 60);
         svg.selectAll('text')
             .data(TIMES)
             .enter()
             .append('text')
-            .attr('x', 0).attr('y', d => (d - 8) * 60)
+            .attr('x', 0).attr('y', d => (d - minHour) * 60)
             .attr('dy', 12)
             .text(d => {
-                const h = (d > 12) ? d - 12 : d;
-                const ap = (d >= 12) ? "PM" : "AM";
+                const normalized = d % 24;
+                const h = normalized % 12 || 12;
+                const ap = normalized >= 12 ? "PM" : "AM";
                 return h + ":00 " + ap;
             })
             .style("font-size", "10px");
 
-        const filtered = the_data.filter(x => x.room == room);
         svg.selectAll('rect')
             .data(filtered)
             .enter()
             .append('rect')
             .attr('x', d => (d.day - 1) * 150 + 45 + 5)
-            .attr('y', d => d.start - 8 * 60)
+            .attr('y', d => d.start - minHour * 60)
             .attr('width', 140)
             .attr('height', d => d.duration)
             .style('fill', d => intToHSL(getHashCode(d.faculty)))
@@ -157,26 +173,27 @@ function load_index(index) {
         group.append('text')
             .attr('dy', 12)
             .attr('x', d => (d.day - 1) * 150 + 50 + 5)
-            .attr('y', d => d.start - 8 * 60)
+            .attr('y', d => d.start - minHour * 60)
             .text(d => d.name)
             .style('font-weight', 700)
             .style("font-size", "12px");
         group.append('text')
             .attr('dy', 12)
             .attr('x', d => (d.day - 1) * 150 + 50 + 5)
-            .attr('y', d => d.start - 8 * 60 + 15)
+            .attr('y', d => d.start - minHour * 60 + 15)
             .text(d => d.faculty)
             .style("font-size", "10px");
         group.append('text')
             .attr('dy', 12)
             .attr('x', d => (d.day - 1) * 150 + 50 + 5)
-            .attr('y', d => d.start - 8 * 60 + 30)
+            .attr('y', d => d.start - minHour * 60 + 30)
             .text(d => {
                 const fn = (t) => {
                     const hh = Math.floor(t / 60);
                     const mm = t % 60;
-                    const h = (hh > 12) ? hh - 12 : hh;
-                    const ap = (hh >= 12) ? "PM" : "AM";
+                    const normalized = hh % 24;
+                    const h = normalized % 12 || 12;
+                    const ap = normalized >= 12 ? "PM" : "AM";
                     return h + ":" + String(mm).padStart(2, '0') + " " + ap;
                 };
                 return fn(d.start) + " - " + fn(d.start + d.duration);
@@ -186,8 +203,20 @@ function load_index(index) {
 }
 
 function read_json(event) {
-    const result = event.target.result;
-    root_json = JSON.parse(result);
+    try {
+        const result = event.target.result;
+        root_json = JSON.parse(result);
+        if (!Array.isArray(root_json) || root_json.length === 0 || !root_json.every(Array.isArray)) {
+            throw new Error("Expected a non-empty JSON array of schedules.");
+        }
+    } catch (error) {
+        root_json = null;
+        locations = null;
+        curr_index = -1;
+        document.getElementById('nav').style.display = "none";
+        d3.select('#schedule').text(error instanceof Error ? error.message : "Invalid schedule JSON.");
+        return;
+    }
     rooms = new Set()
     labs = new Set()
     for (const i in root_json) {

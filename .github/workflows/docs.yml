@@ -71,6 +71,10 @@ jobs:
           test -f fern/static/python-reference/scheduler-python/scheduler/index.mdx
           grep -Fq "class scheduler.scheduler.Scheduler" fern/static/python-reference/scheduler-python/scheduler/scheduler.mdx
           grep -Fq "class scheduler.config.CombinedConfig" fern/static/python-reference/scheduler-python/scheduler/config.mdx
+          grep -Fq "class scheduler.config.RoomConfig" fern/static/python-reference/scheduler-python/scheduler/config.mdx
+          grep -Fq "class scheduler.config.LabConfig" fern/static/python-reference/scheduler-python/scheduler/config.mdx
+          sed -n '/scheduler-config-RoomConfig/,/scheduler-config-SchedulerConfig/p' fern/static/python-reference/scheduler-python/scheduler/config.mdx | grep -Fq '<ParamField path="capacity"'
+          sed -n '/scheduler-config-LabConfig/,/scheduler-config-Meeting/p' fern/static/python-reference/scheduler-python/scheduler/config.mdx | grep -Fq '<ParamField path="features"'
           grep -Fq "class scheduler.models.course.CourseInstance" fern/static/python-reference/scheduler-python/scheduler/models/course.mdx
           grep -Fq "class scheduler.contracts.ScheduleDiagnosis" fern/static/python-reference/scheduler-python/scheduler/contracts.mdx
           grep -Fq "Scheduler.diagnose" fern/static/python-reference/scheduler-python/scheduler/scheduler.mdx

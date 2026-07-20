@@ -10,12 +10,14 @@ from pathlib import Path
 
 import pytest
 from _pytest.outcomes import Skipped
+from click.testing import CliRunner
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from scheduler import CombinedConfig, Scheduler, load_config_from_file, validate_combined_config_data
 from scheduler import server as server_module
 from scheduler.config import CourseConfig
+from scheduler.main import main as scheduler_cli
 from scheduler.models import CourseInstance
 from scheduler.scheduler import get_faculty_availability
 from scheduler.server import (
@@ -28,6 +30,7 @@ from scheduler.server import (
     get_next_schedule,
     submit_schedule,
 )
+from scheduler.server import main as server_cli
 
 pytestmark = pytest.mark.integration
 
@@ -159,6 +162,20 @@ def test_structured_validation_diagnostics_include_json_pointer() -> None:
     assert result.diagnostics[0].path.startswith("/")
 
 
+def test_capacity_schema_validation_reports_exact_resource_and_section_paths(minimal_config_path: Path) -> None:
+    data = json.loads(minimal_config_path.read_text(encoding="utf-8"))
+    data["config"]["rooms"] = ["R1"]
+    del data["config"]["courses"][0]["capacity"]
+
+    result = validate_combined_config_data(data)
+
+    assert result.is_valid is False
+    assert {item.path for item in result.diagnostics} >= {
+        "/config/rooms/0",
+        "/config/courses/0/capacity",
+    }
+
+
 def test_diagnosis_finds_an_alternative_independent_core(minimal_config_path: Path) -> None:
     data = json.loads(minimal_config_path.read_text(encoding="utf-8"))
     for name in ("F2", "F3"):
@@ -273,7 +290,10 @@ def test_no_lab_schedule_uses_internal_no_lab_value(minimal_config_path: Path) -
 
 def test_z3_symbol_generation_accepts_colliding_display_names(minimal_config_path: Path) -> None:
     data = json.loads(minimal_config_path.read_text(encoding="utf-8"))
-    data["config"]["rooms"] = ["A B", "A_B"]
+    data["config"]["rooms"] = [
+        {"name": "A B", "capacity": 30},
+        {"name": "A_B", "capacity": 30},
+    ]
     data["config"]["courses"][0]["room"] = ["A B"]
     config = CombinedConfig(**data)
     assert next(Scheduler(config).get_models()) is not None
@@ -318,6 +338,36 @@ def test_cli_invalid_config_path_exits_nonzero(tmp_path: Path) -> None:
     assert result.returncode != 0
 
 
+def test_cli_accepts_optimizer_flags_and_rejects_nonpositive_limit(minimal_config_path: Path, tmp_path: Path) -> None:
+    output = tmp_path / "optimized"
+    valid = CliRunner().invoke(
+        scheduler_cli,
+        [
+            str(minimal_config_path),
+            "--limit",
+            "1",
+            "--format",
+            "json",
+            "--output",
+            str(output),
+            "-O",
+            "faculty_course",
+        ],
+    )
+    invalid = CliRunner().invoke(scheduler_cli, [str(minimal_config_path), "--limit", "0"])
+
+    assert valid.exit_code == 0, valid.output
+    assert output.with_suffix(".json").is_file()
+    assert invalid.exit_code == 2
+
+
+@pytest.mark.parametrize("args", [["--workers", "0"], ["--port", "0"], ["--port", "65536"]])
+def test_server_cli_rejects_invalid_numeric_bounds(args: list[str]) -> None:
+    result = CliRunner().invoke(server_cli, args)
+
+    assert result.exit_code == 2
+
+
 @pytest.fixture
 def client():
     return TestClient(app)
@@ -348,13 +398,20 @@ def test_server_submit_and_next_schedule(client: TestClient, minimal_combined_co
         assert audit_body["is_valid"] is True
         assert audit_body["faculty_workloads"][0]["faculty"] == "F1"
         assert audit_body["resource_usage"]
+        assert audit_body["resource_usage"][0]["capacity"] == 30
+        assert audit_body["resource_usage"][0]["maximum_assigned_section_capacity"] == 30
+        assert audit_body["resource_usage"][0]["capacity_violations"] == []
         status = client.get(f"/schedules/{schedule_id}/status")
         assert status.status_code == 200, status.text
         status_body = status.json()
         assert status_body["state"] in {"ready", "complete"}
         assert status_body["solver_timeout_ms"] > 0
         assert status_body["max_candidate_slots"] > 0
-        assert status_body["enumeration_scope"] in {"exhausted", "bounded_by_requested_limit"}
+        assert status_body["enumeration_scope"] in {
+            "exhausted",
+            "bounded_by_requested_limit",
+            "indeterminate",
+        }
     finally:
         cleanup_session(schedule_id)
 
@@ -376,6 +433,9 @@ def test_server_reports_unsatisfiable_constraint_groups(
         assert body["conflicting_constraints"][0]["locations"] == ["/config/faculty/0"]
         assert body["configuration_fingerprint"]
         assert body["candidate_domains"][0]["locations"] == ["/config/courses/0"]
+        assert body["candidate_domains"][0]["section_capacity"] == 30
+        assert body["candidate_domains"][0]["capacity_compatible_room_candidates"] == ["R1"]
+        assert body["candidate_domains"][0]["capacity_compatible_lab_candidates"] == ["L1"]
         assert body["capacity_analysis"]
         assert body["day_feasibility"]
         assert body["preflight_findings"]
@@ -488,7 +548,7 @@ def test_server_enforces_active_session_limit(
         finally:
             cleanup_session(first.schedule_id)
 
-    assert asyncio.run(submit_twice()).status_code == 429
+    assert asyncio.run(submit_twice()).status_code == 422
 
 
 def test_server_expires_idle_sessions(minimal_combined_config: CombinedConfig, monkeypatch: pytest.MonkeyPatch) -> None:

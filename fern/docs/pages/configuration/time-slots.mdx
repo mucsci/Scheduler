@@ -44,8 +44,8 @@ Each of `MON`, `TUE`, `WED`, `THU`, and `FRI` must be present with at least one 
 {
   "credits": 4,
   "meetings": [
-    { "day": "MON", "duration": 110, "lab": true },
-    { "day": "WED", "start_time": "10:00", "duration": 110, "lab": false }
+    { "day": "MON", "duration": 110, "lab": true, "delivery": "in_person" },
+    { "day": "WED", "start_time": "10:00", "duration": 110, "lab": false, "delivery": "online" }
   ],
   "start_time": "09:00",
   "disabled": false
@@ -59,9 +59,13 @@ Each of `MON`, `TUE`, `WED`, `THU`, and `FRI` must be present with at least one 
 | `disabled` | No | `false` | Excludes the complete pattern when true. |
 | `start_time` | No | `null` | Pattern-level fixed `HH:MM` start fallback. |
 
-Each meeting has required `day` and positive `duration`, plus optional `lab` (default `false`) and `start_time`
-(default `null`). A meeting-level start overrides the pattern-level start for that meeting. Meetings without either
-fixed start use the day's block spacing.
+Each meeting has required `day` and positive `duration`, plus optional `lab` (default `false`), `start_time`
+(default `null`), and `delivery` (`in_person` by default, or `online`). A meeting-level start overrides the
+pattern-level start for that meeting. Meetings without either fixed start use the day's block spacing. A lab-marked
+meeting must be in person.
+
+The meeting delivery values determine the pattern modality: all in-person is `in_person`, all online is `online`,
+and a mixture is `hybrid`. A course can select only a pattern matching its configured `modality`.
 
 ## Generated combinations
 

@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 from enum import StrEnum
-from typing import Annotated, Literal
+from typing import Annotated, Literal, LiteralString, cast
 
 from pydantic import (
     BaseModel,
@@ -12,13 +12,13 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from pydantic_core import InitErrorDetails, PydanticCustomError
 
 type TimeString = Annotated[
     str,
     Field(
         pattern=r"^([0-1][0-9]|2[0-3]):[0-5][0-9]$",
         description="Time in HH:MM format",
-        frozen=True,
         json_schema_extra={"example": "10:00"},
     ),
 ]
@@ -38,7 +38,6 @@ type TimeRangeString = Annotated[
     Field(
         pattern=r"^([0-1][0-9]|2[0-3]):[0-5][0-9]-([0-1][0-9]|2[0-3]):[0-5][0-9]$",
         description="Time range in HH:MM-HH:MM format",
-        frozen=True,
         json_schema_extra={"example": "10:00-12:00"},
     ),
 ]
@@ -78,7 +77,6 @@ type Day = Annotated[
     Literal["MON", "TUE", "WED", "THU", "FRI"],
     Field(
         description="Day of the week",
-        frozen=True,
         json_schema_extra={"example": "MON"},
     ),
 ]
@@ -96,7 +94,6 @@ d: Day = "MON"
 type Room = Annotated[
     str,
     Field(
-        frozen=True,
         description="Room name",
         json_schema_extra={"example": "Room 101"},
     ),
@@ -115,7 +112,6 @@ r: Room = "Room 101"
 type Lab = Annotated[
     str,
     Field(
-        frozen=True,
         description="Lab name",
         json_schema_extra={"example": "Lab 101"},
     ),
@@ -134,7 +130,6 @@ lab: Lab = "Lab 101"
 type Course = Annotated[
     str,
     Field(
-        frozen=True,
         description="Course name",
         json_schema_extra={"example": "CS 101"},
     ),
@@ -153,7 +148,6 @@ cid: Course = "CS 101"
 type Faculty = Annotated[
     str,
     Field(
-        frozen=True,
         description="Faculty name",
         json_schema_extra={"example": "Dr. Smith"},
     ),
@@ -219,11 +213,13 @@ class StrictBaseModel(BaseModel):
         # Validate the working copy by creating a new instance
         try:
             validated_copy = self.__class__(**working_copy.model_dump())
+            validated_copy.__pydantic_fields_set__ = set(working_copy.__pydantic_fields_set__)
             # If validation passes, update the original object
             self.__dict__.update(validated_copy.__dict__)
-        except ValidationError as e:
+            self.__pydantic_fields_set__ = set(validated_copy.__pydantic_fields_set__)
+        except ValidationError:
             # Validation failed, rollback is automatic (working_copy is discarded)
-            raise e
+            raise
 
 
 class TimeBlock(StrictBaseModel):
@@ -265,7 +261,16 @@ class TimeBlock(StrictBaseModel):
         start_minutes = int(self.start.split(":")[0]) * 60 + int(self.start.split(":")[1])
         end_minutes = int(self.end.split(":")[0]) * 60 + int(self.end.split(":")[1])
         if end_minutes <= start_minutes:
-            raise ValueError("End time must be after start time")
+            raise ValidationError.from_exception_data(
+                self.__class__.__name__,
+                [
+                    InitErrorDetails(
+                        type=PydanticCustomError("time_block_end_not_after_start", "End time must be after start time"),
+                        loc=("end",),
+                        input=self.end,
+                    )
+                ],
+            )
         return self
 
 
@@ -302,7 +307,16 @@ class TimeRange(StrictBaseModel):
         start_minutes = int(self.start.split(":")[0]) * 60 + int(self.start.split(":")[1])
         end_minutes = int(self.end.split(":")[0]) * 60 + int(self.end.split(":")[1])
         if end_minutes <= start_minutes:
-            raise ValueError("End time must be after start time")
+            raise ValidationError.from_exception_data(
+                self.__class__.__name__,
+                [
+                    InitErrorDetails(
+                        type=PydanticCustomError("time_range_end_not_after_start", "End time must be after start time"),
+                        loc=("end",),
+                        input=self.end,
+                    )
+                ],
+            )
         return self
 
     def __str__(self) -> str:
@@ -333,6 +347,140 @@ class TimeRange(StrictBaseModel):
         """
         start, end = time_range_str.split("-")
         return cls(start=start, end=end)
+
+
+class DeliveryMode(StrEnum):
+    """Delivery mode for one generated meeting."""
+
+    IN_PERSON = "in_person"
+    ONLINE = "online"
+
+
+class CourseModality(StrEnum):
+    """Required mixture of meeting delivery modes for a course section."""
+
+    IN_PERSON = "in_person"
+    ONLINE = "online"
+    HYBRID = "hybrid"
+
+
+class _ResourceConfig(StrictBaseModel):
+    """Shared validated shape for a schedulable physical resource."""
+
+    name: str = Field(
+        min_length=1,
+        description="Unique, nonblank resource name used by course references and schedule output",
+    )
+    """Unique resource name used by configuration references and generated schedules."""
+
+    capacity: PositiveInt = Field(description="Maximum number of students the resource can accommodate")
+    """Positive student capacity available to an assigned course section."""
+
+    features: set[str] = Field(
+        default_factory=set,
+        description="Facility and equipment feature tags supplied by this resource",
+    )
+    """Feature tags available to course requirement matching."""
+
+    times: dict[Day, list[TimeRange]] | None = Field(
+        default=None,
+        description="Optional weekday availability windows; null means unrestricted availability",
+    )
+    """Availability by weekday, or null when the resource is always available."""
+
+    @field_validator("name")
+    @classmethod
+    def _validate_nonblank_name(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Resource name must not be blank")
+        if value != value.strip():
+            raise ValueError("Resource name must not contain leading or trailing whitespace")
+        return value
+
+    @field_validator("features", mode="before")
+    @classmethod
+    def _validate_features(cls, value):
+        if not isinstance(value, list | tuple | set | frozenset):
+            return value
+        if any(not isinstance(feature, str) or not feature.strip() for feature in value):
+            raise ValueError("Resource features must not be blank")
+        if any(feature != feature.strip() for feature in value):
+            raise ValueError("Resource features must not contain leading or trailing whitespace")
+        return set(value)
+
+    @field_validator("times", mode="before")
+    @classmethod
+    def _convert_time_strings(cls, value):
+        if value is None or not isinstance(value, dict):
+            return value
+        return {
+            day: (
+                [TimeRange.from_string(item) if isinstance(item, str) else item for item in ranges]
+                if isinstance(ranges, list | tuple)
+                else ranges
+            )
+            for day, ranges in value.items()
+        }
+
+
+class RoomConfig(_ResourceConfig):
+    """A lecture-room resource that can be assigned to physical course meetings.
+
+    Fields:
+        name: Unique, nonblank identifier used by course room candidates,
+            faculty preferences, generated schedules, and diagnostics.
+        capacity: Positive count of usable student seats. Physical assignments
+            require a value at least as large as the course section capacity.
+        features: Facility or equipment tags supplied by the room. A room is
+            eligible only when it contains every feature required by the course.
+        times: Optional availability windows for every scheduler weekday. ``None``
+            means unrestricted availability; a mapping restricts occupancy to the
+            listed windows.
+    """
+
+    name: str = Field(
+        min_length=1,
+        description="Unique, nonblank room name used by references and schedule output",
+    )
+    capacity: PositiveInt = Field(description="Maximum number of students the room can accommodate")
+    features: set[str] = Field(
+        default_factory=set,
+        description="Facility and equipment feature tags supplied by this room",
+    )
+    times: dict[Day, list[TimeRange]] | None = Field(
+        default=None,
+        description="Optional weekday room availability windows; null means unrestricted availability",
+    )
+
+
+class LabConfig(_ResourceConfig):
+    """A laboratory resource that can be assigned to a section's lab meeting.
+
+    Fields:
+        name: Unique, nonblank identifier used by course lab candidates, faculty
+            preferences, generated schedules, and diagnostics.
+        capacity: Positive count of usable student seats. Lab assignments require
+            a value at least as large as the course section capacity.
+        features: Facility or equipment tags supplied by the lab. A lab is
+            eligible only when it contains every feature required by the course.
+        times: Optional availability windows for every scheduler weekday. ``None``
+            means unrestricted availability; a mapping restricts the lab meeting
+            to the listed windows.
+    """
+
+    name: str = Field(
+        min_length=1,
+        description="Unique, nonblank lab name used by references and schedule output",
+    )
+    capacity: PositiveInt = Field(description="Maximum number of students the lab can accommodate")
+    features: set[str] = Field(
+        default_factory=set,
+        description="Facility and equipment feature tags supplied by this lab",
+    )
+    times: dict[Day, list[TimeRange]] | None = Field(
+        default=None,
+        description="Optional weekday lab availability windows; null means unrestricted availability",
+    )
 
 
 class Meeting(StrictBaseModel):
@@ -367,6 +515,17 @@ class Meeting(StrictBaseModel):
     """
     Whether this meeting is the pattern's single lab meeting
     """
+
+    delivery: DeliveryMode = Field(
+        default=DeliveryMode.IN_PERSON,
+        description="Whether this meeting is held in person or online",
+    )
+    """Delivery mode controlling physical-room occupancy for this meeting."""
+
+    @field_validator("delivery", mode="before")
+    @classmethod
+    def _convert_delivery(cls, value):
+        return DeliveryMode(value) if isinstance(value, str) else value
 
 
 class ClassPattern(StrictBaseModel):
@@ -422,7 +581,7 @@ class ClassPattern(StrictBaseModel):
         # Check for duplicate days
         days = [meeting.day for meeting in v]
         if len(days) != len(set(days)):
-            duplicates = [day for day in set(days) if days.count(day) > 1]
+            duplicates = sorted({day for day in days if days.count(day) > 1})
             raise ValueError(f"Duplicate meeting days found: {duplicates}")
 
         return v
@@ -432,6 +591,8 @@ class ClassPattern(StrictBaseModel):
         """A pattern can reserve at most one lab meeting."""
         if sum(meeting.lab for meeting in self.meetings) > 1:
             raise ValueError("A class pattern can contain at most one lab meeting")
+        if any(meeting.lab and meeting.delivery != DeliveryMode.IN_PERSON for meeting in self.meetings):
+            raise ValueError("A lab meeting must use in-person delivery")
         return self
 
 
@@ -499,32 +660,69 @@ class TimeSlotConfig(StrictBaseModel):
             combined error so callers can correct the complete configuration at
             once. It does not mutate the configuration.
         """
-        errors = []
+        errors: list[InitErrorDetails] = []
 
         # Check that all days in time_slot_config are valid
         weekdays: tuple[Day, ...] = ("MON", "TUE", "WED", "THU", "FRI")
         valid_days = frozenset(weekdays)
         for day in self.times:
             if day not in valid_days:
-                errors.append(f"Invalid day '{day}' in time slot configuration")
+                errors.append(
+                    InitErrorDetails(
+                        type=PydanticCustomError(
+                            "invalid_time_slot_day",
+                            "Invalid day '{day}' in time slot configuration",
+                            {"day": day},
+                        ),
+                        loc=("times", day),
+                        input=day,
+                    )
+                )
 
         # Check that there are time blocks for each day
         for day in weekdays:
             if day not in self.times or not self.times[day]:
-                errors.append(f"No time blocks defined for {day}")
+                errors.append(
+                    InitErrorDetails(
+                        type=PydanticCustomError(
+                            "missing_weekday_time_blocks",
+                            "No time blocks defined for {day}",
+                            {"day": day},
+                        ),
+                        loc=("times", day),
+                        input=self.times.get(day),
+                    )
+                )
 
         # Check that class patterns are reasonable
         if not self.classes:
-            errors.append("At least one class pattern must be defined")
+            errors.append(
+                InitErrorDetails(
+                    type=PydanticCustomError(
+                        "missing_class_patterns",
+                        "At least one class pattern must be defined",
+                    ),
+                    loc=("classes",),
+                    input=self.classes,
+                )
+            )
 
         # Check for disabled patterns
         disabled_patterns = [p for p in self.classes if p.disabled]
-        if len(disabled_patterns) == len(self.classes):
-            errors.append("All class patterns are disabled")
+        if self.classes and len(disabled_patterns) == len(self.classes):
+            errors.append(
+                InitErrorDetails(
+                    type=PydanticCustomError(
+                        "all_class_patterns_disabled",
+                        "All class patterns are disabled",
+                    ),
+                    loc=("classes",),
+                    input=self.classes,
+                )
+            )
 
         if errors:
-            error_message = "Time slot configuration errors:\n" + "\n".join(f"  - {error}" for error in errors)
-            raise ValueError(error_message)
+            raise ValidationError.from_exception_data(self.__class__.__name__, errors)
 
         return self
 
@@ -538,6 +736,7 @@ class CourseConfig(StrictBaseModel):
     CourseConfig(
         course_id="CS 101",
         credits=3,
+        capacity=30,
         room=["Room 101"],
         lab=[],
         conflicts=[],
@@ -554,14 +753,27 @@ class CourseConfig(StrictBaseModel):
     Base identifier for the course; repeated values create sections in configuration order
     """
 
+    section_id: str | None = Field(
+        default=None,
+        description="Optional stable section suffix; null uses the generated zero-padded input-order number",
+    )
+    """Stable section suffix, or null to retain generated numbering."""
+
     credits: PositiveInt = Field(description="Number of credit hours", json_schema_extra={"example": 3})
     """
     Number of credit hours
     """
 
+    capacity: PositiveInt = Field(
+        description=("Expected section enrollment that any assigned rooms and labs must accommodate"),
+        json_schema_extra={"example": 30},
+    )
+    """
+    Expected section enrollment used for room and lab capacity validation
+    """
+
     room: list[Room] = Field(
-        min_length=1,
-        description="List of acceptable room names",
+        description="Allowed room names; empty is valid only for compatible patterns that do not occupy a room",
         json_schema_extra={"example": ["Room 101"]},
     )
     """
@@ -592,12 +804,125 @@ class CourseConfig(StrictBaseModel):
     List of faculty names. `null` derives candidates from matching faculty course preferences.
     """
 
+    modality: CourseModality = Field(
+        default=CourseModality.IN_PERSON,
+        description="Required delivery composition of the selected class pattern",
+    )
+    """Whether all meetings are in person, all are online, or the pattern is hybrid."""
+
+    required_room_features: set[str] = Field(
+        default_factory=set,
+        description="Feature tags every assigned lecture room must provide",
+    )
+    """Required room features matched as a subset of resource features."""
+
+    required_lab_features: set[str] = Field(
+        default_factory=set,
+        description="Feature tags every assigned lab must provide",
+    )
+    """Required lab features matched as a subset of resource features."""
+
+    reserve_room_during_lab: bool = Field(
+        default=True,
+        description="Whether the lab meeting also occupies the section's assigned lecture room",
+    )
+    """When false, lab meetings leave the assigned lecture room available."""
+
     @field_validator("faculty")
     @classmethod
     def _validate_faculty_candidates(cls, value: list[Faculty] | None) -> list[Faculty] | None:
         if value == []:
             raise ValueError("Faculty candidates must be non-empty or null for preference-based assignment")
         return value
+
+    @field_validator("room", "lab", "conflicts", "faculty")
+    @classmethod
+    def _validate_unique_references(cls, value: list[str] | None) -> list[str] | None:
+        if value is not None:
+            duplicates = sorted({item for item in value if value.count(item) > 1})
+            if duplicates:
+                raise ValueError(f"Course reference lists must not contain duplicate names: {duplicates}")
+        return value
+
+    @field_validator("course_id")
+    @classmethod
+    def _validate_course_id(cls, value: Course) -> Course:
+        if not value.strip():
+            raise ValueError("Course id must not be blank")
+        if value != value.strip():
+            raise ValueError("Course id must not contain leading or trailing whitespace")
+        return value
+
+    @field_validator("modality", mode="before")
+    @classmethod
+    def _convert_modality(cls, value):
+        return CourseModality(value) if isinstance(value, str) else value
+
+    @field_validator("section_id")
+    @classmethod
+    def _validate_section_id(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("Section id must not be blank")
+        if value is not None and value != value.strip():
+            raise ValueError("Section id must not contain leading or trailing whitespace")
+        return value
+
+    @field_validator("required_room_features", "required_lab_features", mode="before")
+    @classmethod
+    def _validate_required_features(cls, value):
+        if not isinstance(value, list | tuple | set | frozenset):
+            return value
+        if any(not isinstance(feature, str) or not feature.strip() for feature in value):
+            raise ValueError("Required resource features must not be blank")
+        if any(feature != feature.strip() for feature in value):
+            raise ValueError("Required resource features must not contain leading or trailing whitespace")
+        return set(value)
+
+    @model_validator(mode="after")
+    def _validate_delivery_requirements(self):
+        errors: list[InitErrorDetails] = []
+        if self.modality == CourseModality.ONLINE:
+            for field_name, value in (
+                ("room", self.room),
+                ("lab", self.lab),
+                ("required_room_features", self.required_room_features),
+            ):
+                if value:
+                    errors.append(
+                        InitErrorDetails(
+                            type=PydanticCustomError(
+                                "online_course_physical_resource",
+                                "Online courses cannot require rooms, labs, or room features",
+                            ),
+                            loc=(field_name,),
+                            input=value,
+                        )
+                    )
+        if self.required_room_features and not self.room:
+            errors.append(
+                InitErrorDetails(
+                    type=PydanticCustomError(
+                        "course_room_features_without_room",
+                        "Required room features require at least one candidate room",
+                    ),
+                    loc=("required_room_features",),
+                    input=self.required_room_features,
+                )
+            )
+        if self.required_lab_features and not self.lab:
+            errors.append(
+                InitErrorDetails(
+                    type=PydanticCustomError(
+                        "course_lab_features_without_lab",
+                        "Required lab features require at least one candidate lab",
+                    ),
+                    loc=("required_lab_features",),
+                    input=self.required_lab_features,
+                )
+            )
+        if errors:
+            raise ValidationError.from_exception_data(self.__class__.__name__, errors)
+        return self
 
 
 class FacultyConfig(StrictBaseModel):
@@ -706,14 +1031,24 @@ class FacultyConfig(StrictBaseModel):
         if isinstance(v, dict):
             converted = {}
             for day, time_list in v.items():
-                converted[day] = []
-                for time_item in time_list:
-                    if isinstance(time_item, str):
-                        converted[day].append(TimeRange.from_string(time_item))
-                    else:
-                        converted[day].append(time_item)
+                if isinstance(time_list, list | tuple):
+                    converted[day] = [
+                        TimeRange.from_string(time_item) if isinstance(time_item, str) else time_item
+                        for time_item in time_list
+                    ]
+                else:
+                    converted[day] = time_list
             return converted
         return v
+
+    @field_validator("name")
+    @classmethod
+    def _validate_name(cls, value: Faculty) -> Faculty:
+        if not value.strip():
+            raise ValueError("Faculty name must not be blank")
+        if value != value.strip():
+            raise ValueError("Faculty name must not contain leading or trailing whitespace")
+        return value
 
     @field_validator("mandatory_days", mode="before")
     @classmethod
@@ -744,23 +1079,48 @@ class FacultyConfig(StrictBaseModel):
             representations are normalized for comparison, but stored fields are
             not changed. The first invalid relationship is reported immediately.
         """
+        errors: list[InitErrorDetails] = []
         if self.minimum_credits > self.maximum_credits:
-            raise ValueError(
-                f"Minimum credits ({self.minimum_credits}) cannot be greater than "
-                f"maximum credits ({self.maximum_credits})"
+            errors.append(
+                InitErrorDetails(
+                    type=PydanticCustomError(
+                        "faculty_minimum_exceeds_maximum_credits",
+                        "Minimum credits ({minimum}) cannot be greater than maximum credits ({maximum})",
+                        {"minimum": self.minimum_credits, "maximum": self.maximum_credits},
+                    ),
+                    loc=("minimum_credits",),
+                    input=self.minimum_credits,
+                )
             )
         if self.maximum_days < len(self.mandatory_days):
-            raise ValueError(
-                f"maximum_days ({self.maximum_days}) cannot be less than the number of mandatory days "
-                f"({len(self.mandatory_days)})"
+            errors.append(
+                InitErrorDetails(
+                    type=PydanticCustomError(
+                        "faculty_maximum_days_below_mandatory_count",
+                        "maximum_days ({maximum_days}) cannot be less than the number of mandatory days ({count})",
+                        {"maximum_days": self.maximum_days, "count": len(self.mandatory_days)},
+                    ),
+                    loc=("maximum_days",),
+                    input=self.maximum_days,
+                )
             )
         available_days = {day if isinstance(day, str) else str(day) for day in self.times}
         mandatory_days = {day if isinstance(day, str) else str(day) for day in self.mandatory_days}
         unavailable_mandatory = mandatory_days - available_days
         if unavailable_mandatory:
-            raise ValueError(
-                f"Mandatory days {sorted(unavailable_mandatory)} must be present in the availability times"
+            errors.append(
+                InitErrorDetails(
+                    type=PydanticCustomError(
+                        "faculty_mandatory_days_without_availability",
+                        "Mandatory days {days} must be present in the availability times",
+                        {"days": sorted(unavailable_mandatory)},
+                    ),
+                    loc=("mandatory_days",),
+                    input=self.mandatory_days,
+                )
             )
+        if errors:
+            raise ValidationError.from_exception_data(self.__class__.__name__, errors)
         return self
 
 
@@ -770,31 +1130,41 @@ class SchedulerConfig(StrictBaseModel):
 
     **Usage:**
     ```python
-    SchedulerConfig(rooms=[...], labs=[...], courses=[...], faculty=[...])
+    SchedulerConfig(
+        rooms=[RoomConfig(name="Room 101", capacity=40)],
+        labs=[LabConfig(name="Lab 101", capacity=24)],
+        courses=[...],
+        faculty=[...],
+    )
     ```
     """
 
-    rooms: list[Room] = Field(
+    rooms: list[RoomConfig] = Field(
         min_length=1,
-        description="List of available room names",
-        json_schema_extra={"example": ["Room 101"]},
+        description="List of available room definitions",
+        json_schema_extra={"example": [{"name": "Room 101", "capacity": 40}]},
     )
     """
-    List of available `Room` names
+    List of available room definitions
     """
 
-    labs: list[Lab] = Field(description="List of available lab names", json_schema_extra={"example": ["Lab 101"]})
+    labs: list[LabConfig] = Field(
+        description="List of available lab definitions",
+        json_schema_extra={"example": [{"name": "Lab 101", "capacity": 24}]},
+    )
     """
-    List of available `Lab` names
+    List of available lab definitions
     """
 
     courses: list[CourseConfig] = Field(
+        min_length=1,
         description="List of course configurations",
         json_schema_extra={
             "example": [
                 {
                     "course_id": "CS 101",
                     "credits": 3,
+                    "capacity": 24,
                     "room": ["Room 101"],
                     "lab": ["Lab 101"],
                     "conflicts": ["CS 102"],
@@ -808,6 +1178,7 @@ class SchedulerConfig(StrictBaseModel):
     """
 
     faculty: list[FacultyConfig] = Field(
+        min_length=1,
         description="List of faculty configurations",
         json_schema_extra={
             "example": [
@@ -860,34 +1231,88 @@ class SchedulerConfig(StrictBaseModel):
         self._validate_uniqueness()
 
         # Create sets of valid references for efficient lookup
-        valid_rooms = set(self.rooms)
-        valid_labs = set(self.labs)
+        valid_rooms = {room.name for room in self.rooms}
+        valid_labs = {lab.name for lab in self.labs}
         valid_courses = {course.course_id for course in self.courses}
         valid_faculty = {faculty.name for faculty in self.faculty}
 
-        # Collect all validation errors for better user experience
-        errors = []
+        # Collect all validation errors with precise source locations.
+        errors: list[InitErrorDetails] = []
+
+        def add_error(code: str, message: str, loc: tuple, input_value) -> None:
+            errors.append(
+                InitErrorDetails(
+                    type=PydanticCustomError(cast(LiteralString, code), cast(LiteralString, message)),
+                    loc=loc,
+                    input=input_value,
+                )
+            )
+
+        course_counts: dict[str, int] = {}
+        display_names: list[str] = []
+        for course in self.courses:
+            course_counts[course.course_id] = course_counts.get(course.course_id, 0) + 1
+            suffix = course.section_id or f"{course_counts[course.course_id]:02d}"
+            display_names.append(f"{course.course_id}.{suffix}")
+        duplicate_display_names = sorted({name for name in display_names if display_names.count(name) > 1})
+        if duplicate_display_names:
+            duplicate_errors: list[InitErrorDetails] = []
+            seen_display_names: set[str] = set()
+            for index, (course, display_name) in enumerate(zip(self.courses, display_names, strict=True)):
+                if display_name in seen_display_names:
+                    field_name = "section_id" if course.section_id is not None else "course_id"
+                    duplicate_errors.append(
+                        InitErrorDetails(
+                            type=PydanticCustomError(
+                                "duplicate_course_section_identifier",
+                                "Duplicate course section identifiers found: {names}",
+                                {"names": duplicate_display_names},
+                            ),
+                            loc=("courses", index, field_name),
+                            input=getattr(course, field_name),
+                        )
+                    )
+                seen_display_names.add(display_name)
+            raise ValidationError.from_exception_data(self.__class__.__name__, duplicate_errors)
 
         # Validate CourseConfig references
-        for course in self.courses:
+        for course_index, course in enumerate(self.courses):
             # Validate room references
-            invalid_rooms = [room for room in course.room if room not in valid_rooms]
-            if invalid_rooms:
-                errors.append(f'Course "{course.course_id}" references invalid rooms: {invalid_rooms}')
+            for item_index, room in enumerate(course.room):
+                if room not in valid_rooms:
+                    add_error(
+                        "unknown_course_room",
+                        f'Course "{course.course_id}" references invalid rooms: {[room]}',
+                        ("courses", course_index, "room", item_index),
+                        room,
+                    )
 
             # Validate lab references
-            invalid_labs = [lab for lab in course.lab if lab not in valid_labs]
-            if invalid_labs:
-                errors.append(f'Course "{course.course_id}" references invalid labs: {invalid_labs}')
+            for item_index, lab in enumerate(course.lab):
+                if lab not in valid_labs:
+                    add_error(
+                        "unknown_course_lab",
+                        f'Course "{course.course_id}" references invalid labs: {[lab]}',
+                        ("courses", course_index, "lab", item_index),
+                        lab,
+                    )
 
             # Validate conflict course references (including self-conflicts)
-            invalid_conflicts = [conflict for conflict in course.conflicts if conflict not in valid_courses]
-            if invalid_conflicts:
-                errors.append(f'Course "{course.course_id}" references invalid conflict courses: {invalid_conflicts}')
-
-            # Check for self-conflicts
-            if course.course_id in course.conflicts:
-                errors.append(f'Course "{course.course_id}" cannot conflict with itself')
+            for item_index, conflict in enumerate(course.conflicts):
+                if conflict not in valid_courses:
+                    add_error(
+                        "unknown_course_conflict",
+                        f'Course "{course.course_id}" references invalid conflict course: {conflict}',
+                        ("courses", course_index, "conflicts", item_index),
+                        conflict,
+                    )
+                elif conflict == course.course_id:
+                    add_error(
+                        "self_course_conflict",
+                        f'Course "{course.course_id}" cannot conflict with itself',
+                        ("courses", course_index, "conflicts", item_index),
+                        conflict,
+                    )
 
             # Validate explicit faculty references or preference-based inference.
             if course.faculty is None:
@@ -895,37 +1320,58 @@ class SchedulerConfig(StrictBaseModel):
                     faculty.name for faculty in self.faculty if course.course_id in faculty.course_preferences
                 ]
                 if not inferred_faculty:
-                    errors.append(
-                        f'Course "{course.course_id}" has null faculty but no faculty course preferences to derive from'
+                    add_error(
+                        "missing_derived_course_faculty",
+                        f'Course "{course.course_id}" has null faculty but no faculty '
+                        "course preferences to derive from",
+                        ("courses", course_index, "faculty"),
+                        None,
                     )
             else:
-                invalid_faculty = [faculty for faculty in course.faculty if faculty not in valid_faculty]
-                if invalid_faculty:
-                    errors.append(f'Course "{course.course_id}" references invalid faculty: {invalid_faculty}')
+                for item_index, faculty in enumerate(course.faculty):
+                    if faculty not in valid_faculty:
+                        add_error(
+                            "unknown_course_faculty",
+                            f'Course "{course.course_id}" references invalid faculty: {faculty}',
+                            ("courses", course_index, "faculty", item_index),
+                            faculty,
+                        )
 
         # Validate FacultyConfig references
-        for faculty in self.faculty:
+        for faculty_index, faculty in enumerate(self.faculty):
             # Validate course preference references
-            invalid_course_prefs = [course for course in faculty.course_preferences if course not in valid_courses]
-            if invalid_course_prefs:
-                errors.append(
-                    f'Faculty "{faculty.name}" references invalid courses in preferences: {invalid_course_prefs}'
-                )
+            for course in faculty.course_preferences:
+                if course not in valid_courses:
+                    add_error(
+                        "unknown_faculty_course_preference",
+                        f'Faculty "{faculty.name}" references invalid courses in preferences: {[course]}',
+                        ("faculty", faculty_index, "course_preferences", course),
+                        course,
+                    )
 
             # Validate room preference references
-            invalid_room_prefs = [room for room in faculty.room_preferences if room not in valid_rooms]
-            if invalid_room_prefs:
-                errors.append(f'Faculty "{faculty.name}" references invalid rooms in preferences: {invalid_room_prefs}')
+            for room in faculty.room_preferences:
+                if room not in valid_rooms:
+                    add_error(
+                        "unknown_faculty_room_preference",
+                        f'Faculty "{faculty.name}" references invalid rooms in preferences: {[room]}',
+                        ("faculty", faculty_index, "room_preferences", room),
+                        room,
+                    )
 
             # Validate lab preference references
-            invalid_lab_prefs = [lab for lab in faculty.lab_preferences if lab not in valid_labs]
-            if invalid_lab_prefs:
-                errors.append(f'Faculty "{faculty.name}" references invalid labs in preferences: {invalid_lab_prefs}')
+            for lab in faculty.lab_preferences:
+                if lab not in valid_labs:
+                    add_error(
+                        "unknown_faculty_lab_preference",
+                        f'Faculty "{faculty.name}" references invalid labs in preferences: {[lab]}',
+                        ("faculty", faculty_index, "lab_preferences", lab),
+                        lab,
+                    )
 
         # Raise all errors at once for better debugging
         if errors:
-            error_message = "Configuration validation errors:\n" + "\n".join(f"  - {error}" for error in errors)
-            raise ValueError(error_message)
+            raise ValidationError.from_exception_data(self.__class__.__name__, errors)
 
         return self
 
@@ -939,21 +1385,29 @@ class SchedulerConfig(StrictBaseModel):
         scheduler_config._validate_uniqueness()
         ```
         """
-        # Check room uniqueness
-        if len(self.rooms) != len(set(self.rooms)):
-            duplicates = [room for room in set(self.rooms) if self.rooms.count(room) > 1]
-            raise ValueError(f"Duplicate room names found: {duplicates}")
-
-        # Check lab uniqueness
-        if len(self.labs) != len(set(self.labs)):
-            duplicates = [lab for lab in set(self.labs) if self.labs.count(lab) > 1]
-            raise ValueError(f"Duplicate lab names found: {duplicates}")
-
-        # Check faculty uniqueness
-        faculty_names = [faculty.name for faculty in self.faculty]
-        if len(faculty_names) != len(set(faculty_names)):
-            duplicates = [name for name in set(faculty_names) if faculty_names.count(name) > 1]
-            raise ValueError(f"Duplicate faculty names found: {duplicates}")
+        errors: list[InitErrorDetails] = []
+        for field_name, values, label in (
+            ("rooms", self.rooms, "room"),
+            ("labs", self.labs, "lab"),
+            ("faculty", self.faculty, "faculty"),
+        ):
+            seen: set[str] = set()
+            for index, value in enumerate(values):
+                if value.name in seen:
+                    errors.append(
+                        InitErrorDetails(
+                            type=PydanticCustomError(
+                                f"duplicate_{label}_name",
+                                f"Duplicate {label} name: {{name}}",
+                                {"name": value.name},
+                            ),
+                            loc=(field_name, index, "name"),
+                            input=value.name,
+                        )
+                    )
+                seen.add(value.name)
+        if errors:
+            raise ValidationError.from_exception_data(self.__class__.__name__, errors)
 
 
 class OptimizerFlags(StrEnum):
@@ -1014,7 +1468,7 @@ class OptimizerFlags(StrEnum):
 
     PACK_ROOMS = "pack_rooms"
     """
-    Prefer different courses to share a room when any meeting pair is adjacent
+    Prefer different courses to share a room when room-occupying meetings are adjacent
 
     **Usage:**
     ```python
@@ -1049,12 +1503,13 @@ class CombinedConfig(StrictBaseModel):
         description="Scheduler configuration",
         json_schema_extra={
             "example": {
-                "rooms": ["Room 101"],
-                "labs": ["Lab 101"],
+                "rooms": [{"name": "Room 101", "capacity": 40}],
+                "labs": [{"name": "Lab 101", "capacity": 24}],
                 "courses": [
                     {
                         "course_id": "CS 101",
                         "credits": 3,
+                        "capacity": 24,
                         "room": ["Room 101"],
                         "lab": ["Lab 101"],
                         "conflicts": [],
@@ -1148,20 +1603,90 @@ class CombinedConfig(StrictBaseModel):
             if not pattern.disabled:
                 patterns_by_credit.setdefault(pattern.credits, []).append(pattern)
 
-        errors = []
-        for course in self.config.courses:
+        errors: list[InitErrorDetails] = []
+        for index, course in enumerate(self.config.courses):
             patterns = patterns_by_credit.get(course.credits, [])
             if not patterns:
                 errors.append(
-                    f'Course "{course.course_id}" has credits ({course.credits}) with no enabled class pattern'
+                    InitErrorDetails(
+                        type=PydanticCustomError(
+                            "course_pattern_credit_mismatch",
+                            'Course "{course_id}" has credits ({credits}) with no enabled class pattern',
+                            {"course_id": course.course_id, "credits": course.credits},
+                        ),
+                        loc=("config", "courses", index, "credits"),
+                        input=course.credits,
+                    )
                 )
                 continue
 
             requires_lab = bool(course.lab)
-            if not any(any(meeting.lab for meeting in pattern.meetings) == requires_lab for pattern in patterns):
+            resource_patterns = [
+                pattern for pattern in patterns if any(meeting.lab for meeting in pattern.meetings) == requires_lab
+            ]
+            if not resource_patterns:
                 expected = "a lab meeting" if requires_lab else "no lab meeting"
-                errors.append(f'Course "{course.course_id}" has no enabled class pattern with {expected}')
+                errors.append(
+                    InitErrorDetails(
+                        type=PydanticCustomError(
+                            "course_pattern_lab_mismatch",
+                            'Course "{course_id}" has no enabled class pattern with {expected}',
+                            {"course_id": course.course_id, "expected": expected},
+                        ),
+                        loc=("config", "courses", index, "lab"),
+                        input=course.lab,
+                    )
+                )
+                continue
+
+            def pattern_modality(pattern: ClassPattern) -> CourseModality:
+                modes = {meeting.delivery for meeting in pattern.meetings}
+                if modes == {DeliveryMode.IN_PERSON}:
+                    return CourseModality.IN_PERSON
+                if modes == {DeliveryMode.ONLINE}:
+                    return CourseModality.ONLINE
+                return CourseModality.HYBRID
+
+            modality_patterns = [
+                pattern for pattern in resource_patterns if pattern_modality(pattern) == course.modality
+            ]
+            if not modality_patterns:
+                errors.append(
+                    InitErrorDetails(
+                        type=PydanticCustomError(
+                            "course_pattern_modality_mismatch",
+                            'Course "{course_id}" has no enabled class pattern matching modality "{modality}"',
+                            {"course_id": course.course_id, "modality": course.modality.value},
+                        ),
+                        loc=("config", "courses", index, "modality"),
+                        input=course.modality,
+                    )
+                )
+                continue
+
+            if not course.room:
+                room_compatible_patterns = [
+                    pattern
+                    for pattern in modality_patterns
+                    if not any(
+                        meeting.delivery == DeliveryMode.IN_PERSON
+                        and (not meeting.lab or course.reserve_room_during_lab)
+                        for meeting in pattern.meetings
+                    )
+                ]
+                if not room_compatible_patterns:
+                    errors.append(
+                        InitErrorDetails(
+                            type=PydanticCustomError(
+                                "course_pattern_room_requirement_mismatch",
+                                'Course "{course_id}" has no enabled class pattern that can run without a room',
+                                {"course_id": course.course_id},
+                            ),
+                            loc=("config", "courses", index, "room"),
+                            input=course.room,
+                        )
+                    )
 
         if errors:
-            raise ValueError("Configuration validation errors:\n" + "\n".join(f"  - {error}" for error in errors))
+            raise ValidationError.from_exception_data(self.__class__.__name__, errors)
         return self

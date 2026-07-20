@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 
+from scheduler.config import LabConfig, RoomConfig
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -66,6 +68,18 @@ def test_docs_workflow_checks_complete_scheduler_reference_surface() -> None:
         "ScheduleAudit",
         "ConstraintDiagnostic",
         "CourseInstance",
+        "RoomConfig",
+        "LabConfig",
     )
     for term in required_reference_terms:
         assert term in workflow
+
+
+def test_public_resource_models_declare_their_fern_documented_fields() -> None:
+    """Keep inherited validation while exposing fields on each public reference type."""
+    expected_fields = {"name", "capacity", "features", "times"}
+
+    for model in (RoomConfig, LabConfig):
+        assert set(model.__annotations__) == expected_fields
+        assert "Fields:" in (model.__doc__ or "")
+        assert all(model.model_fields[field].description for field in expected_fields)

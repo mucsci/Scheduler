@@ -1,5 +1,8 @@
 """Unit tests for domain models under ``scheduler.models``."""
 
+import csv
+import io
+
 import pytest
 from pydantic import ValidationError
 
@@ -130,6 +133,7 @@ def test_course_str() -> None:
         course_id="CS101",
         section=2,
         credits=3,
+        capacity=30,
         labs=["L1"],
         rooms=["R1"],
         conflicts=[],
@@ -143,6 +147,7 @@ def test_course_instance_as_csv_and_computed() -> None:
         course_id="X",
         section=1,
         credits=3,
+        capacity=30,
         labs=["L1"],
         rooms=["R1"],
         conflicts=[],
@@ -156,6 +161,50 @@ def test_course_instance_as_csv_and_computed() -> None:
     assert ci.course_str == "X.01"
     assert ci.times == slot.times
     assert ci.lab_index is None
+    assert ci.reserve_room_during_lab is True
+    assert ci.model_dump(by_alias=True)["reserve_room_during_lab"] is True
+    c.reserve_room_during_lab = False
+    assert ci.model_dump(by_alias=True)["reserve_room_during_lab"] is False
+
+
+def test_course_instance_csv_quotes_fields_and_uses_empty_nulls() -> None:
+    course = Course(
+        course_id="X,\nY",
+        section=1,
+        credits=3,
+        capacity=30,
+        labs=[],
+        rooms=[],
+        conflicts=[],
+        faculties=['F "One"'],
+    )
+    time = TimeInstance(day=Day.MON, start=TimePoint.make_from(9, 0), duration=Duration(duration=50))
+    instance = CourseInstance(
+        course=course,
+        time=TimeSlot(times=[time]),
+        faculty='F "One"',
+        room=None,
+        lab=None,
+    )
+
+    assert next(csv.reader(io.StringIO(instance.as_csv()))) == [
+        "X,\nY.01",
+        'F "One"',
+        "",
+        "",
+        "MON 09:00-09:50",
+    ]
+
+
+@pytest.mark.parametrize("times,lab_index", [([], None), ([1], 1), ([1], -1)])
+def test_time_slot_rejects_empty_or_invalid_lab_marker(times, lab_index) -> None:
+    meetings = (
+        []
+        if not times
+        else [TimeInstance(day=Day.MON, start=TimePoint.make_from(9, 0), duration=Duration(duration=50))]
+    )
+    with pytest.raises(ValidationError):
+        TimeSlot(times=meetings, lab_index=lab_index)
 
 
 def test_course_instance_lab_index_when_lab_set() -> None:
@@ -163,6 +212,7 @@ def test_course_instance_lab_index_when_lab_set() -> None:
         course_id="Y",
         section=1,
         credits=4,
+        capacity=30,
         labs=["L1"],
         rooms=["R1"],
         conflicts=[],

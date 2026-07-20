@@ -41,6 +41,9 @@ def test_auditor_validates_a_decoded_schedule_without_a_model(
     invalid = auditor.audit_schedule(schedule)
     assert invalid.is_valid is False
     assert any(item.kind == "course_room_eligibility" for item in invalid.constraint_violations)
+    unknown_usage = next(item for item in invalid.resource_usage if item.resource == "not-eligible")
+    assert unknown_usage.capacity is None
+    assert unknown_usage.capacity_violations == ()
 
 
 @pytest.mark.parametrize(
@@ -114,8 +117,9 @@ def test_auditor_reports_missing_mandatory_day(minimal_combined_config: Combined
 
 def test_auditor_detects_overlapping_resources_faculty_and_conflicts() -> None:
     data = two_course_config_data()
-    problem, schedule, auditor = _solved(config_from(data))
-    problem.courses[0].conflicts.append("CS102")
+    data["config"]["courses"][0]["conflicts"] = ["CS102"]
+    data["config"]["courses"][1]["conflicts"] = ["CS101"]
+    _problem, schedule, auditor = _solved(config_from(data))
     schedule[1].time = schedule[0].time
 
     audit = auditor.audit_schedule(schedule)
@@ -130,10 +134,55 @@ def test_auditor_detects_overlapping_resources_faculty_and_conflicts() -> None:
     assert all(usage.collisions for usage in audit.resource_usage)
 
 
+def test_auditor_uses_canonical_course_metadata_and_handles_unknown_faculty() -> None:
+    data = minimal_config_data()
+    data["optimizer_flags"] = ["faculty_course"]
+    data["config"]["faculty"][0]["course_preferences"] = {"CS101": 10}
+    _problem, schedule, auditor = _solved(config_from(data))
+    schedule[0].course.capacity = 1
+    schedule[0].course.rooms.clear()
+    schedule[0].faculty = "unknown"
+
+    audit = auditor.audit_schedule(schedule)
+
+    assert {item.kind for item in audit.constraint_violations} >= {"course_faculty_eligibility"}
+    assert audit.resource_usage[0].maximum_assigned_section_capacity == 30
+    assert audit.objective_scores[0].score == 0
+
+
+def test_auditor_resource_preference_upper_bound_considers_all_candidates() -> None:
+    data = minimal_config_data()
+    data["optimizer_flags"] = ["faculty_room"]
+    data["config"]["rooms"] = [
+        {"name": "R1", "capacity": 30},
+        {"name": "R2", "capacity": 30},
+    ]
+    data["config"]["courses"][0]["room"] = ["R1", "R2"]
+    data["config"]["faculty"][0]["room_preferences"] = {"R1": 1, "R2": 10}
+    _problem, schedule, auditor = _solved(config_from(data))
+    schedule[0].room = "R1"
+
+    score = auditor.audit_schedule(schedule).objective_scores[0]
+
+    assert score.score == 1
+    assert score.independent_upper_bound == 10
+
+
+def test_auditor_reports_a_mutated_invalid_lab_index_without_crashing(
+    minimal_combined_config: CombinedConfig,
+) -> None:
+    _problem, schedule, auditor = _solved(minimal_combined_config)
+    schedule[0].time.lab_index = 999
+
+    audit = auditor.audit_schedule(schedule)
+
+    assert any(item.kind == "course_time_pattern" for item in audit.constraint_violations)
+
+
 def test_auditor_detects_same_course_resource_and_adjacency_rules() -> None:
     data = two_course_config_data(same_course=True)
-    data["config"]["rooms"] = ["R1", "R2"]
-    data["config"]["labs"] = ["L1", "L2"]
+    data["config"]["rooms"] = [{"name": "R1", "capacity": 30}, {"name": "R2", "capacity": 30}]
+    data["config"]["labs"] = [{"name": "L1", "capacity": 30}, {"name": "L2", "capacity": 30}]
     for course in data["config"]["courses"]:
         course["room"] = ["R1", "R2"]
         course["lab"] = ["L1", "L2"]
@@ -148,6 +197,8 @@ def test_auditor_detects_same_course_resource_and_adjacency_rules() -> None:
         if not left.overlaps(right) and not left.lecture_next_to(right) and not left.lab_next_to(right)
     )
     schedule[0].time, schedule[1].time = first, second
+    schedule[0].time.max_time_gap = Duration(duration=10_000)
+    schedule[1].time.max_time_gap = Duration(duration=10_000)
 
     kinds = {item.kind for item in auditor.audit_schedule(schedule).constraint_violations}
 
@@ -204,8 +255,8 @@ def test_auditor_explains_unselected_faculty_preference() -> None:
 def test_auditor_scores_and_explains_all_pair_objectives() -> None:
     data = two_course_config_data()
     data["optimizer_flags"] = ["same_room", "same_lab", "pack_rooms", "pack_labs"]
-    data["config"]["rooms"] = ["R1", "R2"]
-    data["config"]["labs"] = ["L1", "L2"]
+    data["config"]["rooms"] = [{"name": "R1", "capacity": 30}, {"name": "R2", "capacity": 30}]
+    data["config"]["labs"] = [{"name": "L1", "capacity": 30}, {"name": "L2", "capacity": 30}]
     for course in data["config"]["courses"]:
         course["room"] = ["R1", "R2"]
         course["lab"] = ["L1", "L2"]
@@ -228,3 +279,57 @@ def test_auditor_scores_and_explains_all_pair_objectives() -> None:
         "pack_rooms",
         "pack_labs",
     }
+
+
+def test_pack_rooms_ignores_unreserved_lab_adjacency() -> None:
+    data = two_course_config_data()
+    data["optimizer_flags"] = ["pack_rooms"]
+    data["config"]["faculty"].append(
+        {
+            "name": "F2",
+            "maximum_credits": 4,
+            "minimum_credits": 0,
+            "unique_course_limit": 1,
+            "times": {day: ["08:00-20:00"] for day in ("MON", "TUE", "WED", "THU", "FRI")},
+        }
+    )
+    data["config"]["courses"][1]["faculty"] = ["F2"]
+    for course in data["config"]["courses"]:
+        course["reserve_room_during_lab"] = False
+    _problem, schedule, auditor = _solved(config_from(data))
+    lecture_one = TimeInstance(day=Day.MON, start=TimePoint.make_from(8, 0), duration=Duration(duration=50))
+    lecture_two = TimeInstance(day=Day.MON, start=TimePoint.make_from(12, 0), duration=Duration(duration=50))
+    lab_one = TimeInstance(day=Day.TUE, start=TimePoint.make_from(14, 0), duration=Duration(duration=50))
+    lab_two = TimeInstance(day=Day.TUE, start=TimePoint.make_from(15, 0), duration=Duration(duration=50))
+    schedule[0].time = TimeSlot(times=[lecture_one, lab_one], lab_index=1)
+    schedule[1].time = TimeSlot(times=[lecture_two, lab_two], lab_index=1)
+    schedule[1].room = schedule[0].room
+
+    score = auditor.audit_schedule(schedule).objective_scores[0]
+
+    assert schedule[0].time.lab_next_to(schedule[1].time) is True
+    assert score.objective == "pack_rooms"
+    assert score.score == 0
+
+
+@pytest.mark.parametrize("resource_kind", ["room", "lab"])
+def test_auditor_reports_undersized_assigned_resources(resource_kind: str) -> None:
+    data = minimal_config_data()
+    data["config"]["courses"][0]["capacity"] = 30
+    plural = resource_kind + "s"
+    field = resource_kind
+    data["config"][plural] = [
+        {"name": f"small-{resource_kind}", "capacity": 29},
+        {"name": f"large-{resource_kind}", "capacity": 30},
+    ]
+    data["config"]["courses"][0][field] = [f"small-{resource_kind}", f"large-{resource_kind}"]
+    problem, schedule, auditor = _solved(config_from(data))
+    setattr(schedule[0], field, f"small-{resource_kind}")
+
+    audit = auditor.audit_schedule(schedule)
+    usage = next(item for item in audit.resource_usage if item.kind == resource_kind)
+
+    assert any(item.kind == f"course_{resource_kind}_capacity" for item in audit.constraint_violations)
+    assert usage.capacity == 29
+    assert usage.maximum_assigned_section_capacity == 30
+    assert usage.capacity_violations

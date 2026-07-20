@@ -59,11 +59,24 @@
     },
     "CourseConfig": {
       "additionalProperties": false,
-      "description": "Represents a course configuration.\n\n**Usage:**\n```python\nCourseConfig(\n    course_id=\"CS 101\",\n    credits=3,\n    room=[\"Room 101\"],\n    lab=[],\n    conflicts=[],\n    faculty=[\"Dr. Smith\"],\n)\n```",
+      "description": "Represents a course configuration.\n\n**Usage:**\n```python\nCourseConfig(\n    course_id=\"CS 101\",\n    credits=3,\n    capacity=30,\n    room=[\"Room 101\"],\n    lab=[],\n    conflicts=[],\n    faculty=[\"Dr. Smith\"],\n)\n```",
       "properties": {
         "course_id": {
           "$ref": "#/$defs/Course",
           "description": "Base course identifier; repeated values create separately numbered sections"
+        },
+        "section_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional stable section suffix; null uses the generated zero-padded input-order number",
+          "title": "Section Id"
         },
         "credits": {
           "description": "Number of credit hours",
@@ -72,15 +85,21 @@
           "title": "Credits",
           "type": "integer"
         },
+        "capacity": {
+          "description": "Expected section enrollment that any assigned rooms and labs must accommodate",
+          "example": 30,
+          "exclusiveMinimum": 0,
+          "title": "Capacity",
+          "type": "integer"
+        },
         "room": {
-          "description": "List of acceptable room names",
+          "description": "Allowed room names; empty is valid only for compatible patterns that do not occupy a room",
           "example": [
             "Room 101"
           ],
           "items": {
             "$ref": "#/$defs/Room"
           },
-          "minItems": 1,
           "title": "Room",
           "type": "array"
         },
@@ -120,17 +139,57 @@
             "Dr. Smith"
           ],
           "title": "Faculty"
+        },
+        "modality": {
+          "$ref": "#/$defs/CourseModality",
+          "default": "in_person",
+          "description": "Required delivery composition of the selected class pattern"
+        },
+        "required_room_features": {
+          "description": "Feature tags every assigned lecture room must provide",
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Room Features",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "required_lab_features": {
+          "description": "Feature tags every assigned lab must provide",
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Lab Features",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "reserve_room_during_lab": {
+          "default": true,
+          "description": "Whether the lab meeting also occupies the section's assigned lecture room",
+          "title": "Reserve Room During Lab",
+          "type": "boolean"
         }
       },
       "required": [
         "course_id",
         "credits",
+        "capacity",
         "room",
         "conflicts",
         "faculty"
       ],
       "title": "CourseConfig",
       "type": "object"
+    },
+    "CourseModality": {
+      "description": "Required mixture of meeting delivery modes for a course section.",
+      "enum": [
+        "in_person",
+        "online",
+        "hybrid"
+      ],
+      "title": "CourseModality",
+      "type": "string"
     },
     "Day": {
       "description": "Day of the week",
@@ -142,6 +201,15 @@
         "FRI"
       ],
       "example": "MON",
+      "type": "string"
+    },
+    "DeliveryMode": {
+      "description": "Delivery mode for one generated meeting.",
+      "enum": [
+        "in_person",
+        "online"
+      ],
+      "title": "DeliveryMode",
       "type": "string"
     },
     "Faculty": {
@@ -280,6 +348,61 @@
       "example": "Lab 101",
       "type": "string"
     },
+    "LabConfig": {
+      "additionalProperties": false,
+      "description": "A laboratory resource that can be assigned to a section's lab meeting.\n\nFields:\n    name: Unique, nonblank identifier used by course lab candidates, faculty\n        preferences, generated schedules, and diagnostics.\n    capacity: Positive count of usable student seats. Lab assignments require\n        a value at least as large as the course section capacity.\n    features: Facility or equipment tags supplied by the lab. A lab is\n        eligible only when it contains every feature required by the course.\n    times: Optional availability windows for every scheduler weekday. ``None``\n        means unrestricted availability; a mapping restricts the lab meeting\n        to the listed windows.",
+      "properties": {
+        "name": {
+          "description": "Unique, nonblank lab name used by references and schedule output",
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "capacity": {
+          "description": "Maximum number of students the lab can accommodate",
+          "exclusiveMinimum": 0,
+          "title": "Capacity",
+          "type": "integer"
+        },
+        "features": {
+          "description": "Facility and equipment feature tags supplied by this lab",
+          "items": {
+            "type": "string"
+          },
+          "title": "Features",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "times": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "items": {
+                  "$ref": "#/$defs/TimeRange"
+                },
+                "type": "array"
+              },
+              "propertyNames": {
+                "$ref": "#/$defs/Day"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional weekday lab availability windows; null means unrestricted availability",
+          "title": "Times"
+        }
+      },
+      "required": [
+        "name",
+        "capacity"
+      ],
+      "title": "LabConfig",
+      "type": "object"
+    },
     "Meeting": {
       "additionalProperties": false,
       "description": "Represents a single meeting instance.\n\n**Usage:**\n```python\nMeeting(day=\"MON\", duration=90, lab=False)\n```",
@@ -311,6 +434,11 @@
           "description": "Whether this is the pattern's single lab meeting",
           "title": "Lab",
           "type": "boolean"
+        },
+        "delivery": {
+          "$ref": "#/$defs/DeliveryMode",
+          "default": "in_person",
+          "description": "Whether this meeting is held in person or online"
         }
       },
       "required": [
@@ -345,29 +473,90 @@
       "example": "Room 101",
       "type": "string"
     },
+    "RoomConfig": {
+      "additionalProperties": false,
+      "description": "A lecture-room resource that can be assigned to physical course meetings.\n\nFields:\n    name: Unique, nonblank identifier used by course room candidates,\n        faculty preferences, generated schedules, and diagnostics.\n    capacity: Positive count of usable student seats. Physical assignments\n        require a value at least as large as the course section capacity.\n    features: Facility or equipment tags supplied by the room. A room is\n        eligible only when it contains every feature required by the course.\n    times: Optional availability windows for every scheduler weekday. ``None``\n        means unrestricted availability; a mapping restricts occupancy to the\n        listed windows.",
+      "properties": {
+        "name": {
+          "description": "Unique, nonblank room name used by references and schedule output",
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "capacity": {
+          "description": "Maximum number of students the room can accommodate",
+          "exclusiveMinimum": 0,
+          "title": "Capacity",
+          "type": "integer"
+        },
+        "features": {
+          "description": "Facility and equipment feature tags supplied by this room",
+          "items": {
+            "type": "string"
+          },
+          "title": "Features",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "times": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "items": {
+                  "$ref": "#/$defs/TimeRange"
+                },
+                "type": "array"
+              },
+              "propertyNames": {
+                "$ref": "#/$defs/Day"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Optional weekday room availability windows; null means unrestricted availability",
+          "title": "Times"
+        }
+      },
+      "required": [
+        "name",
+        "capacity"
+      ],
+      "title": "RoomConfig",
+      "type": "object"
+    },
     "SchedulerConfig": {
       "additionalProperties": false,
-      "description": "Represents a scheduler configuration.\n\n**Usage:**\n```python\nSchedulerConfig(rooms=[...], labs=[...], courses=[...], faculty=[...])\n```",
+      "description": "Represents a scheduler configuration.\n\n**Usage:**\n```python\nSchedulerConfig(\n    rooms=[RoomConfig(name=\"Room 101\", capacity=40)],\n    labs=[LabConfig(name=\"Lab 101\", capacity=24)],\n    courses=[...],\n    faculty=[...],\n)\n```",
       "properties": {
         "rooms": {
-          "description": "List of available room names",
+          "description": "List of available room definitions",
           "example": [
-            "Room 101"
+            {
+              "capacity": 40,
+              "name": "Room 101"
+            }
           ],
           "items": {
-            "$ref": "#/$defs/Room"
+            "$ref": "#/$defs/RoomConfig"
           },
           "minItems": 1,
           "title": "Rooms",
           "type": "array"
         },
         "labs": {
-          "description": "List of available lab names",
+          "description": "List of available lab definitions",
           "example": [
-            "Lab 101"
+            {
+              "capacity": 24,
+              "name": "Lab 101"
+            }
           ],
           "items": {
-            "$ref": "#/$defs/Lab"
+            "$ref": "#/$defs/LabConfig"
           },
           "title": "Labs",
           "type": "array"
@@ -376,6 +565,7 @@
           "description": "List of course configurations",
           "example": [
             {
+              "capacity": 24,
               "conflicts": [
                 "CS 102"
               ],
@@ -395,6 +585,7 @@
           "items": {
             "$ref": "#/$defs/CourseConfig"
           },
+          "minItems": 1,
           "title": "Courses",
           "type": "array"
         },
@@ -432,6 +623,7 @@
           "items": {
             "$ref": "#/$defs/FacultyConfig"
           },
+          "minItems": 1,
           "title": "Faculty",
           "type": "array"
         }
@@ -562,6 +754,7 @@
       "example": {
         "courses": [
           {
+            "capacity": 24,
             "conflicts": [],
             "course_id": "CS 101",
             "credits": 3,
@@ -602,10 +795,16 @@
           }
         ],
         "labs": [
-          "Lab 101"
+          {
+            "capacity": 24,
+            "name": "Lab 101"
+          }
         ],
         "rooms": [
-          "Room 101"
+          {
+            "capacity": 40,
+            "name": "Room 101"
+          }
         ]
       }
     },

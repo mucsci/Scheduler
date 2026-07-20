@@ -1,6 +1,7 @@
 """Public, solver-independent diagnostic result contracts."""
 
 from dataclasses import dataclass
+from typing import Literal
 
 
 @dataclass(frozen=True)
@@ -60,7 +61,8 @@ class ScheduleDiagnosis:
 
     Fields:
         status: Solver status: ``satisfiable``, ``unsatisfiable``, or ``unknown``.
-        conflicting_constraints: Primary subset-minimal unsatisfiable rule set.
+        conflicting_constraints: Primary unsatisfiable rule set, subset-minimized
+            when ``core_is_minimal`` is true.
         alternative_conflict_sets: Additional bounded subset-minimal rule sets.
         supporting_facts: Derived facts needed to interpret the primary conflict.
         relaxation_suggestions: Ranked configuration changes suggested by conflicts.
@@ -81,7 +83,7 @@ class ScheduleDiagnosis:
         reason: Solver-provided explanation when status is ``unknown``.
     """
 
-    status: str
+    status: Literal["satisfiable", "unsatisfiable", "unknown"]
     conflicting_constraints: tuple["ConstraintDiagnostic", ...] = ()
     alternative_conflict_sets: tuple[tuple["ConstraintDiagnostic", ...], ...] = ()
     supporting_facts: tuple["ConstraintDiagnostic", ...] = ()
@@ -97,7 +99,7 @@ class ScheduleDiagnosis:
     alternative_cores_complete: bool | None = None
     repair_sets_complete: bool | None = None
     diagnostic_completeness: str = "partial"
-    diagnostic_version: str = "1"
+    diagnostic_version: str = "3"
     elapsed_ms: int = 0
     solver_timeout_ms: int | None = None
     reason: str | None = None
@@ -133,11 +135,26 @@ class CandidateDomainDiagnostic:
         faculty_origin: Whether faculty were configured or derived from preferences.
         room_candidates: Eligible room labels.
         lab_candidates: Eligible lab labels.
+        section_capacity: Expected enrollment that resources must accommodate.
+        capacity_compatible_room_candidates: Allowed rooms large enough for the section.
+        capacity_compatible_lab_candidates: Allowed labs large enough for the section.
+        room_capacity_rejections: Bounded explanations for undersized allowed rooms.
+        room_capacity_rejection_count: Total undersized allowed-room count.
+        room_capacity_rejections_truncated: Whether room rejection details were capped.
+        lab_capacity_rejections: Bounded explanations for undersized allowed labs.
+        lab_capacity_rejection_count: Total undersized allowed-lab count.
+        lab_capacity_rejections_truncated: Whether lab rejection details were capped.
         compatible_time_patterns: Meeting patterns matching credits and lab semantics.
         availability_by_faculty: Per-faculty availability summaries.
         rejected_patterns: Bounded explanations for excluded patterns.
         rejected_pattern_count: Total excluded patterns before truncation.
         rejected_patterns_truncated: Whether the rejected-pattern list is incomplete.
+        modality: Required delivery composition for compatible meeting patterns.
+        required_room_features: Feature tags required on the lecture room.
+        required_lab_features: Feature tags required on every lab.
+        feature_compatible_room_candidates: Allowed rooms providing all required features.
+        feature_compatible_lab_candidates: Allowed labs providing all required features.
+        reserve_room_during_lab: Whether lab meetings also consume the lecture room.
     """
 
     course: str
@@ -146,11 +163,26 @@ class CandidateDomainDiagnostic:
     faculty_origin: str
     room_candidates: tuple[str, ...]
     lab_candidates: tuple[str, ...]
+    section_capacity: int
+    capacity_compatible_room_candidates: tuple[str, ...]
+    capacity_compatible_lab_candidates: tuple[str, ...]
+    room_capacity_rejections: tuple[ConstraintDiagnostic, ...]
+    room_capacity_rejection_count: int
+    room_capacity_rejections_truncated: bool
+    lab_capacity_rejections: tuple[ConstraintDiagnostic, ...]
+    lab_capacity_rejection_count: int
+    lab_capacity_rejections_truncated: bool
     compatible_time_patterns: tuple[str, ...]
     availability_by_faculty: tuple[ConstraintDiagnostic, ...]
     rejected_patterns: tuple[ConstraintDiagnostic, ...]
     rejected_pattern_count: int
     rejected_patterns_truncated: bool
+    modality: str = "in_person"
+    required_room_features: tuple[str, ...] = ()
+    required_lab_features: tuple[str, ...] = ()
+    feature_compatible_room_candidates: tuple[str, ...] = ()
+    feature_compatible_lab_candidates: tuple[str, ...] = ()
+    reserve_room_during_lab: bool = True
 
 
 @dataclass(frozen=True)
@@ -252,12 +284,18 @@ class ResourceUsageDiagnostic:
         resource: Configured resource label.
         assignments: Course sections assigned to the resource.
         collisions: Independent overlap findings for those assignments.
+        capacity: Configured student capacity, or ``None`` for an unknown resource in a mutated schedule.
+        maximum_assigned_section_capacity: Largest assigned section using the resource.
+        capacity_violations: Assignments whose section capacity exceeds the resource.
     """
 
     kind: str
     resource: str
     assignments: tuple[str, ...]
+    capacity: int | None
+    maximum_assigned_section_capacity: int
     collisions: tuple[ConstraintDiagnostic, ...] = ()
+    capacity_violations: tuple[ConstraintDiagnostic, ...] = ()
 
 
 @dataclass(frozen=True)

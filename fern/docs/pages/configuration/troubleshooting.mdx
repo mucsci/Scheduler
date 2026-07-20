@@ -34,6 +34,13 @@ ValidationError: ... CourseConfig
 faculty -> 0: "Dr. Unknown" is not in faculty list
 ```
 
+**Legacy or invalid capacity shape**
+
+Global rooms and labs must be objects containing `name` and a positive integer `capacity`; every course also needs
+a positive `capacity`. Validation locations such as `/config/rooms/0` or `/config/courses/0/capacity` identify the
+exact entry to migrate. A well-formed configuration whose resources are simply too small passes validation and is
+reported by feasibility diagnosis instead.
+
 **Business rules**
 
 ```
@@ -52,23 +59,26 @@ end: End time must be after start time
 
 ## Performance
 
-Rough expectations (hardware-dependent):
-
-- **Small** — Few courses and faculty: often sub-second to seconds.
-- **Medium** — Tens of courses: seconds to minutes.
-- **Large** — Many courses and faculty: minutes possible.
+There is no fixed latency guarantee based on course count. Solve time depends on the generated candidate-slot
+domain, resource and faculty choices, pairwise constraints, enabled objectives, timeout, Z3 version, and hardware.
+Benchmark representative configurations in the environment where the scheduler will run.
 
 **Ideas to speed up or shrink search**
 
 - Tighten faculty `times` windows.
 - Reduce optional room/lab choices if not needed.
 - Fewer `optimizer_flags` while debugging.
-- Lower **`limit`**.
+- Lower REST **`limit`** to retain and transfer fewer schedules. This does not necessarily make finding the first
+  schedule faster.
 
 ## No schedules
 
 - Check faculty availability vs. generated time grid.
 - Check room/lab lists vs. course requirements.
+- Compare each section's `capacity` with the capacities of its allowed rooms and labs.
+- Check required features and room/lab `times`; omission means unrestricted, but a supplied map makes missing days unavailable.
+- Confirm course `modality` matches meeting `delivery` values and lab meetings remain in person.
+- If only lecture-room collisions are blocking lab times, verify whether `reserve_room_during_lab` should be `false`.
 - Ensure `conflicts` do not make the instance unsatisfiable.
 - Use `POST /validate` for structured schema and cross-reference errors before submitting.
 - Use `GET /schedules/{id}/diagnosis` for feasible candidate domains, capacity shortfalls, unsat cores, provenance, and verified rule-level repair sets.

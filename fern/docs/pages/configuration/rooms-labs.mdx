@@ -3,26 +3,57 @@ title: Rooms and labs
 description: The config.rooms and config.labs lists and how courses reference them.
 ---
 
-Under **`config`**, **`rooms`** and **`labs`** name the physical resources the solver may assign.
+Under **`config`**, **`rooms`** and **`labs`** define the physical resources the solver may assign.
 
 ## Shape
 
 ```json
 {
-  "rooms": ["Room A", "Room B", "Room C"],
-  "labs": ["Lab 1", "Lab 2"]
+  "rooms": [
+    {
+      "name": "Room A",
+      "capacity": 40,
+      "features": ["accessible", "projector"],
+      "times": {"MON": ["08:00-17:00"], "WED": ["08:00-17:00"]}
+    },
+    {"name": "Room B", "capacity": 28}
+  ],
+  "labs": [
+    {"name": "Lab 1", "capacity": 24}
+  ]
 }
 ```
 
-- **`rooms`** — Non-empty list of unique room names (strings).
-- **`labs`** — List of unique lab names (strings); may be empty if you have no labs.
+- **`rooms`** — Required non-empty list of `RoomConfig` objects.
+- **`labs`** — Required list of `LabConfig` objects; may be empty if no course uses a lab.
+- **`name`** — Required nonblank string without leading/trailing whitespace, unique within the corresponding room
+  or lab list.
+- **`capacity`** — Required positive integer containing the number of students the resource accommodates.
+- **`features`** — Optional set/list of nonblank facility or equipment tags without leading/trailing whitespace;
+  defaults to empty.
+- **`times`** — Optional weekday map of availability ranges. `null` or omission means unrestricted. When a map is
+  provided, missing weekdays and empty lists are unavailable.
 
 Room and lab names must be unique. Every name used in **courses** or **faculty preferences** must appear in these
 lists.
 
 ## Course usage
 
-Each course lists acceptable **rooms** and **labs** (see **Courses**). The solver always picks a room. A non-empty lab list requires a class pattern with exactly one `lab: true` meeting; the solver reserves one of the listed labs for that meeting. Courses with an empty lab list must use a pattern with no lab meeting.
+Each course still references acceptable resources by `name`. The assigned room must accommodate the course
+section's `capacity` and provide every `required_room_features` tag. A non-empty lab list requires a class pattern
+with exactly one `lab: true` meeting. Each assigned lab must accommodate its course section's capacity and provide every
+`required_lab_features` tag. Courses with an empty lab list use no lab and receive no lab constraint.
+
+Every physical meeting must fit the selected resource's `times`. In-person non-lab meetings occupy the lecture
+room. Lab meetings occupy the assigned lab and, by default, the lecture room too. A course can set
+`reserve_room_during_lab: false` so its lab meetings do not consume the lecture room. Online meetings never consume
+a physical room. A separately configured lab-only section may therefore use `room: []` when it sets
+`reserve_room_during_lab: false`; configurations without a room are rejected if every otherwise-compatible pattern
+would occupy one. When a course lists room candidates but its selected pattern is roomless, the generated room is
+still `null`; room capacity, features, availability, collision, and room-preference scoring do not apply.
+
+Capacity equality is valid. A configuration whose referenced resources exist but are all too small remains valid
+input and is diagnosed as unsatisfiable; malformed, missing, zero, or negative capacities fail validation.
 
 ## Practices
 
@@ -30,3 +61,5 @@ Each course lists acceptable **rooms** and **labs** (see **Courses**). The solve
 - If a course has no lab requirement, its `lab` list can be empty.
 - A lab list is a requirement, not merely a preference: include only the labs that can host the designated lab meeting.
 - Keep the global lists aligned with your registrar or facilities data to avoid validation errors on unknown names.
+- Global string-only resources are no longer accepted; migrate `"Room A"` to
+  `{"name": "Room A", "capacity": 40}` with the facility's actual usable capacity.

@@ -80,6 +80,11 @@ class Scheduler:
         """
         return self._solver.get_models()
 
+    @property
+    def _enumeration_completion_reason(self) -> str | None:
+        """Expose solver termination metadata to the REST session adapter."""
+        return self._solver.enumeration_completion_reason
+
     def diagnose(self) -> ScheduleDiagnosis:
         """Explain hard-constraint feasibility without changing model enumeration.
 
@@ -108,7 +113,7 @@ class Scheduler:
             Hard-rule findings, workload/resource summaries, and objective scores.
 
         Raises:
-            KeyError: If assignments reference unknown faculty in preference scoring.
+            None.
 
         Behavior:
             Delegates to the Z3-independent auditor and never trusts or queries the

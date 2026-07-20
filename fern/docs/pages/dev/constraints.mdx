@@ -38,15 +38,17 @@ Aggregating unrelated faculty, course, or resource rules under one tracker makes
    bound and unmet-outcome explanation.
 4. Add optimized solver tests, audit-score tests, and documentation for exact point contribution.
 
-## Compatibility requirements
+## Public interface requirements
 
 - Preserve `Scheduler(full_config, *, solver_timeout_ms=None)` and the behavior of `get_models()`, `diagnose()`, and
   `audit_schedule()`.
 - Preserve root exports and legacy imports from `scheduler.scheduler`.
 - Keep generated ordering, timeout handling, no-lab decoding, deterministic symbols, and model blocking covered by
   characterization tests.
-- `Course.time`, `faculty`, `room`, and `lab` remain compatibility mirrors; new internal logic uses
-  `CourseVariables` from solver artifacts.
+- Create and own Z3 variables exclusively through `CourseVariables` inside solver artifacts. Solver-owned `Course`
+  copies retain the same variables as legacy compatibility mirrors, while `SchedulingProblem.courses` remains
+  solver-independent. Each course section has no lab when its candidate list is empty, or exactly one required lab
+  assignment when that list is non-empty.
 
 ## Testing layers
 

@@ -32,6 +32,7 @@ def _two_course_template() -> dict:
         {
             "course_id": "CS101",
             "credits": 4,
+            "capacity": 30,
             "room": ["R1"],
             "lab": ["L1"],
             "conflicts": ["CS102"],
@@ -40,6 +41,7 @@ def _two_course_template() -> dict:
         {
             "course_id": "CS102",
             "credits": 4,
+            "capacity": 30,
             "room": ["R1"],
             "lab": ["L1"],
             "conflicts": ["CS101"],
@@ -78,6 +80,7 @@ def unsatisfiable_combined_config() -> CombinedConfig:
         {
             "course_id": "CS101",
             "credits": 4,
+            "capacity": 30,
             "room": ["R1"],
             "lab": ["L1"],
             "conflicts": [],
@@ -86,6 +89,7 @@ def unsatisfiable_combined_config() -> CombinedConfig:
         {
             "course_id": "CS102",
             "credits": 4,
+            "capacity": 30,
             "room": ["R1"],
             "lab": ["L1"],
             "conflicts": [],

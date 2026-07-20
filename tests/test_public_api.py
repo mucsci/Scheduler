@@ -48,3 +48,10 @@ def test_scheduler_constructor_and_methods_keep_their_signatures() -> None:
 
 def test_legacy_faculty_availability_helper_remains_importable() -> None:
     assert callable(legacy_scheduler.get_faculty_availability)
+
+
+def test_capacity_resource_config_models_are_exported() -> None:
+    assert scheduler.RoomConfig(name="R1", capacity=30).name == "R1"
+    assert scheduler.LabConfig(name="L1", capacity=24).capacity == 24
+    assert scheduler.CourseModality.HYBRID == "hybrid"
+    assert scheduler.DeliveryMode.ONLINE == "online"

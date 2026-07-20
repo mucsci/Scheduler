@@ -1,6 +1,6 @@
-from typing import Self
+from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_serializer
+from pydantic import BaseModel, ConfigDict, Field, model_serializer, model_validator
 
 from .day import Day
 
@@ -262,6 +262,12 @@ class TimeInstance(BaseModel):
     The duration of the time instance
     """
 
+    delivery: Literal["in_person", "online"] = Field(
+        default="in_person",
+        description="Whether this meeting consumes a physical room",
+    )
+    """Meeting delivery mode used for room occupancy and serialized output."""
+
     @property
     def stop(self) -> TimePoint:
         """Calculate the exclusive stop point of this meeting interval.
@@ -282,7 +288,8 @@ class TimeInstance(BaseModel):
         return TimePoint(timepoint=(self.start.value + self.duration.value))
 
     def __str__(self) -> str:
-        return f"{self.day.name} {str(self.start)}-{str(self.stop)}"
+        suffix = "@online" if self.delivery == "online" else ""
+        return f"{self.day.name} {str(self.start)}-{str(self.stop)}{suffix}"
 
 
 class TimeSlot(BaseModel):
@@ -321,6 +328,14 @@ class TimeSlot(BaseModel):
     Maximum gap used by meeting and lab adjacency checks
     """
 
+    @model_validator(mode="after")
+    def _validate_structure(self) -> "TimeSlot":
+        if not self.times:
+            raise ValueError("A time slot must contain at least one meeting")
+        if self.lab_index is not None and not 0 <= self.lab_index < len(self.times):
+            raise ValueError("Lab index must identify a meeting in the time slot")
+        return self
+
     def __hash__(self) -> int:
         """
         Hash the time slot by its string representation
@@ -342,12 +357,14 @@ class TimeSlot(BaseModel):
             Lab meeting instance, or ``None`` when no lab index is present.
 
         Raises:
-            IndexError: If a malformed slot contains an out-of-range lab index.
+            None.
 
         Behavior:
             Uses only ``lab_index``; it does not infer lab status from duration or day.
+            A slot mutated into an invalid index is treated as having no lab so
+            independent audit code can report incompatibility instead of crashing.
         """
-        if self.lab_index is None:
+        if self.lab_index is None or not 0 <= self.lab_index < len(self.times):
             return None
         return self.times[self.lab_index]
 
@@ -367,6 +384,75 @@ class TimeSlot(BaseModel):
             Checks marker presence only and does not dereference or validate the index.
         """
         return self.lab_index is not None
+
+    def lecture_times(self) -> tuple[TimeInstance, ...]:
+        """Return every non-lab meeting in configured order.
+
+        Args:
+            None.
+
+        Returns:
+            Tuple containing all meetings except the lab-marked index.
+
+        Raises:
+            None.
+
+        Behavior:
+            Preserves configured order and treats a no-lab slot as entirely lecture.
+        """
+        return tuple(time for index, time in enumerate(self.times) if index != self.lab_index)
+
+    def physical_lecture_times(self) -> tuple[TimeInstance, ...]:
+        """Return in-person non-lab meetings that consume the assigned room.
+
+        Args:
+            None.
+
+        Returns:
+            Ordered in-person lecture meeting tuple.
+
+        Raises:
+            None.
+
+        Behavior:
+            Excludes both the lab-marked meeting and meetings delivered online.
+        """
+        return tuple(time for time in self.lecture_times() if time.delivery == "in_person")
+
+    def same_lectures(self, other: "TimeSlot") -> bool:
+        """Compare two slots while ignoring their independently selected lab times.
+
+        Args:
+            other: Slot whose non-lab meetings are compared.
+
+        Returns:
+            Whether ordered lecture meetings are exactly equal.
+
+        Raises:
+            None.
+
+        Behavior:
+            Uses full meeting equality, including delivery mode, day, start, and duration.
+        """
+        return self.lecture_times() == other.lecture_times()
+
+    def lab_overlaps_slot(self, other: "TimeSlot") -> bool:
+        """Check whether this slot's lab overlaps any meeting in another slot.
+
+        Args:
+            other: Complete slot compared with this slot's lab meeting.
+
+        Returns:
+            False when this slot has no lab; otherwise whether it overlaps any other meeting.
+
+        Raises:
+            None.
+
+        Behavior:
+            Evaluates the marked lab against every meeting in ``other`` using exclusive stops.
+        """
+        lab = self.lab_time()
+        return lab is not None and any(self._overlaps(lab, time) for time in other.times)
 
     @staticmethod
     def _diff_between_slots(t1: TimeInstance, t2: TimeInstance) -> Duration:
@@ -400,7 +486,7 @@ class TimeSlot(BaseModel):
             Whether both labs exist and are within the configured maximum gap.
 
         Raises:
-            IndexError: If either slot contains an invalid lab index.
+            None.
 
         Behavior:
             Same-day labs use minimum interval separation; labs on different days
@@ -434,8 +520,8 @@ class TimeSlot(BaseModel):
             Scans meeting pairs in stored order and returns on the first witness;
             cross-day comparisons use corresponding clock-time separation.
         """
-        for _i1, t1 in enumerate(self.times):
-            for _i2, t2 in enumerate(other.times):
+        for t1 in self.times:
+            for t2 in other.times:
                 if TimeSlot._diff_between_slots(t1, t2) <= self.max_time_gap:
                     return True
         return False
@@ -468,7 +554,7 @@ class TimeSlot(BaseModel):
             ``False`` if either lab is absent; otherwise interval overlap status.
 
         Raises:
-            IndexError: If either slot contains an invalid lab index.
+            None.
 
         Behavior:
             Ignores all non-lab meetings and applies the same exclusive-stop overlap

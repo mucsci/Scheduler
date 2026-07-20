@@ -1,6 +1,7 @@
 from collections import Counter
 from functools import cache
 from itertools import product
+from typing import Literal
 
 from .config import TimeBlock, TimeSlotConfig
 from .models import Day, Duration, TimeInstance, TimePoint, TimeSlot
@@ -33,7 +34,7 @@ class TimeSlotGenerator:
         **Args:**
         - config: The TimeSlotConfig containing time blocks and class patterns
         """
-        self.config = config
+        self.config = config.model_copy(deep=True)
 
     def _parse_time(self, time_str: str) -> int:
         """
@@ -53,6 +54,7 @@ class TimeSlotGenerator:
         duration: int,
         time_blocks: list[TimeBlock],
         start_time: str | None = None,
+        delivery: Literal["in_person", "online"] = "in_person",
     ) -> list[TimeInstance]:
         """
         Generate all possible time slots for a given day and duration.
@@ -76,6 +78,7 @@ class TimeSlotGenerator:
                         day=Day[day],
                         start=TimePoint.make_from(pattern_start // 60, pattern_start % 60),
                         duration=Duration(duration=duration),
+                        delivery=delivery,
                     )
                 )
                 continue
@@ -86,6 +89,7 @@ class TimeSlotGenerator:
                     day=Day[day],
                     start=TimePoint.make_from(current_start // 60, current_start % 60),
                     duration=Duration(duration=duration),
+                    delivery=delivery,
                 )
                 day_slots.append(time_instance)
                 current_start += block.spacing
@@ -140,7 +144,6 @@ class TimeSlotGenerator:
         start_times = Counter(t.start.timepoint for t in time_combination)
         return max(start_times.values()) >= 2
 
-    @cache
     def time_slots(self, credits: int) -> list[TimeSlot]:
         """
         Generate every distinct valid meeting arrangement for a credit value.
@@ -165,12 +168,18 @@ class TimeSlotGenerator:
             starts. Cartesian products are retained only when meetings do not
             overlap, meet cross-day overlap and matching-start rules, and produce a
             new slot. The pattern's lab-marked meeting determines ``lab_index``.
-            Results are cached by credit value on this generator instance.
+            Immutable results are cached by credit value on this generator instance;
+            every call returns fresh deep copies so callers cannot corrupt the cache.
         """
+        return [slot.model_copy(deep=True) for slot in self._time_slots(credits)]
+
+    @cache
+    def _time_slots(self, credits: int) -> tuple[TimeSlot, ...]:
+        """Return the immutable cached implementation of :meth:`time_slots`."""
         # Find matching class patterns for the requested credits
         matching_patterns = [p for p in self.config.classes if p.credits == credits and not p.disabled]
         if not matching_patterns:
-            return []
+            return ()
 
         result = []
         for pattern in matching_patterns:
@@ -182,6 +191,7 @@ class TimeSlotGenerator:
                     duration=meeting.duration,
                     time_blocks=self.config.times.get(meeting.day, []),
                     start_time=meeting.start_time or pattern.start_time,
+                    delivery=meeting.delivery.value,
                 )
                 meeting_slots.append(day_slots)
 
@@ -212,4 +222,4 @@ class TimeSlotGenerator:
                 if slot not in result:
                     result.append(slot)
 
-        return result
+        return tuple(result)

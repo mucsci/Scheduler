@@ -8,14 +8,17 @@ from typing import cast
 import pytest
 from pydantic import ValidationError
 
+from scheduler import validate_combined_config_data
 from scheduler.config import (
     ClassPattern,
     CombinedConfig,
     CourseConfig,
     Day,
     FacultyConfig,
+    LabConfig,
     Meeting,
     OptimizerFlags,
+    RoomConfig,
     SchedulerConfig,
     StrictBaseModel,
     TimeBlock,
@@ -24,6 +27,7 @@ from scheduler.config import (
 )
 from scheduler.scheduler import load_config_from_file
 from scheduler.time_slot_generator import TimeSlotGenerator
+from tests.scenario_builders import minimal_config_data
 
 
 def _faculty_times(raw: dict[str, list[str | TimeRange]]) -> dict[Day, list[TimeRange]]:
@@ -225,6 +229,21 @@ def test_meeting_start_time_overrides_pattern_start_time() -> None:
     assert {slot.times[0].start.value for slot in slots} == {12 * 60}
 
 
+def test_time_slot_generator_cache_does_not_expose_mutable_results() -> None:
+    config = CombinedConfig.model_validate(minimal_config_data()).time_slot_config
+    generator = TimeSlotGenerator(config)
+    first = generator.time_slots(4)
+    expected = str(first[0])
+    first.clear()
+
+    second = generator.time_slots(4)
+    second[0].times.clear()
+    config.classes[0].disabled = True
+
+    assert generator.time_slots(4)
+    assert str(generator.time_slots(4)[0]) == expected
+
+
 # --- FacultyConfig ---
 
 
@@ -363,12 +382,13 @@ def test_faculty_preferences_optional() -> None:
 
 def _minimal_scheduler_kwargs():
     return {
-        "rooms": ["R1"],
-        "labs": ["L1"],
+        "rooms": [{"name": "R1", "capacity": 30}],
+        "labs": [{"name": "L1", "capacity": 30}],
         "courses": [
             CourseConfig(
                 course_id="CS101",
                 credits=3,
+                capacity=30,
                 room=["R1"],
                 lab=["L1"],
                 conflicts=[],
@@ -387,18 +407,124 @@ def _minimal_scheduler_kwargs():
     }
 
 
+@pytest.mark.parametrize("field", ["courses", "faculty"])
+def test_scheduler_config_requires_nonempty_courses_and_faculty(field: str) -> None:
+    kwargs = _minimal_scheduler_kwargs()
+    kwargs[field] = []
+
+    with pytest.raises(ValidationError) as error:
+        SchedulerConfig(**kwargs)
+
+    assert error.value.errors()[0]["loc"] == (field,)
+
+
+@pytest.mark.parametrize(
+    "mutate,expected_path",
+    [
+        (lambda data: data["config"]["courses"][0].update({"course_id": " "}), "/config/courses/0/course_id"),
+        (lambda data: data["config"]["faculty"][0].update({"name": "\t"}), "/config/faculty/0/name"),
+        (lambda data: data["config"]["courses"][0].update({"room": ["missing"]}), "/config/courses/0/room/0"),
+        (lambda data: data["config"]["courses"][0].update({"lab": ["missing"]}), "/config/courses/0/lab/0"),
+        (lambda data: data["config"]["courses"][0].update({"faculty": ["missing"]}), "/config/courses/0/faculty/0"),
+    ],
+)
+def test_raw_validation_reports_precise_identity_and_reference_paths(mutate, expected_path: str) -> None:
+    data = minimal_config_data()
+    mutate(data)
+
+    result = validate_combined_config_data(data)
+
+    assert result.is_valid is False
+    assert result.diagnostics[0].path == expected_path
+
+
+@pytest.mark.parametrize(
+    ("target", "expected_path"),
+    [("room", "/config/rooms/0/times/MON"), ("faculty", "/config/faculty/0/times/MON")],
+)
+def test_raw_validation_handles_malformed_availability_collections(target: str, expected_path: str) -> None:
+    data = minimal_config_data()
+    if target == "room":
+        data["config"]["rooms"][0]["times"] = {"MON": None}
+    else:
+        data["config"]["faculty"][0]["times"] = {"MON": None}
+
+    result = validate_combined_config_data(data)
+
+    assert result.is_valid is False
+    assert result.diagnostics[0].path == expected_path
+
+
+@pytest.mark.parametrize("model", [RoomConfig, LabConfig])
+def test_resource_config_requires_nonblank_name_and_positive_capacity(model) -> None:
+    assert model(name="Resource", capacity=1).capacity == 1
+    with pytest.raises(ValidationError, match="must not be blank"):
+        model(name="   ", capacity=1)
+    with pytest.raises(ValidationError):
+        model(name="Resource", capacity=0)
+
+
+@pytest.mark.parametrize(
+    "constructor,field,value",
+    [
+        (RoomConfig, "name", " Room"),
+        (CourseConfig, "course_id", "CS101 "),
+        (FacultyConfig, "name", " F1"),
+    ],
+)
+def test_identifiers_reject_surrounding_whitespace(constructor, field: str, value: str) -> None:
+    if constructor is RoomConfig:
+        kwargs = {"name": "R1", "capacity": 1}
+    elif constructor is CourseConfig:
+        kwargs = {
+            "course_id": "CS101",
+            "credits": 3,
+            "capacity": 1,
+            "room": ["R1"],
+            "lab": [],
+            "conflicts": [],
+            "faculty": ["F1"],
+        }
+    else:
+        kwargs = {
+            "name": "F1",
+            "maximum_credits": 0,
+            "minimum_credits": 0,
+            "unique_course_limit": 1,
+            "times": {},
+        }
+    kwargs[field] = value
+
+    with pytest.raises(ValidationError, match="leading or trailing whitespace"):
+        constructor(**kwargs)
+
+
+def test_strict_capacity_schema_rejects_legacy_resources_and_missing_section_capacity() -> None:
+    data = json.loads((Path(__file__).parent / "fixtures" / "minimal_config.json").read_text(encoding="utf-8"))
+    data["config"]["rooms"] = ["R1"]
+    del data["config"]["courses"][0]["capacity"]
+
+    with pytest.raises(ValidationError) as caught:
+        CombinedConfig.model_validate(data)
+
+    locations = {tuple(error["loc"]) for error in caught.value.errors()}
+    assert ("config", "rooms", 0) in locations
+    assert ("config", "courses", 0, "capacity") in locations
+
+
 def test_scheduler_config_valid() -> None:
     SchedulerConfig(**_minimal_scheduler_kwargs())
 
 
 @pytest.mark.parametrize(
     ("field", "value"),
-    [("credits", 0), ("room", []), ("faculty", [])],
+    [("credits", 0), ("capacity", 0), ("faculty", [])],
 )
 def test_course_config_rejects_documented_invalid_values(field: str, value: object) -> None:
     values: dict[str, object] = {
         "course_id": "CS101",
         "credits": 3,
+        "capacity": 30,
         "room": ["R1"],
         "lab": [],
         "conflicts": [],
@@ -407,6 +533,33 @@ def test_course_config_rejects_documented_invalid_values(field: str, value: obje
     values[field] = value
     with pytest.raises(ValidationError):
         CourseConfig.model_validate(values)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("room", ["R1", "R1"]),
+        ("lab", ["L1", "L1"]),
+        ("conflicts", ["CS102", "CS102"]),
+        ("faculty", ["F1", "F1"]),
+    ],
+)
+def test_course_config_rejects_duplicate_references(field: str, value: list[str]) -> None:
+    values: dict[str, object] = {
+        "course_id": "CS101",
+        "credits": 3,
+        "capacity": 30,
+        "room": ["R1"],
+        "lab": [],
+        "conflicts": [],
+        "faculty": ["F1"],
+    }
+    values[field] = value
+
+    with pytest.raises(ValidationError, match="must not contain duplicate names") as error:
+        CourseConfig.model_validate(values)
+
+    assert error.value.errors()[0]["loc"] == (field,)
 
 
 def test_scheduler_config_rejects_empty_rooms() -> None:
@@ -418,16 +571,27 @@ def test_scheduler_config_rejects_empty_rooms() -> None:
 
 def test_scheduler_config_duplicate_rooms() -> None:
     kw = _minimal_scheduler_kwargs()
-    kw["rooms"] = ["R1", "R1"]
-    with pytest.raises(ValidationError, match="Duplicate room"):
+    kw["rooms"] = [{"name": "R1", "capacity": 30}, {"name": "R1", "capacity": 40}]
+    with pytest.raises(ValidationError, match="Duplicate room") as caught:
         SchedulerConfig(**kw)
+    assert caught.value.errors()[0]["loc"] == ("rooms", 1, "name")
 
 
 def test_scheduler_config_duplicate_labs() -> None:
     kw = _minimal_scheduler_kwargs()
-    kw["labs"] = ["L1", "L1"]
+    kw["labs"] = [{"name": "L1", "capacity": 30}, {"name": "L1", "capacity": 40}]
     with pytest.raises(ValidationError, match="Duplicate lab"):
         SchedulerConfig(**kw)
+
+
+def test_raw_validation_reports_duplicate_resource_item_path() -> None:
+    data = minimal_config_data()
+    data["config"]["rooms"].append({"name": "R1", "capacity": 40})
+
+    result = validate_combined_config_data(data)
+
+    assert result.is_valid is False
+    assert result.diagnostics[0].path == "/config/rooms/1/name"
 
 
 def test_scheduler_config_duplicate_faculty() -> None:
@@ -458,6 +622,7 @@ def test_scheduler_config_invalid_course_room() -> None:
         CourseConfig(
             course_id="CS101",
             credits=3,
+            capacity=30,
             room=["Nope"],
             lab=["L1"],
             conflicts=[],
@@ -474,6 +639,7 @@ def test_scheduler_config_invalid_course_lab() -> None:
         CourseConfig(
             course_id="CS101",
             credits=3,
+            capacity=30,
             room=["R1"],
             lab=["BadLab"],
             conflicts=[],
@@ -490,6 +656,7 @@ def test_scheduler_config_invalid_conflict_course() -> None:
         CourseConfig(
             course_id="CS101",
             credits=3,
+            capacity=30,
             room=["R1"],
             lab=["L1"],
             conflicts=["MISSING"],
@@ -506,6 +673,7 @@ def test_scheduler_config_self_conflict() -> None:
         CourseConfig(
             course_id="CS101",
             credits=3,
+            capacity=30,
             room=["R1"],
             lab=["L1"],
             conflicts=["CS101"],
@@ -522,6 +690,7 @@ def test_scheduler_config_invalid_course_faculty() -> None:
         CourseConfig(
             course_id="CS101",
             credits=3,
+            capacity=30,
             room=["R1"],
             lab=["L1"],
             conflicts=[],
@@ -538,6 +707,7 @@ def test_scheduler_config_derives_null_course_faculty_from_preferences() -> None
         CourseConfig(
             course_id="CS101",
             credits=3,
+            capacity=30,
             room=["R1"],
             lab=["L1"],
             conflicts=[],
@@ -563,6 +733,7 @@ def test_scheduler_config_rejects_null_course_faculty_without_preferences() -> N
         CourseConfig(
             course_id="CS101",
             credits=3,
+            capacity=30,
             room=["R1"],
             lab=["L1"],
             conflicts=[],
@@ -681,6 +852,19 @@ def test_strict_edit_mode_success() -> None:
         w.value = 2
     assert m.name == "b"
     assert m.value == 2
+    assert m.model_dump(exclude_unset=True) == {"name": "b", "value": 2}
+
+
+def test_strict_edit_mode_preserves_unset_defaults() -> None:
+    class Editable(StrictBaseModel):
+        name: str
+        value: int = 1
+
+    model = Editable(name="before")
+    with model.edit_mode() as working:
+        working.name = "after"
+
+    assert model.model_dump(exclude_unset=True) == {"name": "after"}
 
 
 def test_strict_edit_mode_rollback() -> None:
@@ -760,3 +944,11 @@ def test_load_config_from_file_bad_json(tmp_path: Path) -> None:
     p.write_text("{ not json", encoding="utf-8")
     with pytest.raises(json.JSONDecodeError):
         load_config_from_file(CombinedConfig, str(p))
+
+
+def test_load_config_from_file_reports_nonobject_json_as_validation_error(tmp_path: Path) -> None:
+    path = tmp_path / "array.json"
+    path.write_text("[]", encoding="utf-8")
+
+    with pytest.raises(ValidationError):
+        load_config_from_file(CombinedConfig, path)

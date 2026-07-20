@@ -12,7 +12,9 @@ from scheduler.config import (
     ClassPattern,
     CourseConfig,
     FacultyConfig,
+    LabConfig,
     Meeting,
+    RoomConfig,
     SchedulerConfig,
     TimeBlock,
     TimeRange,
@@ -37,6 +39,8 @@ def _page(relative_path: str) -> str:
         (ClassPattern, ("configuration/time-slots.mdx",)),
         (TimeSlotConfig, ("configuration/time-slots.mdx",)),
         (CourseConfig, ("configuration/courses.mdx",)),
+        (RoomConfig, ("configuration/rooms-labs.mdx",)),
+        (LabConfig, ("configuration/rooms-labs.mdx",)),
         (FacultyConfig, ("configuration/faculty.mdx",)),
         (
             SchedulerConfig,
@@ -140,3 +144,20 @@ def test_contributor_docs_reject_monolithic_architecture_claims() -> None:
     assert not [claim for claim in stale_claims if claim in corpus]
     assert "`SolverEngine` owns the Z3 context" in constraints
     assert "`Scheduler` is a stable orchestration façade" in constraints
+
+
+def test_browser_clients_track_schedule_occupancy_and_pin_their_dependency() -> None:
+    """Keep standalone viewers aligned with serialized room-occupancy semantics."""
+    for filename in ("scheduler.html", "scheduler_rest.html"):
+        source = (ROOT / filename).read_text(encoding="utf-8")
+        assert "d3@7.9.0/dist/d3.min.js" in source
+        assert 'integrity="sha384-' in source
+        assert "entry.delivery === 'online' || (isLab && !reserve_room_during_lab)" in source
+        assert "const h = normalized % 12 || 12;" in source
+    local_viewer = (ROOT / "scheduler.html").read_text(encoding="utf-8")
+    assert '<span id="nav">' in local_viewer
+    assert "</span>" in local_viewer
+    assert "Math.floor(Math.min(...filtered.map(x => x.start)) / 60)" in local_viewer
+    assert "d.start - minHour * 60" in local_viewer
+    assert "Expected a non-empty JSON array of schedules." in local_viewer
+    assert "const TIMES = [8, 9, 10" not in local_viewer

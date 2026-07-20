@@ -29,6 +29,12 @@ JSON Pointer paths. Valid input returns its canonical configuration fingerprint.
 session, consume session capacity, or invoke Z3. A body that is not a JSON object can still be rejected by FastAPI
 with `422` before configuration validation runs.
 
+The request schema requires global room/lab objects with positive capacities and a positive expected-enrollment
+`capacity` on every course section. Resources may also declare `features` and `times`; sections may declare stable
+ids, delivery modality, required features, no lab or one required lab assignment, and whether labs reserve the lecture room. Candidate and
+preference references, generated schedule rows, and audit resource identifiers remain name strings. Well-formed
+but infeasible resource requirements are accepted so diagnosis can explain the shortfall.
+
 ## Submit a configuration
 
 ```bash
@@ -55,6 +61,10 @@ curl -X POST "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf
 
 `next` generates, retains, and returns one schedule. Generated indices are zero-based and append-only. Reaching the
 requested limit or exhausting the solution space returns `400`; unexpected generation failures return `500`.
+Each meeting includes `delivery`. Every course row includes one optional `lab` name and `lab_index`; both are null
+for no-lab sections. It also includes `reserve_room_during_lab`, which tells clients whether the lab-marked meeting
+occupies the assigned lecture room as well as the lab. A separately listed lab section receives its own row and
+capacity.
 
 To enumerate the remainder in the background:
 
@@ -94,8 +104,10 @@ See **Diagnostics and auditing** for the diagnostic and audit contracts.
 `cancelled`, `failed`, or `completed`.
 
 Terminal `completion_reason` values include `requested_schedule_limit_reached`, `solution_space_exhausted`,
-`generation_error`, `background_generation_cancelled`, and `background_generation_failed`. `enumeration_scope` is
-`exhausted` only after proven solution-space exhaustion; otherwise it is `bounded_by_requested_limit`.
+`solver_timeout`, `solver_unknown`, `generation_error`, `background_generation_cancelled`, and
+`background_generation_failed`. `enumeration_scope` is `exhausted` only after proven solution-space exhaustion,
+`bounded_by_requested_limit` only when the requested schedule limit was reached, and `indeterminate` while no
+terminal condition is known or when the solver timed out, returned unknown, or generation failed.
 
 ## Endpoint inventory
 
@@ -134,9 +146,9 @@ curl -X POST "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf
 Cleanup removes the session and requests cancellation of queued initialization or background generation. Work
 already running in a solver thread may finish internally, but the session is no longer addressable.
 
-Idle sessions expire after 30 minutes by default. Active initialization and background generation are not reaped.
-The lifespan-managed reaper checks at least once per minute, or more frequently when the configured TTL is shorter.
-Restarting the process clears every session.
+Idle sessions expire after 30 minutes by default. Active initialization, background generation, and locked
+foreground generation/diagnosis/audit operations are not reaped. The lifespan-managed reaper checks at least once
+per minute, or more frequently when the configured TTL is shorter. Restarting the process clears every session.
 
 ## Built-in request limits
 
@@ -147,13 +159,12 @@ Environment values must be positive integers. Missing, invalid, and non-positive
 | `SCHEDULER_API_MAX_ACTIVE_SESSIONS` | 16 | In-memory sessions retained concurrently. |
 | `SCHEDULER_API_MAX_COURSES` | 100 | Courses accepted in one submitted configuration. |
 | `SCHEDULER_API_MAX_SCHEDULES` | 100 | Maximum requested `limit` for an API session. |
-| `SCHEDULER_API_MAX_CANDIDATE_SLOTS` | 10,000 | Bounded arithmetic preflight estimate of generated time-slot candidates. |
+| `SCHEDULER_API_MAX_CANDIDATE_SLOTS` | 10,000 | Bounded estimate of generated meeting-pattern candidates across requested credit values. |
 | `SCHEDULER_API_SOLVER_TIMEOUT_MS` | 30,000 | Timeout applied to each API Z3 check. |
 | `SCHEDULER_API_SESSION_TTL_SECONDS` | 1,800 | Idle-session lifetime. |
 
-Course, requested-schedule, and candidate-slot limits return `422`. A full active-session pool returns `429`.
-These limits apply only to the REST server; CLI and direct Python callers remain bounded only by configuration and
-their own resources.
+Every built-in submission limit, including a full active-session pool, returns `422`. These limits apply only to
+the REST server; CLI and direct Python callers remain bounded only by configuration and their own resources.
 
 ## Common HTTP failures
 
@@ -164,7 +175,6 @@ their own resources.
 | `408` | Lazy generator initialization was cancelled. |
 | `409` | A conflicting background generation operation is active. |
 | `422` | Request validation, API limits, or asynchronous scheduler initialization failed. |
-| `429` | Active-session capacity is full. |
 | `500` | Unexpected scheduler, generator, or background failure. |
 
 ## Deployment and security

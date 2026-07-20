@@ -7,7 +7,7 @@ User-visible JSON is defined by **`src/scheduler/config.py`** using Pydantic v2 
 
 ## Steps
 
-1. **Model** — Add fields to the appropriate nested model (`SchedulerConfig`, `FacultyConfig`, `CourseConfig`, `TimeSlotConfig`, etc.) or top-level **`CombinedConfig`**.
+1. **Model** — Add fields to the appropriate nested model (`RoomConfig`, `LabConfig`, `SchedulerConfig`, `FacultyConfig`, `CourseConfig`, `TimeSlotConfig`, etc.) or top-level **`CombinedConfig`**.
 2. **Types** — Reuse **`TimeString`**, **`TimeRangeString`**, **`Preference`**, **`Day`**, or add new **`Annotated[..., Field(...)]`** aliases for reuse and JSON Schema quality.
 3. **Validators** — Use **`field_validator`** / **`model_validator`** for cross-field rules; keep error messages explicit.
 4. **Normalization** — Add solver-independent policy state or cached queries to **`SchedulingProblem`** when more
@@ -22,6 +22,10 @@ Because **`extra="forbid"`**, clients get errors on unknown keys — document ne
 
 Combined rules that depend on multiple sub-models belong on `CombinedConfig`. Raw non-throwing validation is
 adapted by `validate_combined_config_data`; do not create a separate set of REST-only validation semantics.
+
+Room and lab definitions are capacity-bearing objects, while courses and faculty preferences reference their
+`name` strings. Capacity infeasibility belongs in the solver, diagnostics, and auditor; malformed or nonpositive
+capacity belongs in Pydantic validation.
 
 ## JSON Schema
 

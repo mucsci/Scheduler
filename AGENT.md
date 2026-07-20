@@ -44,7 +44,7 @@ skills/            # task playbooks (SKILL.md per subfolder) for assistants and 
 
 ## Conventions that trip people up
 
-1. **`Course` naming**: `scheduler.config` uses `Course` as a **course-id string** type in JSON config. `scheduler.models` defines a **`Course` class** (credits, meetings, etc.). `CourseInstance.course` is the model; use **`.course.course_id`** for the config-style id. (See README “Note on naming”.)
+1. **`Course` naming**: `scheduler.config` uses `Course` as a **course-id string** type in JSON config. `scheduler.models` defines a **`Course` class** (section policy, resource/faculty candidates, and legacy solver-variable mirrors). `CourseInstance.course` is the model; use **`.course.course_id`** for the config-style id. (See README “Note on naming”.)
 2. **Generated artifacts**: After changing **`src/scheduler/server.py`** or API-facing models, refresh **`fern/openapi.json`**. After **`CombinedConfig`** / config models change, refresh **`fern/docs/assets/combined-config.schema.json`**. Fern generates the Python library reference from public source and docstrings into the ignored **`fern/static/python-reference/`** directory; do not commit it. See CONTRIBUTING.
 3. **Style**: **Ruff** is authoritative (`pyproject.toml`: line length **120**, `py312`). CONTRIBUTING matches this; when in doubt follow **`pyproject.toml`**.
 4. **Architecture**: `scheduler.py` is orchestration only. Normalize shared policy in `problem.py`, own Z3 in
@@ -52,6 +52,10 @@ skills/            # task playbooks (SKILL.md per subfolder) for assistants and 
 5. **Documentation parity**: Configuration fields, public façade methods, REST routes, API limit variables, and
    canonical examples are checked by `tests/test_documentation_parity.py`; update the corresponding Fern guide
    whenever one of those implementation surfaces changes.
+6. **Physical resources and sections**: `SchedulerConfig.rooms` and `labs` contain capacity-, feature-, and
+   availability-bearing objects, while references and output remain name-based. A course has no lab when its
+   candidate list is empty; a non-empty list requires exactly one lab assignment. Keep capacity, feature,
+   availability, delivery, and room-during-lab rules separately tracked in the solver, diagnostics, and auditor.
 
 ## Skills
 

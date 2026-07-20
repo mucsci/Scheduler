@@ -1,19 +1,25 @@
 ---
 title: Courses
-description: Course entries under config.courses — credits, rooms, labs, conflicts, and faculty.
+description: Course sections, stable ids, delivery, resource requirements, capacity, and labs.
 ---
 
-The required **`courses`** list at `config.courses` contains each course section the solver must schedule. The list
-itself may be empty, although a normal scheduling problem contains at least one course.
+The required **`courses`** list at `config.courses` contains each course section the solver must schedule. It must
+contain at least one course.
 
 ## Example
 
 ```json
 {
   "course_id": "CS101",
+  "section_id": "A",
   "credits": 3,
+  "capacity": 28,
+  "modality": "hybrid",
   "room": ["Room A", "Room B"],
   "lab": ["Lab 1"],
+  "required_room_features": ["accessible"],
+  "required_lab_features": ["gpu"],
+  "reserve_room_during_lab": false,
   "conflicts": ["CS102"],
   "faculty": ["Dr. Smith", "Dr. Johnson"]
 }
@@ -24,17 +30,39 @@ itself may be empty, although a normal scheduling problem contains at least one 
 | Field | Required | Description |
 |-------|----------|-------------|
 | `course_id` | Yes | Base string id. Repeated values create separately numbered sections. |
+| `section_id` | No | Stable nonblank section suffix. `null` uses the zero-padded input-order number. |
 | `credits` | Yes | Positive integer; must match an allowed pattern in `time_slot_config.classes`. |
-| `room` | Yes | Non-empty list of allowed **room** names (subset of `config.rooms`). |
+| `capacity` | Yes | Positive expected section enrollment; every assigned room or lab must be at least this large. |
+| `modality` | No | `in_person` (default), `online`, or `hybrid`; the selected pattern must match exactly. |
+| `room` | Yes | Allowed room names. Use `[]` only when every compatible pattern needs no lecture room. If a course can choose both room-using and roomless patterns, the selected pattern determines whether a room is assigned. |
 | `lab` | No | Allowed lab names; defaults to `[]`, which means the course has no lab meeting. |
+| `required_room_features` | No | Set/list of nonblank feature tags the assigned room must provide; defaults to empty. |
+| `required_lab_features` | No | Set/list of nonblank feature tags every assigned lab must provide; defaults to empty. |
+| `reserve_room_during_lab` | No | Whether lab meetings also occupy the lecture room; defaults to `true`. |
 | `conflicts` | Yes | Other base `course_id` values that must not overlap; use `[]` for none. |
 | `faculty` | Yes | Non-empty list of faculty names, or `null` to derive candidates from matching faculty `course_preferences`. |
 
 ## Validation rules
 
 - Room, lab, and faculty names must exist in the corresponding global lists.
+- The `room`, `lab`, `faculty`, and `conflicts` lists cannot repeat the same name; duplicates are rejected instead
+  of implicitly changing optimizer weights.
+- Course ids, section ids, faculty names, resource names, and feature tags cannot be blank or contain leading or
+  trailing whitespace.
+- Final display ids must be unique. An explicit `section_id` is used verbatim after `course_id.`; otherwise the
+  section number is generated in input order (`01`, `02`, ...).
+- `capacity` must be a positive integer. Resource capacity equality is accepted; undersized candidate resources
+  are excluded by a hard rule rather than rejected during configuration validation.
 - `faculty: null` requires at least one faculty member with a `course_preferences` entry for that course; `faculty: []` is invalid.
-- Every course credit value needs at least one enabled class pattern. A course with labs needs a pattern with one lab meeting; a course without labs needs a pattern with none.
+- `online` courses cannot list rooms or labs. An `in_person` or `hybrid` section may use `room: []` only when at
+  least one otherwise-compatible pattern has no in-person non-lab meeting and does not reserve a room during its lab.
+- Every course credit value needs an enabled pattern with matching lab presence and matching `modality`.
+- A non-empty `lab` list creates exactly one required lab assignment for the section. Model another lab section as
+  another complete course-section entry with its own `section_id` and `capacity`.
+- The assigned lab must fit the section `capacity`, provide its required features, and be available for the
+  lab-marked meeting.
+- `reserve_room_during_lab: true` blocks the lecture room during the lab meeting. Set it to `false` when the lab
+  meets entirely in its assigned lab and the lecture room may be reused.
 - Every `conflicts` entry must be a valid `course_id` of another course (not yourself).
 - A course cannot list itself in `conflicts`.
 - A conflict names the base id, so it applies to every section with that id. Conflict declarations need not be
@@ -44,5 +72,6 @@ itself may be empty, although a normal scheduling problem contains at least one 
 
 - Use consistent `course_id` naming (e.g. subject + number).
 - Repeat a complete course entry when multiple sections must be scheduled; sections are numbered in input order.
+- Repeated sections may declare different capacities.
 - Multiple rooms/labs give the solver flexibility and often improve feasibility.
 - Model real registration conflicts explicitly in `conflicts`.

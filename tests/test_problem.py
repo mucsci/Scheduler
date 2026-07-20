@@ -1,5 +1,8 @@
 """Unit tests for solver-independent problem normalization."""
 
+import pytest
+from pydantic import ValidationError
+
 from scheduler import CombinedConfig
 from scheduler.problem import SchedulingProblem
 from tests.scenario_builders import config_from, minimal_config_data, no_lab_config_data
@@ -41,6 +44,7 @@ def test_problem_builds_separate_credit_ranges_and_source_paths() -> None:
         {
             "course_id": "CS102",
             "credits": 3,
+            "capacity": 30,
             "room": ["R1"],
             "lab": [],
             "conflicts": [],
@@ -76,6 +80,7 @@ def test_problem_separates_lab_and_no_lab_domains_for_same_credits() -> None:
         {
             "course_id": "CS102",
             "credits": 4,
+            "capacity": 30,
             "room": ["R1"],
             "lab": [],
             "conflicts": [],
@@ -114,3 +119,56 @@ def test_problem_supports_globally_empty_labs_and_snapshots_preferences() -> Non
     assert problem.labs == []
     assert problem.faculty_policies["F1"].course_preferences == {"CS101": 8}
     assert all(not slot.has_lab() for slot in problem.compatible_slots(problem.courses[0]))
+
+
+def test_problem_snapshots_the_complete_input_configuration() -> None:
+    config = config_from(minimal_config_data())
+    problem = SchedulingProblem.from_config(config)
+    fingerprint = problem.configuration_fingerprint()
+
+    config.config.courses[0].capacity = 1
+    config.config.rooms[0].capacity = 1
+
+    assert problem.courses[0].capacity == 30
+    assert problem.room_policies["R1"].capacity == 30
+    assert problem.configuration_fingerprint() == fingerprint
+
+
+def test_problem_revalidates_nested_container_mutations() -> None:
+    config = config_from(minimal_config_data())
+    config.config.courses.clear()
+
+    with pytest.raises(ValidationError):
+        SchedulingProblem.from_config(config)
+
+
+def test_problem_normalizes_resource_and_section_capacities() -> None:
+    data = minimal_config_data()
+    data["config"]["rooms"][0]["capacity"] = 44
+    data["config"]["labs"][0]["capacity"] = 32
+    data["config"]["courses"][0]["capacity"] = 28
+
+    problem = SchedulingProblem.from_config(config_from(data))
+
+    assert problem.rooms == ["R1"]
+    assert problem.labs == ["L1"]
+    assert problem.room_policies["R1"].capacity == 44
+    assert problem.room_policies["R1"].config_path == "/config/rooms/0"
+    assert problem.lab_policies["L1"].capacity == 32
+    assert problem.courses[0].capacity == 28
+    assert problem.course_policies["CS101.01"].capacity == 28
+
+
+def test_repeated_sections_keep_distinct_capacities() -> None:
+    data = minimal_config_data()
+    second = dict(data["config"]["courses"][0])
+    second["capacity"] = 20
+    data["config"]["courses"][0]["capacity"] = 30
+    data["config"]["courses"].append(second)
+    data["config"]["faculty"][0].update({"maximum_credits": 8})
+
+    problem = SchedulingProblem.from_config(config_from(data))
+
+    assert [course.capacity for course in problem.courses] == [30, 20]
+    assert problem.course_policies["CS101.01"].capacity == 30
+    assert problem.course_policies["CS101.02"].capacity == 20
