@@ -8,11 +8,13 @@
     "times": [
       {
         "day": 1,
+        "delivery": "in_person",
         "duration": 110,
         "start": 840
       },
       {
         "day": 3,
+        "delivery": "in_person",
         "duration": 110,
         "start": 840
       }

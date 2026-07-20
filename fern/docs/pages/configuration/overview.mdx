@@ -16,6 +16,7 @@ The Course Constraint Scheduler uses a **JSON** configuration that defines the s
 
 - **Cross-references** — Course rooms/labs/faculty/conflicts must name entities that exist in `config`.
 - **Business rules** — e.g. faculty min/max credits, mandatory days, no self-conflicts.
+- **Required capacities** — Resource capacities and each section's expected enrollment are positive integers.
 - **Strict types** — Times and ranges use fixed string patterns (see below).
 - **No unknown keys** — Every model uses `extra="forbid"`; misspelled or future fields fail validation.
 - **No coercion** — `strict=True` rejects values such as a numeric string where an integer is required.
@@ -30,7 +31,8 @@ These are enforced in JSON via patterns and constraints:
 | `TimeRangeString` | `HH:MM-HH:MM` |
 | `Preference` | Integer `0`–`10` |
 | `Day` | `MON`, `TUE`, `WED`, `THU`, or `FRI` |
-| Room / lab / course / faculty ids | Strings; room, lab, and faculty names are unique; repeated course ids create sections |
+| Room / lab definitions | Objects with unique nonblank `name` and positive integer `capacity` |
+| Course / faculty / resource references | Strings; repeated course ids create sections, while room/lab references use definition names |
 
 ## JSON Schema
 
@@ -57,6 +59,8 @@ The repository keeps complete configurations executable instead of duplicating u
   is the canonical minimal configuration used by unit, integration, Python, and REST tests.
 - [`example.json`](https://github.com/mucsci/scheduler/blob/main/example.json) is a larger multi-course example,
   including repeated sections and preference-derived faculty candidates.
+
+The current schema is strict: legacy global room/lab strings and course entries without `capacity` are rejected.
 
 Both files are validated as `CombinedConfig` in the documentation parity tests.
 

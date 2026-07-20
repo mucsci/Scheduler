@@ -564,6 +564,54 @@
             "type": "array",
             "title": "Lab Candidates"
           },
+          "section_capacity": {
+            "type": "integer",
+            "title": "Section Capacity"
+          },
+          "capacity_compatible_room_candidates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Capacity Compatible Room Candidates"
+          },
+          "capacity_compatible_lab_candidates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Capacity Compatible Lab Candidates"
+          },
+          "room_capacity_rejections": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Room Capacity Rejections"
+          },
+          "room_capacity_rejection_count": {
+            "type": "integer",
+            "title": "Room Capacity Rejection Count"
+          },
+          "room_capacity_rejections_truncated": {
+            "type": "boolean",
+            "title": "Room Capacity Rejections Truncated"
+          },
+          "lab_capacity_rejections": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Lab Capacity Rejections"
+          },
+          "lab_capacity_rejection_count": {
+            "type": "integer",
+            "title": "Lab Capacity Rejection Count"
+          },
+          "lab_capacity_rejections_truncated": {
+            "type": "boolean",
+            "title": "Lab Capacity Rejections Truncated"
+          },
           "compatible_time_patterns": {
             "items": {
               "type": "string"
@@ -592,6 +640,42 @@
           "rejected_patterns_truncated": {
             "type": "boolean",
             "title": "Rejected Patterns Truncated"
+          },
+          "modality": {
+            "type": "string",
+            "title": "Modality"
+          },
+          "required_room_features": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Required Room Features"
+          },
+          "required_lab_features": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Required Lab Features"
+          },
+          "feature_compatible_room_candidates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Feature Compatible Room Candidates"
+          },
+          "feature_compatible_lab_candidates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Feature Compatible Lab Candidates"
+          },
+          "reserve_room_during_lab": {
+            "type": "boolean",
+            "title": "Reserve Room During Lab"
           }
         },
         "type": "object",
@@ -602,14 +686,29 @@
           "faculty_origin",
           "room_candidates",
           "lab_candidates",
+          "section_capacity",
+          "capacity_compatible_room_candidates",
+          "capacity_compatible_lab_candidates",
+          "room_capacity_rejections",
+          "room_capacity_rejection_count",
+          "room_capacity_rejections_truncated",
+          "lab_capacity_rejections",
+          "lab_capacity_rejection_count",
+          "lab_capacity_rejections_truncated",
           "compatible_time_patterns",
           "availability_by_faculty",
           "rejected_patterns",
           "rejected_pattern_count",
-          "rejected_patterns_truncated"
+          "rejected_patterns_truncated",
+          "modality",
+          "required_room_features",
+          "required_lab_features",
+          "feature_compatible_room_candidates",
+          "feature_compatible_lab_candidates",
+          "reserve_room_during_lab"
         ],
         "title": "CandidateDomainDiagnosticResponse",
-        "description": "Static resource and time-domain analysis for one configured course.\n\nFields:\n    course: Course identifier being analyzed.\n    locations: Source paths that define the course domain.\n    faculty_candidates: Faculty eligible to teach the course.\n    faculty_origin: Whether eligibility was explicit or preference-derived.\n    room_candidates: Rooms eligible for the course.\n    lab_candidates: Labs eligible for the course, empty for no-lab courses.\n    compatible_time_patterns: Time-slot patterns compatible with course semantics.\n    availability_by_faculty: Availability findings for each candidate faculty.\n    rejected_patterns: Detailed reasons sampled from rejected patterns.\n    rejected_pattern_count: Total number of rejected patterns.\n    rejected_patterns_truncated: Whether detailed rejection output was capped."
+        "description": "Static resource and time-domain analysis for one configured course.\n\nFields:\n    course: Course identifier being analyzed.\n    locations: Source paths that define the course domain.\n    faculty_candidates: Faculty eligible to teach the course.\n    faculty_origin: Whether eligibility was explicit or preference-derived.\n    room_candidates: Rooms eligible for the course.\n    lab_candidates: Labs eligible for the course, empty for no-lab courses.\n    section_capacity: Expected enrollment that assigned resources must accommodate.\n    capacity_compatible_room_candidates: Allowed rooms large enough for the section.\n    capacity_compatible_lab_candidates: Allowed labs large enough for the section.\n    room_capacity_rejections: Bounded explanations for undersized allowed rooms.\n    room_capacity_rejection_count: Total number of undersized allowed rooms.\n    room_capacity_rejections_truncated: Whether room rejection details were capped.\n    lab_capacity_rejections: Bounded explanations for undersized allowed labs.\n    lab_capacity_rejection_count: Total number of undersized allowed labs.\n    lab_capacity_rejections_truncated: Whether lab rejection details were capped.\n    compatible_time_patterns: Time-slot patterns compatible with course semantics.\n    availability_by_faculty: Availability findings for each candidate faculty.\n    rejected_patterns: Detailed reasons sampled from rejected patterns.\n    rejected_pattern_count: Total number of rejected patterns.\n    rejected_patterns_truncated: Whether detailed rejection output was capped.\n    modality: Required meeting-delivery composition.\n    required_room_features: Features required from the lecture room.\n    required_lab_features: Features required from every lab.\n    feature_compatible_room_candidates: Allowed rooms satisfying feature requirements.\n    feature_compatible_lab_candidates: Allowed labs satisfying feature requirements.\n    reserve_room_during_lab: Whether lab meetings consume the lecture room."
       },
       "CapacityDiagnosticResponse": {
         "properties": {
@@ -715,6 +814,7 @@
             "example": {
               "courses": [
                 {
+                  "capacity": 24,
                   "conflicts": [],
                   "course_id": "CS 101",
                   "credits": 3,
@@ -755,10 +855,16 @@
                 }
               ],
               "labs": [
-                "Lab 101"
+                {
+                  "capacity": 24,
+                  "name": "Lab 101"
+                }
               ],
               "rooms": [
-                "Room 101"
+                {
+                  "capacity": 40,
+                  "name": "Room 101"
+                }
               ]
             }
           },
@@ -986,6 +1092,18 @@
             "description": "Base course identifier; repeated values create separately numbered sections",
             "example": "CS 101"
           },
+          "section_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Id",
+            "description": "Optional stable section suffix; null uses the generated zero-padded input-order number"
+          },
           "credits": {
             "type": "integer",
             "exclusiveMinimum": 0.0,
@@ -993,14 +1111,20 @@
             "description": "Number of credit hours",
             "example": 3
           },
+          "capacity": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Capacity",
+            "description": "Expected section enrollment that any assigned rooms and labs must accommodate",
+            "example": 30
+          },
           "room": {
             "items": {
               "$ref": "#/components/schemas/Room"
             },
             "type": "array",
-            "minItems": 1,
             "title": "Room",
-            "description": "List of acceptable room names",
+            "description": "Allowed room names; empty is valid only for compatible patterns that do not occupy a room",
             "example": [
               "Room 101"
             ]
@@ -1041,6 +1165,35 @@
             "example": [
               "Dr. Smith"
             ]
+          },
+          "modality": {
+            "$ref": "#/components/schemas/CourseModality",
+            "description": "Required delivery composition of the selected class pattern",
+            "default": "in_person"
+          },
+          "required_room_features": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true,
+            "title": "Required Room Features",
+            "description": "Feature tags every assigned lecture room must provide"
+          },
+          "required_lab_features": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true,
+            "title": "Required Lab Features",
+            "description": "Feature tags every assigned lab must provide"
+          },
+          "reserve_room_during_lab": {
+            "type": "boolean",
+            "title": "Reserve Room During Lab",
+            "description": "Whether the lab meeting also occupies the section's assigned lecture room",
+            "default": true
           }
         },
         "additionalProperties": false,
@@ -1048,12 +1201,13 @@
         "required": [
           "course_id",
           "credits",
+          "capacity",
           "room",
           "conflicts",
           "faculty"
         ],
         "title": "CourseConfig",
-        "description": "Represents a course configuration.\n\n**Usage:**\n```python\nCourseConfig(\n    course_id=\"CS 101\",\n    credits=3,\n    room=[\"Room 101\"],\n    lab=[],\n    conflicts=[],\n    faculty=[\"Dr. Smith\"],\n)\n```"
+        "description": "Represents a course configuration.\n\n**Usage:**\n```python\nCourseConfig(\n    course_id=\"CS 101\",\n    credits=3,\n    capacity=30,\n    room=[\"Room 101\"],\n    lab=[],\n    conflicts=[],\n    faculty=[\"Dr. Smith\"],\n)\n```"
       },
       "CourseConfig-Output": {
         "properties": {
@@ -1061,6 +1215,18 @@
             "$ref": "#/components/schemas/Course",
             "description": "Base course identifier; repeated values create separately numbered sections"
           },
+          "section_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Id",
+            "description": "Optional stable section suffix; null uses the generated zero-padded input-order number"
+          },
           "credits": {
             "type": "integer",
             "exclusiveMinimum": 0.0,
@@ -1068,14 +1234,20 @@
             "description": "Number of credit hours",
             "example": 3
           },
+          "capacity": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Capacity",
+            "description": "Expected section enrollment that any assigned rooms and labs must accommodate",
+            "example": 30
+          },
           "room": {
             "items": {
               "$ref": "#/components/schemas/Room"
             },
             "type": "array",
-            "minItems": 1,
             "title": "Room",
-            "description": "List of acceptable room names",
+            "description": "Allowed room names; empty is valid only for compatible patterns that do not occupy a room",
             "example": [
               "Room 101"
             ]
@@ -1116,6 +1288,35 @@
             "example": [
               "Dr. Smith"
             ]
+          },
+          "modality": {
+            "$ref": "#/components/schemas/CourseModality",
+            "description": "Required delivery composition of the selected class pattern",
+            "default": "in_person"
+          },
+          "required_room_features": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true,
+            "title": "Required Room Features",
+            "description": "Feature tags every assigned lecture room must provide"
+          },
+          "required_lab_features": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true,
+            "title": "Required Lab Features",
+            "description": "Feature tags every assigned lab must provide"
+          },
+          "reserve_room_during_lab": {
+            "type": "boolean",
+            "title": "Reserve Room During Lab",
+            "description": "Whether the lab meeting also occupies the section's assigned lecture room",
+            "default": true
           }
         },
         "additionalProperties": false,
@@ -1123,12 +1324,13 @@
         "required": [
           "course_id",
           "credits",
+          "capacity",
           "room",
           "conflicts",
           "faculty"
         ],
         "title": "CourseConfig",
-        "description": "Represents a course configuration.\n\n**Usage:**\n```python\nCourseConfig(\n    course_id=\"CS 101\",\n    credits=3,\n    room=[\"Room 101\"],\n    lab=[],\n    conflicts=[],\n    faculty=[\"Dr. Smith\"],\n)\n```"
+        "description": "Represents a course configuration.\n\n**Usage:**\n```python\nCourseConfig(\n    course_id=\"CS 101\",\n    credits=3,\n    capacity=30,\n    room=[\"Room 101\"],\n    lab=[],\n    conflicts=[],\n    faculty=[\"Dr. Smith\"],\n)\n```"
       },
       "CourseInstanceResponse": {
         "properties": {
@@ -1182,7 +1384,7 @@
               }
             ],
             "title": "Lab Index",
-            "description": "When `lab` is set, index into `times` for the lab meeting."
+            "description": "Index into `times` for the lab meeting."
           }
         },
         "additionalProperties": false,
@@ -1193,7 +1395,17 @@
           "times"
         ],
         "title": "CourseInstanceResponse",
-        "description": "One course assignment in the JSON representation of a generated schedule.\n\nFields:\n    course: Course identifier including its generated section suffix.\n    faculty: Faculty member assigned to teach the course.\n    times: Ordered lecture and optional lab meeting instances.\n    room: Assigned lecture room, or null when absent.\n    lab: Assigned lab resource, or null for a no-lab course.\n    lab_index: Index of the lab meeting in ``times``, or null for no lab."
+        "description": "One course assignment in the JSON representation of a generated schedule.\n\nFields:\n    course: Course identifier including its generated section suffix.\n    faculty: Faculty member assigned to teach the course.\n    times: Ordered lecture and optional lab meeting instances.\n    room: Assigned lecture room, or null when absent.\n    lab: Assigned lab resource, or null for a no-lab section.\n    lab_index: Index of the lab meeting in ``times``, or null for no lab."
+      },
+      "CourseModality": {
+        "type": "string",
+        "enum": [
+          "in_person",
+          "online",
+          "hybrid"
+        ],
+        "title": "CourseModality",
+        "description": "Required mixture of meeting delivery modes for a course section."
       },
       "Day": {
         "type": "string",
@@ -1264,6 +1476,15 @@
         ],
         "title": "DayFeasibilityDiagnosticResponse",
         "description": "Feasibility summary for one faculty member on one teaching day.\n\nFields:\n    faculty: Faculty member whose day is analyzed.\n    day: Weekday name under consideration.\n    availability_windows: Configured time windows on that day.\n    eligible_courses: Courses the faculty member may teach.\n    compatible_pattern_count: Patterns compatible before availability filtering.\n    available_pattern_count: Compatible patterns fitting availability windows.\n    is_mandatory: Whether faculty policy requires teaching on this day.\n    locations: Configuration paths supporting the analysis."
+      },
+      "DeliveryMode": {
+        "type": "string",
+        "enum": [
+          "in_person",
+          "online"
+        ],
+        "title": "DeliveryMode",
+        "description": "Delivery mode for one generated meeting."
       },
       "Faculty": {
         "type": "string",
@@ -1648,6 +1869,114 @@
         "description": "Lab name",
         "example": "Lab 101"
       },
+      "LabConfig-Input": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name",
+            "description": "Unique, nonblank lab name used by references and schedule output"
+          },
+          "capacity": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Capacity",
+            "description": "Maximum number of students the lab can accommodate"
+          },
+          "features": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true,
+            "title": "Features",
+            "description": "Facility and equipment feature tags supplied by this lab"
+          },
+          "times": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "$ref": "#/components/schemas/TimeRange-Input"
+                  },
+                  "type": "array"
+                },
+                "propertyNames": {
+                  "$ref": "#/components/schemas/Day"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Times",
+            "description": "Optional weekday lab availability windows; null means unrestricted availability"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "capacity"
+        ],
+        "title": "LabConfig",
+        "description": "A laboratory resource that can be assigned to a section's lab meeting.\n\nFields:\n    name: Unique, nonblank identifier used by course lab candidates, faculty\n        preferences, generated schedules, and diagnostics.\n    capacity: Positive count of usable student seats. Lab assignments require\n        a value at least as large as the course section capacity.\n    features: Facility or equipment tags supplied by the lab. A lab is\n        eligible only when it contains every feature required by the course.\n    times: Optional availability windows for every scheduler weekday. ``None``\n        means unrestricted availability; a mapping restricts the lab meeting\n        to the listed windows."
+      },
+      "LabConfig-Output": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name",
+            "description": "Unique, nonblank lab name used by references and schedule output"
+          },
+          "capacity": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Capacity",
+            "description": "Maximum number of students the lab can accommodate"
+          },
+          "features": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true,
+            "title": "Features",
+            "description": "Facility and equipment feature tags supplied by this lab"
+          },
+          "times": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "$ref": "#/components/schemas/TimeRange-Output"
+                  },
+                  "type": "array"
+                },
+                "propertyNames": {
+                  "$ref": "#/components/schemas/Day"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Times",
+            "description": "Optional weekday lab availability windows; null means unrestricted availability"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "capacity"
+        ],
+        "title": "LabConfig",
+        "description": "A laboratory resource that can be assigned to a section's lab meeting.\n\nFields:\n    name: Unique, nonblank identifier used by course lab candidates, faculty\n        preferences, generated schedules, and diagnostics.\n    capacity: Positive count of usable student seats. Lab assignments require\n        a value at least as large as the course section capacity.\n    features: Facility or equipment tags supplied by the lab. A lab is\n        eligible only when it contains every feature required by the course.\n    times: Optional availability windows for every scheduler weekday. ``None``\n        means unrestricted availability; a mapping restricts the lab meeting\n        to the listed windows."
+      },
       "Meeting": {
         "properties": {
           "day": {
@@ -1676,6 +2005,11 @@
             "title": "Lab",
             "description": "Whether this is the pattern's single lab meeting",
             "default": false
+          },
+          "delivery": {
+            "$ref": "#/components/schemas/DeliveryMode",
+            "description": "Whether this meeting is held in person or online",
+            "default": "in_person"
           }
         },
         "additionalProperties": false,
@@ -1864,6 +2198,28 @@
             },
             "type": "array",
             "title": "Collisions"
+          },
+          "capacity": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capacity"
+          },
+          "maximum_assigned_section_capacity": {
+            "type": "integer",
+            "title": "Maximum Assigned Section Capacity"
+          },
+          "capacity_violations": {
+            "items": {
+              "$ref": "#/components/schemas/ConstraintDiagnosticResponse"
+            },
+            "type": "array",
+            "title": "Capacity Violations"
           }
         },
         "type": "object",
@@ -1871,15 +2227,126 @@
           "kind",
           "resource",
           "assignments",
-          "collisions"
+          "collisions",
+          "capacity",
+          "maximum_assigned_section_capacity",
+          "capacity_violations"
         ],
         "title": "ResourceUsageDiagnosticResponse",
-        "description": "Assignment and collision summary for one room, lab, or faculty resource.\n\nFields:\n    kind: Resource category represented by this row.\n    resource: Configured resource identifier.\n    assignments: Course assignments consuming the resource.\n    collisions: Detected overlap violations involving the resource."
+        "description": "Assignment and collision summary for one room or lab resource.\n\nFields:\n    kind: Resource category represented by this row.\n    resource: Configured resource identifier.\n    assignments: Course assignments consuming the resource.\n    collisions: Detected overlap violations involving the resource.\n    capacity: Configured student capacity, or null for an unknown resource in a mutated Python audit.\n    maximum_assigned_section_capacity: Largest assigned section enrollment using the resource.\n    capacity_violations: Assigned sections that exceed configured capacity."
       },
       "Room": {
         "type": "string",
         "description": "Room name",
         "example": "Room 101"
+      },
+      "RoomConfig-Input": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name",
+            "description": "Unique, nonblank room name used by references and schedule output"
+          },
+          "capacity": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Capacity",
+            "description": "Maximum number of students the room can accommodate"
+          },
+          "features": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true,
+            "title": "Features",
+            "description": "Facility and equipment feature tags supplied by this room"
+          },
+          "times": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "$ref": "#/components/schemas/TimeRange-Input"
+                  },
+                  "type": "array"
+                },
+                "propertyNames": {
+                  "$ref": "#/components/schemas/Day"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Times",
+            "description": "Optional weekday room availability windows; null means unrestricted availability"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "capacity"
+        ],
+        "title": "RoomConfig",
+        "description": "A lecture-room resource that can be assigned to physical course meetings.\n\nFields:\n    name: Unique, nonblank identifier used by course room candidates,\n        faculty preferences, generated schedules, and diagnostics.\n    capacity: Positive count of usable student seats. Physical assignments\n        require a value at least as large as the course section capacity.\n    features: Facility or equipment tags supplied by the room. A room is\n        eligible only when it contains every feature required by the course.\n    times: Optional availability windows for every scheduler weekday. ``None``\n        means unrestricted availability; a mapping restricts occupancy to the\n        listed windows."
+      },
+      "RoomConfig-Output": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Name",
+            "description": "Unique, nonblank room name used by references and schedule output"
+          },
+          "capacity": {
+            "type": "integer",
+            "exclusiveMinimum": 0.0,
+            "title": "Capacity",
+            "description": "Maximum number of students the room can accommodate"
+          },
+          "features": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true,
+            "title": "Features",
+            "description": "Facility and equipment feature tags supplied by this room"
+          },
+          "times": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "$ref": "#/components/schemas/TimeRange-Output"
+                  },
+                  "type": "array"
+                },
+                "propertyNames": {
+                  "$ref": "#/components/schemas/Day"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Times",
+            "description": "Optional weekday room availability windows; null means unrestricted availability"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "capacity"
+        ],
+        "title": "RoomConfig",
+        "description": "A lecture-room resource that can be assigned to physical course meetings.\n\nFields:\n    name: Unique, nonblank identifier used by course room candidates,\n        faculty preferences, generated schedules, and diagnostics.\n    capacity: Positive count of usable student seats. Physical assignments\n        require a value at least as large as the course section capacity.\n    features: Facility or equipment tags supplied by the room. A room is\n        eligible only when it contains every feature required by the course.\n    times: Optional availability windows for every scheduler weekday. ``None``\n        means unrestricted availability; a mapping restricts occupancy to the\n        listed windows."
       },
       "ScheduleAuditResponse": {
         "properties": {
@@ -1982,6 +2449,7 @@
             "example": {
               "courses": [
                 {
+                  "capacity": 24,
                   "conflicts": [],
                   "course_id": "CS 101",
                   "credits": 3,
@@ -2022,10 +2490,16 @@
                 }
               ],
               "labs": [
-                "Lab 101"
+                {
+                  "capacity": 24,
+                  "name": "Lab 101"
+                }
               ],
               "rooms": [
-                "Room 101"
+                {
+                  "capacity": 40,
+                  "name": "Room 101"
+                }
               ]
             }
           },
@@ -2354,25 +2828,31 @@
         "properties": {
           "rooms": {
             "items": {
-              "$ref": "#/components/schemas/Room"
+              "$ref": "#/components/schemas/RoomConfig-Input"
             },
             "type": "array",
             "minItems": 1,
             "title": "Rooms",
-            "description": "List of available room names",
+            "description": "List of available room definitions",
             "example": [
-              "Room 101"
+              {
+                "capacity": 40,
+                "name": "Room 101"
+              }
             ]
           },
           "labs": {
             "items": {
-              "$ref": "#/components/schemas/Lab"
+              "$ref": "#/components/schemas/LabConfig-Input"
             },
             "type": "array",
             "title": "Labs",
-            "description": "List of available lab names",
+            "description": "List of available lab definitions",
             "example": [
-              "Lab 101"
+              {
+                "capacity": 24,
+                "name": "Lab 101"
+              }
             ]
           },
           "courses": {
@@ -2384,6 +2864,7 @@
             "description": "List of course configurations",
             "example": [
               {
+                "capacity": 24,
                 "conflicts": [
                   "CS 102"
                 ],
@@ -2448,31 +2929,37 @@
           "faculty"
         ],
         "title": "SchedulerConfig",
-        "description": "Represents a scheduler configuration.\n\n**Usage:**\n```python\nSchedulerConfig(rooms=[...], labs=[...], courses=[...], faculty=[...])\n```"
+        "description": "Represents a scheduler configuration.\n\n**Usage:**\n```python\nSchedulerConfig(\n    rooms=[RoomConfig(name=\"Room 101\", capacity=40)],\n    labs=[LabConfig(name=\"Lab 101\", capacity=24)],\n    courses=[...],\n    faculty=[...],\n)\n```"
       },
       "SchedulerConfig-Output": {
         "properties": {
           "rooms": {
             "items": {
-              "$ref": "#/components/schemas/Room"
+              "$ref": "#/components/schemas/RoomConfig-Output"
             },
             "type": "array",
             "minItems": 1,
             "title": "Rooms",
-            "description": "List of available room names",
+            "description": "List of available room definitions",
             "example": [
-              "Room 101"
+              {
+                "capacity": 40,
+                "name": "Room 101"
+              }
             ]
           },
           "labs": {
             "items": {
-              "$ref": "#/components/schemas/Lab"
+              "$ref": "#/components/schemas/LabConfig-Output"
             },
             "type": "array",
             "title": "Labs",
-            "description": "List of available lab names",
+            "description": "List of available lab definitions",
             "example": [
-              "Lab 101"
+              {
+                "capacity": 24,
+                "name": "Lab 101"
+              }
             ]
           },
           "courses": {
@@ -2484,6 +2971,7 @@
             "description": "List of course configurations",
             "example": [
               {
+                "capacity": 24,
                 "conflicts": [
                   "CS 102"
                 ],
@@ -2548,7 +3036,7 @@
           "faculty"
         ],
         "title": "SchedulerConfig",
-        "description": "Represents a scheduler configuration.\n\n**Usage:**\n```python\nSchedulerConfig(rooms=[...], labs=[...], courses=[...], faculty=[...])\n```"
+        "description": "Represents a scheduler configuration.\n\n**Usage:**\n```python\nSchedulerConfig(\n    rooms=[RoomConfig(name=\"Room 101\", capacity=40)],\n    labs=[LabConfig(name=\"Lab 101\", capacity=24)],\n    courses=[...],\n    faculty=[...],\n)\n```"
       },
       "SessionDiagnosticResponse": {
         "properties": {
@@ -2742,6 +3230,15 @@
             "type": "integer",
             "title": "Duration",
             "description": "Duration in minutes."
+          },
+          "delivery": {
+            "type": "string",
+            "enum": [
+              "in_person",
+              "online"
+            ],
+            "title": "Delivery",
+            "description": "Meeting delivery mode."
           }
         },
         "additionalProperties": false,
@@ -2749,7 +3246,8 @@
         "required": [
           "day",
           "start",
-          "duration"
+          "duration",
+          "delivery"
         ],
         "title": "TimeInstanceResponse",
         "description": "One meeting time block within a scheduled course (JSON shape)."

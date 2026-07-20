@@ -48,10 +48,11 @@ soft objectives, consume a generated model, or alter later `get_models()` result
 
 The response can include:
 
-- `candidate_domains`: eligible faculty, rooms, labs, compatible patterns, availability counts, and bounded rejected
-  pattern explanations for every course.
-- `capacity_analysis`: necessary-condition workload, mandatory-day, pairwise separation, forced-resource, and
-  singleton-pattern checks.
+- `candidate_domains`: modality, section capacity, resource candidates filtered by capacity and required features,
+  lab capacity domains, the room-during-lab policy, bounded rejection explanations, compatible patterns,
+  and faculty availability counts.
+- `capacity_analysis`: per-section room and lab coverage plus necessary workload, mandatory-day, pairwise separation,
+  forced-resource, and singleton-pattern checks.
 - `day_feasibility`: every faculty/day cell with availability, eligible courses, and compatible/available patterns.
 - `preflight_findings`: deterministic contradictions and relevant derived facts found before core extraction.
 - `conflicting_constraints`: one subset-minimal unsatisfiable business-rule core.
@@ -63,12 +64,15 @@ The response can include:
 
 `core_is_minimal`, `alternative_cores_complete`, and `repair_sets_complete` distinguish proven properties from
 bounded searches. `diagnostic_completeness` is `hard_constraint_feasibility`, `bounded_unsat_cores`, or
-`preflight_only`; `diagnostic_version` identifies the payload semantics. An `unknown` result also supplies `reason`,
+`preflight_only`; `diagnostic_version` is `3` for modality-, feature-, availability-, and single-lab-aware candidate,
+provenance, and audit semantics. An `unknown` result also supplies `reason`,
 `elapsed_ms`, and the active `solver_timeout_ms`.
 
 Built-in diagnostic work bounds are part of those completeness semantics:
 
 - Rejected-pattern detail is limited to 128 records per course while `rejected_pattern_count` retains the total.
+- Undersized room and lab details are each limited to 128 records per course while their rejection counts retain
+  the total.
 - Static pair feasibility checks compare at most 4,096 pattern pairs; an indeterminate capped comparison is omitted
   rather than reported as feasible or infeasible.
 - Alternative-core search returns at most 16 alternatives and performs at most 128 solver checks.
@@ -98,7 +102,9 @@ the schedule. It reports:
 - `constraint_violations`: hard-rule failures, including missing/duplicate course coverage.
 - `faculty_workloads`: credits, distinct courses, teaching days, configured limits, and mandatory-day satisfaction
   for every faculty member.
-- `resource_usage`: room and lab assignments plus independently detected collisions.
+- `resource_usage`: room and lab assignments, configured capacity, maximum assigned section capacity,
+  independently detected collisions, and capacity violations. Room collision checks honor online delivery and
+  `reserve_room_during_lab`.
 - `objective_scores`: achieved scores for every enabled optimizer flag.
 - `preference_outcomes`: objective points that were available but not selected.
 
@@ -114,8 +120,9 @@ All contracts are immutable dataclasses and are exported from both `scheduler` a
 `scheduler.scheduler` path:
 
 - Validation: `ConfigurationDiagnostic`, `ConfigurationValidationResult`.
-- Feasibility: `ScheduleDiagnosis`, `ConstraintDiagnostic`, `CandidateDomainDiagnostic`, `CapacityDiagnostic`,
-  `DayFeasibilityDiagnostic`, `ProvenanceEdge`, `RelaxationSuggestion`, `RepairSetDiagnostic`.
+- Feasibility: `ScheduleDiagnosis`, `ConstraintDiagnostic`, `CandidateDomainDiagnostic`,
+  `CapacityDiagnostic`, `DayFeasibilityDiagnostic`, `ProvenanceEdge`,
+  `RelaxationSuggestion`, `RepairSetDiagnostic`.
 - Auditing: `ScheduleAudit`, `FacultyWorkloadDiagnostic`, `ResourceUsageDiagnostic`, `ObjectiveScoreDiagnostic`.
 
 The generated Python **Reference** describes every field in declaration order. `load_config_from_file`,

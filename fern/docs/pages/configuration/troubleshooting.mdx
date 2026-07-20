@@ -34,6 +34,13 @@ ValidationError: ... CourseConfig
 faculty -> 0: "Dr. Unknown" is not in faculty list
 ```
 
+**Legacy or invalid capacity shape**
+
+Global rooms and labs must be objects containing `name` and a positive integer `capacity`; every course also needs
+a positive `capacity`. Validation locations such as `/config/rooms/0` or `/config/courses/0/capacity` identify the
+exact entry to migrate. A well-formed configuration whose resources are simply too small passes validation and is
+reported by feasibility diagnosis instead.
+
 **Business rules**
 
 ```
@@ -69,6 +76,10 @@ Rough expectations (hardware-dependent):
 
 - Check faculty availability vs. generated time grid.
 - Check room/lab lists vs. course requirements.
+- Compare each section's `capacity` with the capacities of its allowed rooms and labs.
+- Check required features and room/lab `times`; omission means unrestricted, but a supplied map makes missing days unavailable.
+- Confirm course `modality` matches meeting `delivery` values and lab meetings remain in person.
+- If only lecture-room collisions are blocking lab times, verify whether `reserve_room_during_lab` should be `false`.
 - Ensure `conflicts` do not make the instance unsatisfiable.
 - Use `POST /validate` for structured schema and cross-reference errors before submitting.
 - Use `GET /schedules/{id}/diagnosis` for feasible candidate domains, capacity shortfalls, unsat cores, provenance, and verified rule-level repair sets.

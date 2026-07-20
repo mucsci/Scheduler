@@ -13,8 +13,10 @@ from bidict import frozenbidict
 
 from .config import OptimizerFlags
 from .logging import logger
-from .models import Course, CourseInstance, Day, TimeSlot
+from .models import Course, CourseInstance, Day, TimeInstance, TimeSlot
 from .problem import SchedulingProblem
+
+type RoomOverlapKey = tuple[bool, bool]
 
 
 @dataclass(frozen=True)
@@ -28,6 +30,8 @@ class RelationTables:
         lecture_next_to: Relation indicating lecture adjacency.
         faculty_available: Relation indicating faculty availability for a slot.
         lab_next_to: Relation indicating lab-meeting adjacency.
+        room_overlaps: Cached, total room-occupancy relations keyed by the two
+            courses' lab-reservation policies.
     """
 
     constraints: tuple[z3.BoolRef, ...]
@@ -36,6 +40,7 @@ class RelationTables:
     lecture_next_to: z3.FuncDeclRef
     faculty_available: z3.FuncDeclRef
     lab_next_to: z3.FuncDeclRef
+    room_overlaps: Mapping[RoomOverlapKey, z3.FuncDeclRef]
 
 
 @dataclass(frozen=True)
@@ -48,7 +53,7 @@ class Z3Symbols:
         faculty_sort: Enum sort representing configured faculty.
         faculty_constants: Bidirectional mapping from faculty labels to constants.
         room_sort: Enum sort representing configured rooms.
-        room_constants: Bidirectional mapping from room labels to constants.
+        room_constants: Bidirectional mapping from room labels or ``None`` to constants.
         lab_sort: Enum sort representing labs plus the internal no-lab value.
         lab_constants: Bidirectional mapping from lab labels or ``None`` to constants.
     """
@@ -58,7 +63,7 @@ class Z3Symbols:
     faculty_sort: z3.SortRef
     faculty_constants: frozenbidict[str, z3.ExprRef]
     room_sort: z3.SortRef
-    room_constants: frozenbidict[str, z3.ExprRef]
+    room_constants: frozenbidict[str | None, z3.ExprRef]
     lab_sort: z3.SortRef
     lab_constants: frozenbidict[str | None, z3.ExprRef]
 
@@ -122,7 +127,7 @@ class SolverEngine:
     """Own the complete Z3 lifecycle for one normalized problem."""
 
     def _create_course_variables(self, z3_data: Z3Symbols) -> None:
-        """Create internal variables and populate legacy ``Course`` mirrors."""
+        """Create solver-owned variables without mutating normalized courses."""
         for course in self._courses:
             variables = CourseVariables(
                 time=z3.Const(f"{course}_time", z3_data.time_slot_sort),
@@ -131,10 +136,6 @@ class SolverEngine:
                 lab=z3.Const(f"{course}_lab", z3_data.lab_sort),
             )
             self._course_variables[str(course)] = variables
-            course.time = variables.time
-            course.faculty = variables.faculty
-            course.room = variables.room
-            course.lab = variables.lab
 
     def _variables(self, course: Course) -> CourseVariables:
         return self._course_variables[str(course)]
@@ -168,11 +169,14 @@ class SolverEngine:
         ```
         """
 
-        # Create TimeSlot EnumSort
-        time_slot_names = [f"time_slot_{i}" for i in range(len(self._slots))]
+        # Equal TimeSlot values can be generated for different credit domains.
+        # Use one enum value per distinct slot so no unreachable enum constant is
+        # left unconstrained when the value-to-symbol lookup deduplicates them.
+        unique_slots = tuple(dict.fromkeys(self._slots))
+        time_slot_names = [f"time_slot_{i}" for i in range(len(unique_slots))]
         time_slot_sort, time_slot_constants = z3.EnumSort("TimeSlot", time_slot_names, ctx=self._ctx)
         time_slot_constants_dict = frozenbidict(
-            {time_slot: time_slot_constants[i] for i, time_slot in enumerate(self._slots)}
+            {time_slot: time_slot_constants[i] for i, time_slot in enumerate(unique_slots)}
         )
 
         # Create Faculty EnumSort
@@ -182,11 +186,24 @@ class SolverEngine:
             {faculty: faculty_constants[i] for i, faculty in enumerate(self._faculty)},
         )
 
-        # Create Room EnumSort
-        room_names = [f"room_{i}" for i in range(len(self._rooms))]
+        # Add an internal no-room value whenever a course has no room candidates
+        # or can select a pattern whose meetings do not occupy a lecture room.
+        has_roomless_assignment = any(
+            not course.rooms
+            or any(
+                not self._problem._slot_requires_room(
+                    slot,
+                    reserve_room_during_lab=course.reserve_room_during_lab,
+                )
+                for slot in self._slots
+            )
+            for course in self._courses
+        )
+        room_values: list[str | None] = ([None] if has_roomless_assignment else []) + self._rooms
+        room_names = (["room_none"] if has_roomless_assignment else []) + [f"room_{i}" for i in range(len(self._rooms))]
         room_sort, room_constants = z3.EnumSort("Room", room_names, ctx=self._ctx)
         room_constants_dict = frozenbidict(
-            {room: room_constants[i] for i, room in enumerate(self._rooms)},
+            {room: room_constants[i] for i, room in enumerate(room_values)},
         )
 
         # Always include an internal no-lab value so configurations without
@@ -243,6 +260,12 @@ class SolverEngine:
         self._faculty_availability = {name: list(policy.availability) for name, policy in policies.items()}
         self._rooms = self._problem.rooms
         self._labs = self._problem.labs
+        self._room_capacities = {name: policy.capacity for name, policy in self._problem.room_policies.items()}
+        self._lab_capacities = {name: policy.capacity for name, policy in self._problem.lab_policies.items()}
+        self._room_features = {name: policy.features for name, policy in self._problem.room_policies.items()}
+        self._lab_features = {name: policy.features for name, policy in self._problem.lab_policies.items()}
+        self._room_availability = {name: policy.availability for name, policy in self._problem.room_policies.items()}
+        self._lab_availability = {name: policy.availability for name, policy in self._problem.lab_policies.items()}
         self._courses = self._problem.courses
         self._slots = self._problem.slots
         self._ranges = self._problem.slot_ranges
@@ -254,6 +277,7 @@ class SolverEngine:
 
         # Create Z3 structures
         z3_data = self._create_z3_enumsorts()
+        self._z3_data = z3_data
         self._create_course_variables(z3_data)
 
         # Build function constraints and get the function references
@@ -277,7 +301,7 @@ class SolverEngine:
             function_data.lab_overlaps,
             function_data.lecture_next_to,
             function_data.lab_next_to,
-            z3_data,
+            function_data.room_overlaps,
         )
 
         # Aggregate all constraints
@@ -286,7 +310,6 @@ class SolverEngine:
         )
 
         self._function_data = function_data
-        self._z3_data = z3_data
         self._artifacts = SolverArtifacts(
             context=self._ctx,
             symbols=z3_data,
@@ -329,6 +352,96 @@ class SolverEngine:
             raise ValueError(f"Unknown relationship function: {fn_name}")
         self._slot_relationship_cache[key] = result
         return result
+
+    def _allowed_time_expression(self, variable: z3.ExprRef, slots: Sequence[TimeSlot]) -> z3.BoolRef:
+        """Restrict a time variable to an ordered finite slot domain."""
+        choices = [variable == self._z3_data.time_slot_constants[slot] for slot in slots]
+        return cast(z3.BoolRef, z3.Or(choices) if choices else z3.BoolVal(False, ctx=self._ctx))
+
+    def _or_in_context(self, expressions: Sequence[z3.BoolRef]) -> z3.BoolRef:
+        """Build a disjunction whose empty value belongs to this engine's context."""
+        return cast(z3.BoolRef, z3.Or(expressions) if expressions else z3.BoolVal(False, ctx=self._ctx))
+
+    def _room_is_assigned(self, variable: z3.ExprRef) -> z3.BoolRef:
+        """Return a guard that excludes the internal no-room enum value."""
+        no_room = self._z3_data.room_constants.get(None)
+        if no_room is None:
+            return z3.BoolVal(True, ctx=self._ctx)
+        return cast(z3.BoolRef, variable != no_room)
+
+    @staticmethod
+    def _times_available(times: Sequence[TimeInstance], availability: tuple[TimeInstance, ...] | None) -> bool:
+        """Return whether every meeting is contained by an optional availability policy."""
+        if availability is None:
+            return True
+        return all(
+            any(
+                meeting.day == window.day and window.start <= meeting.start and meeting.stop <= window.stop
+                for window in availability
+            )
+            for meeting in times
+        )
+
+    def _lab_time_available(self, slot: TimeSlot, availability: tuple[TimeInstance, ...] | None) -> bool:
+        """Return whether a slot has a lab meeting inside the supplied windows."""
+        lab_time = slot.lab_time()
+        return lab_time is not None and self._times_available((lab_time,), availability)
+
+    @staticmethod
+    def _room_times(slot: TimeSlot, *, include_lab: bool) -> tuple[TimeInstance, ...]:
+        """Return physical meetings in a slot that occupy its lecture room."""
+        times = list(slot.physical_lecture_times())
+        lab = slot.lab_time()
+        if include_lab and lab is not None:
+            times.append(lab)
+        return tuple(times)
+
+    @staticmethod
+    def _meetings_overlap(left: Sequence[TimeInstance], right: Sequence[TimeInstance]) -> bool:
+        """Return whether any meetings in two occupancy sets overlap."""
+        return any(TimeSlot._overlaps(first, second) for first in left for second in right)
+
+    def _room_overlap_key(self, left: Course, right: Course) -> RoomOverlapKey:
+        """Return the reusable room-occupancy relation key for a course pair."""
+        return (left.reserve_room_during_lab, right.reserve_room_during_lab)
+
+    def _z3ify_room_overlap_constraint(
+        self,
+        z3_data: Z3Symbols,
+        name: str,
+        key: RoomOverlapKey,
+    ) -> tuple[z3.FuncDeclRef, list[z3.BoolRef]]:
+        """Define one room-overlap relation for reusable occupancy semantics."""
+        reserve_left, reserve_right = key
+        z3fn = z3.Function(
+            name,
+            z3_data.time_slot_sort,
+            z3_data.time_slot_sort,
+            z3.BoolSort(ctx=self._ctx),
+        )
+        true: list[tuple[z3.ExprRef, z3.ExprRef]] = []
+        false: list[tuple[z3.ExprRef, z3.ExprRef]] = []
+        # Define the relation over the complete enum domain. Diagnostics may
+        # intentionally relax course time-domain constraints; a partial table
+        # would make those repair checks depend on unconstrained function values.
+        for left_slot in self._slots:
+            for right_slot in self._slots:
+                constants = (
+                    z3_data.time_slot_constants[left_slot],
+                    z3_data.time_slot_constants[right_slot],
+                )
+                overlaps = self._meetings_overlap(
+                    self._room_times(left_slot, include_lab=reserve_left),
+                    self._room_times(right_slot, include_lab=reserve_right),
+                )
+                (true if overlaps else false).append(constants)
+
+        constraints: list[z3.BoolRef] = []
+        if true:
+            constraints.append(cast(z3.BoolRef, z3.And([z3fn(left, right) for left, right in true])))
+        if false:
+            constraints.append(cast(z3.BoolRef, z3.And([z3.Not(z3fn(left, right)) for left, right in false])))
+        return z3fn, constraints
 
     def _z3ify_time_constraint(
         self, z3_data: Z3Symbols, name: str, *, ctx: z3.Context | None = None
@@ -454,12 +567,30 @@ class SolverEngine:
         )
         lab_next_to, lab_next_to_C = self._z3ify_time_constraint(z3_data, "lab_next_to", ctx=self._ctx)
 
+        room_overlap_keys: list[RoomOverlapKey] = []
+        for left, right in itertools.combinations(self._courses, 2):
+            if set(left.rooms) & set(right.rooms):
+                key = self._room_overlap_key(left, right)
+                if key not in room_overlap_keys:
+                    room_overlap_keys.append(key)
+        room_overlaps: dict[RoomOverlapKey, z3.FuncDeclRef] = {}
+        room_overlap_constraints: list[z3.BoolRef] = []
+        for index, key in enumerate(room_overlap_keys):
+            relation, constraints = self._z3ify_room_overlap_constraint(
+                z3_data,
+                f"room_overlaps_{index}",
+                key,
+            )
+            room_overlaps[key] = relation
+            room_overlap_constraints.extend(constraints)
+
         function_constraints: list[z3.BoolRef] = []
         function_constraints.extend(overlaps_C)
         function_constraints.extend(lab_overlaps_C)
         function_constraints.extend(lecture_next_to_C)
         function_constraints.extend(lab_next_to_C)
         function_constraints.extend(faculty_available_C)
+        function_constraints.extend(room_overlap_constraints)
 
         return RelationTables(
             constraints=tuple(function_constraints),
@@ -468,6 +599,7 @@ class SolverEngine:
             lecture_next_to=lecture_next_to,
             faculty_available=faculty_available,
             lab_next_to=lab_next_to,
+            room_overlaps=MappingProxyType(room_overlaps),
         )
 
     def _build_faculty_constraints(self, z3_data: Z3Symbols) -> list[z3.BoolRef]:
@@ -555,7 +687,12 @@ class SolverEngine:
                 course_day_assignments: list[z3.BoolRef] = []
                 if slot_constants and faculty_courses:
                     for course in faculty_courses:
-                        slot_matches = [self._variables(course).time == slot_const for slot_const in slot_constants]
+                        time_variables = [self._variables(course).time]
+                        slot_matches = [
+                            time_variable == slot_const
+                            for time_variable in time_variables
+                            for slot_const in slot_constants
+                        ]
                         if slot_matches:
                             course_day_assignments.append(
                                 self._simplify(
@@ -605,31 +742,26 @@ class SolverEngine:
         faculty_available: z3.FuncDeclRef,
         z3_data: Z3Symbols,
     ) -> list[z3.BoolRef]:
-        """
-        Create individual course constraints.
-
-        **Usage:**
-        ```python
-        self._build_course_constraints(overlaps, faculty_available, z3_data)
-        ```
-
-        **Args:**
-        - overlaps: `z3.FuncDeclRef` function for checking time overlaps
-        - faculty_available: `z3.FuncDeclRef` function for checking faculty availability
-        - z3_data: `Z3Symbols` object containing the Z3 sorts and constants
-
-        **Returns:**
-        - `list[z3.BoolRef]` containing the course constraints
-        """
-        # Course constraints with optimized conflict checking - batch generation
+        """Create assignment-domain, compatibility, and availability constraints."""
         course_constraints: list[z3.BoolRef] = []
         for c in self._courses:
-            # conflict constraints
-            conflict_constraints: list[z3.BoolRef] = []
+            course_constraint_list: list[z3.BoolRef] = []
+            compatible_slots = self._problem.compatible_slots(c)
+            time_constraint = self._allowed_time_expression(self._variables(c).time, compatible_slots)
+            course_constraint_list.append(time_constraint)
+            self._diagnostic_constraints.append(
+                DiagnosticConstraintArtifact(
+                    time_constraint,
+                    f"Course {c} must use a compatible {c.credits}-credit {c.modality} meeting pattern",
+                    kind="course_time_pattern",
+                    subjects=(str(c),),
+                )
+            )
+
             for d in self._courses:
                 if d != c and d.course_id in c.conflicts:
                     conflict = cast(z3.BoolRef, z3.Not(overlaps(self._variables(c).time, self._variables(d).time)))
-                    conflict_constraints.append(conflict)
+                    course_constraint_list.append(conflict)
                     self._diagnostic_constraints.append(
                         DiagnosticConstraintArtifact(
                             conflict,
@@ -639,11 +771,10 @@ class SolverEngine:
                         )
                     )
 
-            # faculty availability constraint
             availability_constraint = cast(
                 z3.BoolRef, faculty_available(self._variables(c).faculty, self._variables(c).time)
             )
-            course_constraint_list: list[z3.BoolRef] = [availability_constraint]
+            course_constraint_list.append(availability_constraint)
             self._diagnostic_constraints.append(
                 DiagnosticConstraintArtifact(
                     availability_constraint,
@@ -653,40 +784,10 @@ class SolverEngine:
                 )
             )
 
-            # Get valid time slots for this credit level
-            start, stop = self._ranges[c.credits]
-            requires_lab = bool(c.labs)
-            valid_time_slots = {
-                i for i, slot in enumerate(self._slots) if start <= i <= stop and slot.has_lab() == requires_lab
-            }
-            if valid_time_slots:
-                # Constrain time to valid slots for this credit level
-                time_constraint = cast(
-                    z3.BoolRef,
-                    z3.Or(
-                        [
-                            self._variables(c).time == z3_data.time_slot_constants[self._slots[i]]
-                            for i in valid_time_slots
-                        ]
-                    ),
-                )
-                course_constraint_list.append(time_constraint)
-                self._diagnostic_constraints.append(
-                    DiagnosticConstraintArtifact(
-                        time_constraint,
-                        f"Course {c} must use a compatible {c.credits}-credit meeting pattern",
-                        kind="course_time_pattern",
-                        subjects=(str(c),),
-                    )
-                )
-
             if c.labs:
-                # we must assign to a lab when we have options
                 lab_constraint = cast(
                     z3.BoolRef,
-                    z3.Or(
-                        [self._variables(c).lab == z3_data.lab_constants[lab] for lab in self._labs if lab in c.labs]
-                    ),
+                    z3.Or([self._variables(c).lab == z3_data.lab_constants[lab] for lab in c.labs]),
                 )
                 course_constraint_list.append(lab_constraint)
                 self._diagnostic_constraints.append(
@@ -697,49 +798,189 @@ class SolverEngine:
                         subjects=(str(c), *c.labs),
                     )
                 )
+
+                capacity_constraint = self._or_in_context(
+                    [
+                        self._variables(c).lab == z3_data.lab_constants[lab]
+                        for lab in c.labs
+                        if self._lab_capacities[lab] >= c.capacity
+                    ]
+                )
+                course_constraint_list.append(capacity_constraint)
+                self._diagnostic_constraints.append(
+                    DiagnosticConstraintArtifact(
+                        capacity_constraint,
+                        f"Course {c} requires a lab capacity of at least {c.capacity}",
+                        kind="course_lab_capacity",
+                        subjects=(str(c),),
+                    )
+                )
+
+                if c.required_lab_features:
+                    feature_constraint = self._or_in_context(
+                        [
+                            self._variables(c).lab == z3_data.lab_constants[lab]
+                            for lab in c.labs
+                            if c.required_lab_features <= self._lab_features[lab]
+                        ]
+                    )
+                    course_constraint_list.append(feature_constraint)
+                    self._diagnostic_constraints.append(
+                        DiagnosticConstraintArtifact(
+                            feature_constraint,
+                            f"Course {c} requires lab features {sorted(c.required_lab_features)}",
+                            kind="course_lab_features",
+                            subjects=(str(c),),
+                        )
+                    )
+
+                if any(self._lab_availability[lab] is not None for lab in c.labs):
+                    lab_availability_parts = []
+                    for lab in c.labs:
+                        available_slots = tuple(
+                            slot for slot in self._slots if self._lab_time_available(slot, self._lab_availability[lab])
+                        )
+                        lab_availability_parts.append(
+                            z3.Implies(
+                                self._variables(c).lab == z3_data.lab_constants[lab],
+                                self._allowed_time_expression(self._variables(c).time, available_slots),
+                            )
+                        )
+                    lab_availability_constraint = cast(z3.BoolRef, z3.And(lab_availability_parts))
+                    course_constraint_list.append(lab_availability_constraint)
+                    self._diagnostic_constraints.append(
+                        DiagnosticConstraintArtifact(
+                            lab_availability_constraint,
+                            f"Course {c} must fit the selected lab's availability",
+                            kind="course_lab_availability",
+                            subjects=(str(c),),
+                        )
+                    )
             else:
                 course_constraint_list.append(cast(z3.BoolRef, self._variables(c).lab == z3_data.lab_constants[None]))
-            if c.rooms:
-                # we must assign to a room when we have options
+
+            room_required_slots = tuple(
+                slot
+                for slot in self._slots
+                if self._problem._slot_requires_room(
+                    slot,
+                    reserve_room_during_lab=c.reserve_room_during_lab,
+                )
+            )
+            room_required = self._allowed_time_expression(self._variables(c).time, room_required_slots)
+            allowed_rooms = self._or_in_context(
+                [self._variables(c).room == z3_data.room_constants[room] for room in c.rooms]
+            )
+            no_room = z3_data.room_constants.get(None)
+            if no_room is None:
+                room_constraint = allowed_rooms
+            else:
                 room_constraint = cast(
                     z3.BoolRef,
-                    z3.Or(
-                        [
-                            self._variables(c).room == z3_data.room_constants[room]
-                            for room in self._rooms
-                            if room in c.rooms
-                        ]
+                    z3.And(
+                        z3.Implies(room_required, allowed_rooms),
+                        z3.Implies(z3.Not(room_required), self._variables(c).room == no_room),
                     ),
                 )
-                course_constraint_list.append(room_constraint)
-                self._diagnostic_constraints.append(
-                    DiagnosticConstraintArtifact(
-                        room_constraint,
-                        f"Course {c} must use one of its allowed rooms",
-                        kind="course_room_eligibility",
-                        subjects=(str(c), *c.rooms),
-                    )
+            course_constraint_list.append(room_constraint)
+            self._diagnostic_constraints.append(
+                DiagnosticConstraintArtifact(
+                    room_constraint,
+                    f"Course {c} must use an allowed room exactly when its selected pattern requires one",
+                    kind="course_room_eligibility",
+                    subjects=(str(c), *c.rooms),
                 )
-            if c.faculties:
-                # we must assign to a faculty from the candidates
-                faculty_constraint = cast(
+            )
+
+            if c.rooms:
+                room_capacity_constraint = cast(
                     z3.BoolRef,
-                    z3.Or(
-                        [self._variables(c).faculty == z3_data.faculty_constants[faculty] for faculty in c.faculties]
+                    z3.Implies(
+                        room_required,
+                        self._or_in_context(
+                            [
+                                self._variables(c).room == z3_data.room_constants[room]
+                                for room in c.rooms
+                                if self._room_capacities[room] >= c.capacity
+                            ]
+                        ),
                     ),
                 )
-                course_constraint_list.append(faculty_constraint)
+                course_constraint_list.append(room_capacity_constraint)
                 self._diagnostic_constraints.append(
                     DiagnosticConstraintArtifact(
-                        faculty_constraint,
-                        f"Course {c} must use one of its eligible faculty",
-                        kind="course_faculty_eligibility",
-                        subjects=(str(c), *c.faculties),
+                        room_capacity_constraint,
+                        f"Course {c} requires a room with capacity of at least {c.capacity}",
+                        kind="course_room_capacity",
+                        subjects=(str(c),),
                     )
                 )
-            if conflict_constraints:
-                conflict_constraint = cast(z3.BoolRef, z3.And(conflict_constraints))
-                course_constraint_list.append(conflict_constraint)
+
+                if c.required_room_features:
+                    feature_constraint = cast(
+                        z3.BoolRef,
+                        z3.Implies(
+                            room_required,
+                            self._or_in_context(
+                                [
+                                    self._variables(c).room == z3_data.room_constants[room]
+                                    for room in c.rooms
+                                    if c.required_room_features <= self._room_features[room]
+                                ]
+                            ),
+                        ),
+                    )
+                    course_constraint_list.append(feature_constraint)
+                    self._diagnostic_constraints.append(
+                        DiagnosticConstraintArtifact(
+                            feature_constraint,
+                            f"Course {c} requires room features {sorted(c.required_room_features)}",
+                            kind="course_room_features",
+                            subjects=(str(c),),
+                        )
+                    )
+
+                if any(self._room_availability[room] is not None for room in c.rooms):
+                    room_availability_parts = []
+                    for room in c.rooms:
+                        availability = self._room_availability[room]
+                        main_slots = tuple(
+                            slot
+                            for slot in self._slots
+                            if self._times_available(
+                                self._room_times(slot, include_lab=c.reserve_room_during_lab), availability
+                            )
+                        )
+                        room_availability_parts.append(
+                            z3.Implies(
+                                self._variables(c).room == z3_data.room_constants[room],
+                                self._allowed_time_expression(self._variables(c).time, main_slots),
+                            )
+                        )
+                    room_availability_constraint = cast(z3.BoolRef, z3.And(room_availability_parts))
+                    course_constraint_list.append(room_availability_constraint)
+                    self._diagnostic_constraints.append(
+                        DiagnosticConstraintArtifact(
+                            room_availability_constraint,
+                            f"Course {c} must fit the selected room's availability",
+                            kind="course_room_availability",
+                            subjects=(str(c),),
+                        )
+                    )
+
+            faculty_constraint = cast(
+                z3.BoolRef,
+                z3.Or([self._variables(c).faculty == z3_data.faculty_constants[faculty] for faculty in c.faculties]),
+            )
+            course_constraint_list.append(faculty_constraint)
+            self._diagnostic_constraints.append(
+                DiagnosticConstraintArtifact(
+                    faculty_constraint,
+                    f"Course {c} must use one of its eligible faculty",
+                    kind="course_faculty_eligibility",
+                    subjects=(str(c), *c.faculties),
+                )
+            )
 
             course_constraints.append(cast(z3.BoolRef, z3.And(course_constraint_list)))
 
@@ -751,14 +992,14 @@ class SolverEngine:
         lab_overlaps: z3.FuncDeclRef,
         lecture_next_to: z3.FuncDeclRef,
         lab_next_to: z3.FuncDeclRef,
-        z3_data: Z3Symbols,
+        room_overlaps: Mapping[RoomOverlapKey, z3.FuncDeclRef],
     ) -> list[z3.BoolRef]:
         """
         Create resource sharing and faculty scheduling constraints.
 
         **Usage:**
         ```python
-        self._build_resource_constraints(overlaps, lab_overlaps, lecture_next_to, lab_next_to, z3_data)
+        self._build_resource_constraints(overlaps, lab_overlaps, lecture_next_to, lab_next_to, room_overlaps)
         ```
 
         **Args:**
@@ -766,7 +1007,7 @@ class SolverEngine:
         - lab_overlaps: `z3.FuncDeclRef` function for checking lab overlaps
         - lecture_next_to: `z3.FuncDeclRef` function for checking lecture next to each other
         - lab_next_to: `z3.FuncDeclRef` function for checking lab next to each other
-        - z3_data: `Z3Symbols` object containing the Z3 sorts and constants
+        - room_overlaps: total room-occupancy relations keyed by reservation policy
 
         **Returns:**
         - `list[z3.BoolRef]` containing the resource constraints
@@ -780,11 +1021,17 @@ class SolverEngine:
 
             # Enforce same room usage when both courses can use the same rooms
             if set(i.rooms) & set(j.rooms):
+                room_overlap = room_overlaps[self._room_overlap_key(i, j)]
+                room_non_overlap = z3.Not(room_overlap(self._variables(i).time, self._variables(j).time))
                 shared_room_constraint = cast(
                     z3.BoolRef,
                     z3.Implies(
-                        self._variables(i).room == self._variables(j).room,
-                        z3.Not(overlaps(self._variables(i).time, self._variables(j).time)),
+                        z3.And(
+                            self._room_is_assigned(self._variables(i).room),
+                            self._room_is_assigned(self._variables(j).room),
+                            self._variables(i).room == self._variables(j).room,
+                        ),
+                        room_non_overlap,
                     ),
                 )
                 resource.append(shared_room_constraint)
@@ -798,8 +1045,18 @@ class SolverEngine:
                 )
                 if i.course_id == j.course_id:
                     # when a faculty teaches two sections of the same course,
-                    # they must use the same room
-                    same_room_constraint = cast(z3.BoolRef, self._variables(i).room == self._variables(j).room)
+                    # their physical room assignments must match. A section whose
+                    # selected pattern is roomless has no room to coordinate.
+                    same_room_constraint = cast(
+                        z3.BoolRef,
+                        z3.Implies(
+                            z3.And(
+                                self._room_is_assigned(self._variables(i).room),
+                                self._room_is_assigned(self._variables(j).room),
+                            ),
+                            self._variables(i).room == self._variables(j).room,
+                        ),
+                    )
                     constraint_parts.append(same_room_constraint)
                     shared_faculty_parts.append(
                         (same_room_constraint, "same_course_room", f"Sections {i} and {j} must use the same room")
@@ -852,8 +1109,8 @@ class SolverEngine:
                 shared_faculty_parts.append(
                     (lecture_adjacency, "same_course_lecture_adjacency", f"Sections {i} and {j} must be adjacent")
                 )
-                # Only require lab_next_to if the course has labs
-                if i.labs:
+                # Lab adjacency only applies when both sections contain lab meetings.
+                if i.labs and j.labs:
                     lab_adjacency = cast(z3.BoolRef, lab_next_to(self._variables(i).time, self._variables(j).time))
                     constraint_parts.append(lab_adjacency)
                     shared_faculty_parts.append(
@@ -890,7 +1147,8 @@ class SolverEngine:
             if i.course_id == j.course_id:
                 # prevent overlapping times for different sections of the same course
                 section_overlap_constraint = cast(
-                    z3.BoolRef, z3.Not(overlaps(self._variables(i).time, self._variables(j).time))
+                    z3.BoolRef,
+                    z3.Not(overlaps(self._variables(i).time, self._variables(j).time)),
                 )
                 resource_constraints.append(section_overlap_constraint)
                 self._diagnostic_constraints.append(
@@ -1194,6 +1452,8 @@ class SolverEngine:
                     z3.If(
                         z3.And(
                             self._variables(i).faculty == self._variables(j).faculty,
+                            self._room_is_assigned(self._variables(i).room),
+                            self._room_is_assigned(self._variables(j).room),
                             self._variables(i).room == self._variables(j).room,
                         ),
                         1,
@@ -1204,6 +1464,8 @@ class SolverEngine:
                     packing_rooms.append(
                         z3.If(
                             z3.And(
+                                self._room_is_assigned(self._variables(i).room),
+                                self._room_is_assigned(self._variables(j).room),
                                 self._variables(i).room == self._variables(j).room,
                                 self._function_data.lecture_next_to(self._variables(i).time, self._variables(j).time),
                             ),

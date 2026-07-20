@@ -29,6 +29,12 @@ JSON Pointer paths. Valid input returns its canonical configuration fingerprint.
 session, consume session capacity, or invoke Z3. A body that is not a JSON object can still be rejected by FastAPI
 with `422` before configuration validation runs.
 
+The request schema requires global room/lab objects with positive capacities and a positive expected-enrollment
+`capacity` on every course section. Resources may also declare `features` and `times`; sections may declare stable
+ids, delivery modality, required features, optional labs, and whether labs reserve the lecture room. Candidate and
+preference references, generated schedule rows, and audit resource identifiers remain name strings. Well-formed
+but infeasible resource requirements are accepted so diagnosis can explain the shortfall.
+
 ## Submit a configuration
 
 ```bash
@@ -55,6 +61,8 @@ curl -X POST "http://localhost:8000/schedules/f9f2c906-5a00-4b78-a0dd-31f3240fbf
 
 `next` generates, retains, and returns one schedule. Generated indices are zero-based and append-only. Reaching the
 requested limit or exhausting the solution space returns `400`; unexpected generation failures return `500`.
+Each meeting includes `delivery`. Every course row includes one optional `lab` name and `lab_index`; both are null
+for no-lab sections. A separately listed lab section receives its own row and capacity.
 
 To enumerate the remainder in the background:
 
@@ -147,7 +155,7 @@ Environment values must be positive integers. Missing, invalid, and non-positive
 | `SCHEDULER_API_MAX_ACTIVE_SESSIONS` | 16 | In-memory sessions retained concurrently. |
 | `SCHEDULER_API_MAX_COURSES` | 100 | Courses accepted in one submitted configuration. |
 | `SCHEDULER_API_MAX_SCHEDULES` | 100 | Maximum requested `limit` for an API session. |
-| `SCHEDULER_API_MAX_CANDIDATE_SLOTS` | 10,000 | Bounded arithmetic preflight estimate of generated time-slot candidates. |
+| `SCHEDULER_API_MAX_CANDIDATE_SLOTS` | 10,000 | Bounded estimate of generated meeting-pattern candidates across requested credit values. |
 | `SCHEDULER_API_SOLVER_TIMEOUT_MS` | 30,000 | Timeout applied to each API Z3 check. |
 | `SCHEDULER_API_SESSION_TTL_SECONDS` | 1,800 | Idle-session lifetime. |
 

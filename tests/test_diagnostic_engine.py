@@ -1,5 +1,7 @@
 """Unit tests for diagnostics independent of the public façade."""
 
+import pytest
+
 from scheduler import CombinedConfig
 from scheduler.diagnostics import DiagnosticEngine
 from scheduler.problem import SchedulingProblem
@@ -115,3 +117,32 @@ def test_diagnostic_fingerprint_is_stable_and_input_sensitive(
     assert first.diagnose().configuration_fingerprint == second.diagnose().configuration_fingerprint
     assert first_problem.configuration_fingerprint() != changed_problem.configuration_fingerprint()
     assert third.diagnose().configuration_fingerprint == changed_problem.configuration_fingerprint()
+
+
+@pytest.mark.parametrize("resource_kind", ["room", "lab"])
+def test_diagnostics_explain_resource_capacity_shortfalls(resource_kind: str) -> None:
+    data = minimal_config_data()
+    data["config"]["courses"][0]["capacity"] = 31
+    if resource_kind == "room":
+        data["config"]["labs"][0]["capacity"] = 31
+    else:
+        data["config"]["rooms"][0]["capacity"] = 31
+    _problem, _solver, diagnostics = _engines(config_from(data))
+
+    result = diagnostics.diagnose()
+    domain = result.candidate_domains[0]
+
+    assert result.status == "unsatisfiable"
+    assert any(item.kind == f"course_{resource_kind}_capacity" for item in result.conflicting_constraints)
+    assert any(item.kind == f"course_{resource_kind}_capacity_shortfall" for item in result.preflight_findings)
+    assert any(item.kind == f"course_{resource_kind}_capacity_coverage" for item in result.capacity_analysis)
+    assert any(
+        suggestion.kind == f"add_capacity_compatible_{resource_kind}_candidate"
+        for suggestion in result.relaxation_suggestions
+    )
+    assert result.repair_sets and all(repair.verified for repair in result.repair_sets)
+    assert any(edge.relationship == "below_section_capacity" for edge in result.provenance)
+    assert domain.section_capacity == 31
+    assert getattr(domain, f"capacity_compatible_{resource_kind}_candidates") == ()
+    assert getattr(domain, f"{resource_kind}_capacity_rejection_count") == 1
+    assert getattr(domain, f"{resource_kind}_capacity_rejections")

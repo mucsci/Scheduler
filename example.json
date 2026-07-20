@@ -1,25 +1,32 @@
 {
   "config": {
-    "rooms": ["Roddy 136", "Roddy 140", "Roddy 147"],
-    "labs": ["Linux", "Mac"],
+    "rooms": [
+      {"name": "Roddy 136", "capacity": 28},
+      {"name": "Roddy 140", "capacity": 28},
+      {"name": "Roddy 147", "capacity": 28}
+    ],
+    "labs": [
+      {"name": "Linux", "capacity": 28},
+      {"name": "Mac", "capacity": 28}
+    ],
     "courses": [
-        {"course_id": "CMSC 140", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": [], "conflicts": ["CMSC 161", "CMSC 162"], "faculty": null},
-        {"course_id": "CMSC 140", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": [], "conflicts": ["CMSC 161", "CMSC 162"], "faculty": null},
-        {"course_id": "CMSC 152", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": [], "faculty": null},
-        {"course_id": "CMSC 161", "credits": 4, "room": ["Roddy 136"], "lab": ["Linux"], "conflicts": ["CMSC 140"], "faculty": ["Zoppetti"]},
-        {"course_id": "CMSC 161", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": [], "faculty": null},
-        {"course_id": "CMSC 161", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": ["CMSC 140"], "faculty": null},
-        {"course_id": "CMSC 162", "credits": 4, "room": ["Roddy 140"], "lab": ["Linux"], "conflicts": ["CMSC 140"], "faculty": null},
-        {"course_id": "CMSC 330", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux", "Mac"], "conflicts": ["CMSC 362", "CMSC 366"], "faculty": null},
-        {"course_id": "CMSC 340", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": ["CMSC 380", "CMSC 420", "CMSC 453", "CMSC 476"], "faculty": null},
-        {"course_id": "CMSC 340", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": ["CMSC 362", "CMSC 366", "CMSC 330"], "faculty": null},
-        {"course_id": "CMSC 362", "credits": 4, "room": ["Roddy 136"], "lab": ["Linux"], "conflicts": ["CMSC 330", "CMSC 366"], "faculty": null},
-        {"course_id": "CMSC 366", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux", "Mac"], "conflicts": ["CMSC 340", "CMSC 362", "CMSC 330"], "faculty": null},
-        {"course_id": "CMSC 366", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux", "Mac"], "conflicts": ["CMSC 362", "CMSC 330"], "faculty": null},
-        {"course_id": "CMSC 380", "credits": 4, "room": ["Roddy 140"], "lab": ["Mac", "Linux"], "conflicts": ["CMSC 420", "CMSC 453", "CMSC 476"], "faculty": null},
-        {"course_id": "CMSC 420", "credits": 4, "room": ["Roddy 140"], "lab": ["Mac"], "conflicts": ["CMSC 380", "CMSC 453", "CMSC 476"], "faculty": null},
-        {"course_id": "CMSC 453", "credits": 4, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": ["CMSC 380", "CMSC 420", "CMSC 476"], "faculty": null},
-        {"course_id": "CMSC 476", "credits": 4, "room": ["Roddy 136"], "lab": ["Linux"], "conflicts": ["CMSC 380", "CMSC 420", "CMSC 453"], "faculty": null}
+        {"course_id": "CMSC 140", "credits": 4, "capacity": 28, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": [], "conflicts": ["CMSC 161", "CMSC 162"], "faculty": null},
+        {"course_id": "CMSC 140", "credits": 4, "capacity": 28, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": [], "conflicts": ["CMSC 161", "CMSC 162"], "faculty": null},
+        {"course_id": "CMSC 152", "credits": 4, "capacity": 28, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": [], "faculty": null},
+        {"course_id": "CMSC 161", "credits": 4, "capacity": 28, "room": ["Roddy 136"], "lab": ["Linux"], "conflicts": ["CMSC 140"], "faculty": ["Zoppetti"]},
+        {"course_id": "CMSC 161", "credits": 4, "capacity": 28, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": [], "faculty": null},
+        {"course_id": "CMSC 161", "credits": 4, "capacity": 28, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux"], "conflicts": ["CMSC 140"], "faculty": null},
+        {"course_id": "CMSC 162", "credits": 4, "capacity": 28, "room": ["Roddy 140"], "lab": ["Linux"], "conflicts": ["CMSC 140"], "faculty": null},
+        {"course_id": "CMSC 330", "credits": 4, "capacity": 28, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux", "Mac"], "conflicts": ["CMSC 362", "CMSC 366"], "faculty": null},
+        {"course_id": "CMSC 340", "credits": 4, "capacity": 28, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": ["CMSC 380", "CMSC 420", "CMSC 453", "CMSC 476"], "faculty": null},
+        {"course_id": "CMSC 340", "credits": 4, "capacity": 28, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": ["CMSC 362", "CMSC 366", "CMSC 330"], "faculty": null},
+        {"course_id": "CMSC 362", "credits": 4, "capacity": 28, "room": ["Roddy 136"], "lab": ["Linux"], "conflicts": ["CMSC 330", "CMSC 366"], "faculty": null},
+        {"course_id": "CMSC 366", "credits": 4, "capacity": 28, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux", "Mac"], "conflicts": ["CMSC 340", "CMSC 362", "CMSC 330"], "faculty": null},
+        {"course_id": "CMSC 366", "credits": 4, "capacity": 28, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Linux", "Mac"], "conflicts": ["CMSC 362", "CMSC 330"], "faculty": null},
+        {"course_id": "CMSC 380", "credits": 4, "capacity": 28, "room": ["Roddy 140"], "lab": ["Mac", "Linux"], "conflicts": ["CMSC 420", "CMSC 453", "CMSC 476"], "faculty": null},
+        {"course_id": "CMSC 420", "credits": 4, "capacity": 28, "room": ["Roddy 140"], "lab": ["Mac"], "conflicts": ["CMSC 380", "CMSC 453", "CMSC 476"], "faculty": null},
+        {"course_id": "CMSC 453", "credits": 4, "capacity": 28, "room": ["Roddy 136", "Roddy 140", "Roddy 147"], "lab": ["Mac", "Linux"], "conflicts": ["CMSC 380", "CMSC 420", "CMSC 476"], "faculty": null},
+        {"course_id": "CMSC 476", "credits": 4, "capacity": 28, "room": ["Roddy 136"], "lab": ["Linux"], "conflicts": ["CMSC 380", "CMSC 420", "CMSC 453"], "faculty": null}
     ],
     "faculty": [
         {

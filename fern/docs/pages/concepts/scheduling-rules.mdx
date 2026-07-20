@@ -9,17 +9,24 @@ never relax a hard rule.
 
 ## Course assignments
 
-Every configured course section receives exactly one faculty member, room, and compatible meeting pattern.
+Every configured course section receives one faculty member and a compatible meeting pattern. A section receives
+one lecture room when that pattern contains an in-person non-lab meeting or reserves its room during a lab. Fully
+online sections and separately modeled lab-only sections with `reserve_room_during_lab: false` receive no room.
 
-- Faculty and rooms must come from the course's eligible lists.
+- Faculty and any assigned physical room must come from the course's eligible lists.
+- The assigned room's capacity must be at least the section `capacity`, provide all `required_room_features`, and
+  be available for every meeting that consumes it.
 - `faculty: null` derives eligibility from faculty members who have a `course_preferences` key for the course.
-- A course with a non-empty `lab` list receives exactly one listed lab for its single lab-marked meeting.
+- A course with a non-empty `lab` list receives exactly one lab assignment for its lab-marked meeting.
+- The assigned lab must fit the section capacity, provide all required lab features, and be available for that
+  meeting. Additional lab sections are represented as additional course-section entries.
 - A course with `lab: []` uses a no-lab pattern and its generated `lab` and `lab_index` values are `null`.
-- The meeting pattern must have matching credits and matching lab presence.
+- The meeting pattern must have matching credits, lab presence, and course modality.
 - The assigned pattern must fit entirely within the assigned faculty member's availability.
 
 Repeated `course_id` values are separate sections, numbered in configuration order (`CS101.01`, `CS101.02`, and
-so on). A `conflicts` entry names the base course id and therefore applies to every matching section.
+so on) unless a stable `section_id` supplies the suffix. A `conflicts` entry names the base course id and therefore
+applies to every matching section.
 
 ## Faculty workload
 
@@ -39,14 +46,17 @@ mandatory teaching day.
 
 - Courses that declare a conflict cannot overlap.
 - Different sections of the same base course cannot overlap.
-- Two assignments using the same room cannot have any overlapping meetings, including lab-marked meetings.
-- Two assignments using the same lab cannot have overlapping lab meetings.
+- Two assignments using the same room cannot overlap during physical lecture meetings. Lab meetings also occupy
+  that room when their course has `reserve_room_during_lab: true`; when false, the room remains available.
+- Online meetings never occupy a physical room.
+- Two course sections using the same lab cannot have overlapping lab meetings.
 - Courses taught by the same faculty member cannot overlap.
 
 Additional same-faculty rules use `max_time_gap` to decide whether two meetings are adjacent:
 
-- Sections of the same course taught by one faculty member use the same room or lab when their corresponding
-  candidate lists intersect, and have adjacent meeting and lab pairs.
+- Sections of the same course taught by one faculty member use the same room when both selected patterns require
+  one, and use the same lab when both have lab assignments, provided the corresponding candidate lists intersect.
+  Their meeting and lab pairs must also be adjacent where applicable.
 - Different courses taught by one faculty member must not have adjacent meeting pairs; when both use labs,
   their lab meetings must not be adjacent.
 
@@ -60,10 +70,10 @@ inside `optimizer_flags` does not change that registration order.
 | `faculty_course` | The assigned faculty member's configured score for the course id. |
 | `faculty_room` | The assigned faculty member's configured score for the selected room. |
 | `faculty_lab` | The assigned faculty member's configured score for the selected lab. No-lab courses add zero. |
-| `same_room` | One point for each eligible course pair taught by the same faculty member in the same room. |
-| `same_lab` | One point for each eligible lab-course pair taught by the same faculty member in the same lab. |
-| `pack_rooms` | One point for different-course pairs using the same room when any meeting pair is adjacent. |
-| `pack_labs` | One point for different-course pairs using the same lab at adjacent lab times. |
+| `same_room` | One point for each eligible course pair taught by the same faculty member in the same non-null room. |
+| `same_lab` | One point for each eligible course-section pair taught by the same faculty member in the same lab. |
+| `pack_rooms` | One point for different-course pairs using the same non-null room when any meeting pair is adjacent. |
+| `pack_labs` | One point for each different-course section pair using the same lab at adjacent lab times. |
 
 Missing preference keys and explicit preference value `0` contribute zero. Each generated schedule is blocked
 before the next solver check, so enumeration yields distinct complete assignments until `limit`, solver exhaustion,

@@ -159,6 +159,20 @@ def test_structured_validation_diagnostics_include_json_pointer() -> None:
     assert result.diagnostics[0].path.startswith("/")
 
 
+def test_capacity_schema_validation_reports_exact_resource_and_section_paths(minimal_config_path: Path) -> None:
+    data = json.loads(minimal_config_path.read_text(encoding="utf-8"))
+    data["config"]["rooms"] = ["R1"]
+    del data["config"]["courses"][0]["capacity"]
+
+    result = validate_combined_config_data(data)
+
+    assert result.is_valid is False
+    assert {item.path for item in result.diagnostics} >= {
+        "/config/rooms/0",
+        "/config/courses/0/capacity",
+    }
+
+
 def test_diagnosis_finds_an_alternative_independent_core(minimal_config_path: Path) -> None:
     data = json.loads(minimal_config_path.read_text(encoding="utf-8"))
     for name in ("F2", "F3"):
@@ -273,7 +287,10 @@ def test_no_lab_schedule_uses_internal_no_lab_value(minimal_config_path: Path) -
 
 def test_z3_symbol_generation_accepts_colliding_display_names(minimal_config_path: Path) -> None:
     data = json.loads(minimal_config_path.read_text(encoding="utf-8"))
-    data["config"]["rooms"] = ["A B", "A_B"]
+    data["config"]["rooms"] = [
+        {"name": "A B", "capacity": 30},
+        {"name": "A_B", "capacity": 30},
+    ]
     data["config"]["courses"][0]["room"] = ["A B"]
     config = CombinedConfig(**data)
     assert next(Scheduler(config).get_models()) is not None
@@ -348,6 +365,9 @@ def test_server_submit_and_next_schedule(client: TestClient, minimal_combined_co
         assert audit_body["is_valid"] is True
         assert audit_body["faculty_workloads"][0]["faculty"] == "F1"
         assert audit_body["resource_usage"]
+        assert audit_body["resource_usage"][0]["capacity"] == 30
+        assert audit_body["resource_usage"][0]["maximum_assigned_section_capacity"] == 30
+        assert audit_body["resource_usage"][0]["capacity_violations"] == []
         status = client.get(f"/schedules/{schedule_id}/status")
         assert status.status_code == 200, status.text
         status_body = status.json()
@@ -376,6 +396,9 @@ def test_server_reports_unsatisfiable_constraint_groups(
         assert body["conflicting_constraints"][0]["locations"] == ["/config/faculty/0"]
         assert body["configuration_fingerprint"]
         assert body["candidate_domains"][0]["locations"] == ["/config/courses/0"]
+        assert body["candidate_domains"][0]["section_capacity"] == 30
+        assert body["candidate_domains"][0]["capacity_compatible_room_candidates"] == ["R1"]
+        assert body["candidate_domains"][0]["capacity_compatible_lab_candidates"] == ["L1"]
         assert body["capacity_analysis"]
         assert body["day_feasibility"]
         assert body["preflight_findings"]

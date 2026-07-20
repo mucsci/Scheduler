@@ -12,7 +12,9 @@ from scheduler.config import (
     ClassPattern,
     CourseConfig,
     FacultyConfig,
+    LabConfig,
     Meeting,
+    RoomConfig,
     SchedulerConfig,
     TimeBlock,
     TimeRange,
@@ -37,6 +39,8 @@ def _page(relative_path: str) -> str:
         (ClassPattern, ("configuration/time-slots.mdx",)),
         (TimeSlotConfig, ("configuration/time-slots.mdx",)),
         (CourseConfig, ("configuration/courses.mdx",)),
+        (RoomConfig, ("configuration/rooms-labs.mdx",)),
+        (LabConfig, ("configuration/rooms-labs.mdx",)),
         (FacultyConfig, ("configuration/faculty.mdx",)),
         (
             SchedulerConfig,

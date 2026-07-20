@@ -41,6 +41,9 @@ def test_auditor_validates_a_decoded_schedule_without_a_model(
     invalid = auditor.audit_schedule(schedule)
     assert invalid.is_valid is False
     assert any(item.kind == "course_room_eligibility" for item in invalid.constraint_violations)
+    unknown_usage = next(item for item in invalid.resource_usage if item.resource == "not-eligible")
+    assert unknown_usage.capacity is None
+    assert unknown_usage.capacity_violations == ()
 
 
 @pytest.mark.parametrize(
@@ -132,8 +135,8 @@ def test_auditor_detects_overlapping_resources_faculty_and_conflicts() -> None:
 
 def test_auditor_detects_same_course_resource_and_adjacency_rules() -> None:
     data = two_course_config_data(same_course=True)
-    data["config"]["rooms"] = ["R1", "R2"]
-    data["config"]["labs"] = ["L1", "L2"]
+    data["config"]["rooms"] = [{"name": "R1", "capacity": 30}, {"name": "R2", "capacity": 30}]
+    data["config"]["labs"] = [{"name": "L1", "capacity": 30}, {"name": "L2", "capacity": 30}]
     for course in data["config"]["courses"]:
         course["room"] = ["R1", "R2"]
         course["lab"] = ["L1", "L2"]
@@ -204,8 +207,8 @@ def test_auditor_explains_unselected_faculty_preference() -> None:
 def test_auditor_scores_and_explains_all_pair_objectives() -> None:
     data = two_course_config_data()
     data["optimizer_flags"] = ["same_room", "same_lab", "pack_rooms", "pack_labs"]
-    data["config"]["rooms"] = ["R1", "R2"]
-    data["config"]["labs"] = ["L1", "L2"]
+    data["config"]["rooms"] = [{"name": "R1", "capacity": 30}, {"name": "R2", "capacity": 30}]
+    data["config"]["labs"] = [{"name": "L1", "capacity": 30}, {"name": "L2", "capacity": 30}]
     for course in data["config"]["courses"]:
         course["room"] = ["R1", "R2"]
         course["lab"] = ["L1", "L2"]
@@ -228,3 +231,26 @@ def test_auditor_scores_and_explains_all_pair_objectives() -> None:
         "pack_rooms",
         "pack_labs",
     }
+
+
+@pytest.mark.parametrize("resource_kind", ["room", "lab"])
+def test_auditor_reports_undersized_assigned_resources(resource_kind: str) -> None:
+    data = minimal_config_data()
+    data["config"]["courses"][0]["capacity"] = 30
+    plural = resource_kind + "s"
+    field = resource_kind
+    data["config"][plural] = [
+        {"name": f"small-{resource_kind}", "capacity": 29},
+        {"name": f"large-{resource_kind}", "capacity": 30},
+    ]
+    data["config"]["courses"][0][field] = [f"small-{resource_kind}", f"large-{resource_kind}"]
+    problem, schedule, auditor = _solved(config_from(data))
+    setattr(schedule[0], field, f"small-{resource_kind}")
+
+    audit = auditor.audit_schedule(schedule)
+    usage = next(item for item in audit.resource_usage if item.kind == resource_kind)
+
+    assert any(item.kind == f"course_{resource_kind}_capacity" for item in audit.constraint_violations)
+    assert usage.capacity == 29
+    assert usage.maximum_assigned_section_capacity == 30
+    assert usage.capacity_violations

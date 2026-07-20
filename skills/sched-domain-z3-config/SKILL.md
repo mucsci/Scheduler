@@ -29,6 +29,12 @@ When touching types or docs, preserve this distinction to avoid breaking configs
 ## Config workflow
 
 - Representative sample: **`example.json`**; smaller fixtures under **`tests/fixtures/`**.
+- Global rooms and labs are `RoomConfig` / `LabConfig` objects with positive capacity, feature tags, and optional
+  availability. Courses and preference maps reference their names; every course section has expected enrollment
+  and may require features, stable identity, modality, and one optional lab assignment.
+- Capacity, features, resource availability, delivery mode, lab assignment, and optional lecture-room
+  occupancy during labs are separate hard solver rules with tracked artifacts and independent auditor checks; do
+  not fold them invisibly into reference validation.
 - After schema-affecting config changes, regenerate **`fern/docs/assets/combined-config.schema.json`** (see [sched-fern-openapi-docs](../sched-fern-openapi-docs/SKILL.md)).
 
 ## Z3

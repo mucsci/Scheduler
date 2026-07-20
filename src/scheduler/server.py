@@ -6,7 +6,7 @@ from collections.abc import Generator
 from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import click
 from fastapi import BackgroundTasks, FastAPI, HTTPException
@@ -91,6 +91,7 @@ class TimeInstanceResponse(BaseModel):
     day: int = Field(description="Weekday as `Day` enum value (1=Monday … 5=Friday).")
     start: int = Field(description="Start time in minutes since midnight.")
     duration: int = Field(description="Duration in minutes.")
+    delivery: Literal["in_person", "online"] = Field(description="Meeting delivery mode.")
 
 
 class CourseInstanceResponse(BaseModel):
@@ -102,7 +103,7 @@ class CourseInstanceResponse(BaseModel):
         faculty: Faculty member assigned to teach the course.
         times: Ordered lecture and optional lab meeting instances.
         room: Assigned lecture room, or null when absent.
-        lab: Assigned lab resource, or null for a no-lab course.
+        lab: Assigned lab resource, or null for a no-lab section.
         lab_index: Index of the lab meeting in ``times``, or null for no lab.
     """
 
@@ -113,10 +114,7 @@ class CourseInstanceResponse(BaseModel):
     times: list[TimeInstanceResponse]
     room: str | None = Field(default=None, description="Assigned room when present.")
     lab: str | None = Field(default=None, description="Assigned lab when present.")
-    lab_index: int | None = Field(
-        default=None,
-        description="When `lab` is set, index into `times` for the lab meeting.",
-    )
+    lab_index: int | None = Field(default=None, description="Index into `times` for the lab meeting.")
 
 
 def _schedule_response_rows(courses: list[CourseInstance]) -> list[CourseInstanceResponse]:
@@ -379,11 +377,26 @@ class CandidateDomainDiagnosticResponse(BaseModel):
         faculty_origin: Whether eligibility was explicit or preference-derived.
         room_candidates: Rooms eligible for the course.
         lab_candidates: Labs eligible for the course, empty for no-lab courses.
+        section_capacity: Expected enrollment that assigned resources must accommodate.
+        capacity_compatible_room_candidates: Allowed rooms large enough for the section.
+        capacity_compatible_lab_candidates: Allowed labs large enough for the section.
+        room_capacity_rejections: Bounded explanations for undersized allowed rooms.
+        room_capacity_rejection_count: Total number of undersized allowed rooms.
+        room_capacity_rejections_truncated: Whether room rejection details were capped.
+        lab_capacity_rejections: Bounded explanations for undersized allowed labs.
+        lab_capacity_rejection_count: Total number of undersized allowed labs.
+        lab_capacity_rejections_truncated: Whether lab rejection details were capped.
         compatible_time_patterns: Time-slot patterns compatible with course semantics.
         availability_by_faculty: Availability findings for each candidate faculty.
         rejected_patterns: Detailed reasons sampled from rejected patterns.
         rejected_pattern_count: Total number of rejected patterns.
         rejected_patterns_truncated: Whether detailed rejection output was capped.
+        modality: Required meeting-delivery composition.
+        required_room_features: Features required from the lecture room.
+        required_lab_features: Features required from every lab.
+        feature_compatible_room_candidates: Allowed rooms satisfying feature requirements.
+        feature_compatible_lab_candidates: Allowed labs satisfying feature requirements.
+        reserve_room_during_lab: Whether lab meetings consume the lecture room.
     """
 
     course: str
@@ -392,11 +405,26 @@ class CandidateDomainDiagnosticResponse(BaseModel):
     faculty_origin: str
     room_candidates: list[str]
     lab_candidates: list[str]
+    section_capacity: int
+    capacity_compatible_room_candidates: list[str]
+    capacity_compatible_lab_candidates: list[str]
+    room_capacity_rejections: list[ConstraintDiagnosticResponse]
+    room_capacity_rejection_count: int
+    room_capacity_rejections_truncated: bool
+    lab_capacity_rejections: list[ConstraintDiagnosticResponse]
+    lab_capacity_rejection_count: int
+    lab_capacity_rejections_truncated: bool
     compatible_time_patterns: list[str]
     availability_by_faculty: list[ConstraintDiagnosticResponse]
     rejected_patterns: list[ConstraintDiagnosticResponse]
     rejected_pattern_count: int
     rejected_patterns_truncated: bool
+    modality: str
+    required_room_features: list[str]
+    required_lab_features: list[str]
+    feature_compatible_room_candidates: list[str]
+    feature_compatible_lab_candidates: list[str]
+    reserve_room_during_lab: bool
 
 
 class ProvenanceEdgeResponse(BaseModel):
@@ -508,19 +536,25 @@ class FacultyWorkloadDiagnosticResponse(BaseModel):
 
 class ResourceUsageDiagnosticResponse(BaseModel):
     """
-    Assignment and collision summary for one room, lab, or faculty resource.
+    Assignment and collision summary for one room or lab resource.
 
     Fields:
         kind: Resource category represented by this row.
         resource: Configured resource identifier.
         assignments: Course assignments consuming the resource.
         collisions: Detected overlap violations involving the resource.
+        capacity: Configured student capacity, or null for an unknown resource in a mutated Python audit.
+        maximum_assigned_section_capacity: Largest assigned section enrollment using the resource.
+        capacity_violations: Assigned sections that exceed configured capacity.
     """
 
     kind: str
     resource: str
     assignments: list[str]
     collisions: list[ConstraintDiagnosticResponse]
+    capacity: int | None
+    maximum_assigned_section_capacity: int
+    capacity_violations: list[ConstraintDiagnosticResponse]
 
 
 class ObjectiveScoreDiagnosticResponse(BaseModel):
@@ -617,11 +651,26 @@ def _candidate_domain_response(domain: CandidateDomainDiagnostic) -> CandidateDo
         faculty_origin=domain.faculty_origin,
         room_candidates=list(domain.room_candidates),
         lab_candidates=list(domain.lab_candidates),
+        section_capacity=domain.section_capacity,
+        capacity_compatible_room_candidates=list(domain.capacity_compatible_room_candidates),
+        capacity_compatible_lab_candidates=list(domain.capacity_compatible_lab_candidates),
+        room_capacity_rejections=[_constraint_diagnostic_response(item) for item in domain.room_capacity_rejections],
+        room_capacity_rejection_count=domain.room_capacity_rejection_count,
+        room_capacity_rejections_truncated=domain.room_capacity_rejections_truncated,
+        lab_capacity_rejections=[_constraint_diagnostic_response(item) for item in domain.lab_capacity_rejections],
+        lab_capacity_rejection_count=domain.lab_capacity_rejection_count,
+        lab_capacity_rejections_truncated=domain.lab_capacity_rejections_truncated,
         compatible_time_patterns=list(domain.compatible_time_patterns),
         availability_by_faculty=[_constraint_diagnostic_response(item) for item in domain.availability_by_faculty],
         rejected_patterns=[_constraint_diagnostic_response(item) for item in domain.rejected_patterns],
         rejected_pattern_count=domain.rejected_pattern_count,
         rejected_patterns_truncated=domain.rejected_patterns_truncated,
+        modality=domain.modality,
+        required_room_features=list(domain.required_room_features),
+        required_lab_features=list(domain.required_lab_features),
+        feature_compatible_room_candidates=list(domain.feature_compatible_room_candidates),
+        feature_compatible_lab_candidates=list(domain.feature_compatible_lab_candidates),
+        reserve_room_during_lab=domain.reserve_room_during_lab,
     )
 
 
@@ -693,6 +742,11 @@ def _schedule_audit_response(schedule_id: str, index: int, audit: ScheduleAudit)
                 resource=item.resource,
                 assignments=list(item.assignments),
                 collisions=[_constraint_diagnostic_response(collision) for collision in item.collisions],
+                capacity=item.capacity,
+                maximum_assigned_section_capacity=item.maximum_assigned_section_capacity,
+                capacity_violations=[
+                    _constraint_diagnostic_response(violation) for violation in item.capacity_violations
+                ],
             )
             for item in audit.resource_usage
         ],
@@ -923,7 +977,7 @@ def _count_meeting_starts(meeting, time_blocks, fallback_start: str | None) -> i
 
 
 def _estimate_candidate_slots(request: CombinedConfig, limit: int) -> int:
-    """Cheap upper bound for the Cartesian products used by TimeSlotGenerator."""
+    """Return a bounded upper estimate for generated candidate time slots."""
     required_credits = {course.credits for course in request.config.courses}
     estimate = 0
     for pattern in request.time_slot_config.classes:

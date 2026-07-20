@@ -45,6 +45,23 @@ def _json_pointer(location: tuple[object, ...]) -> str:
     return "/" + "/".join(str(part).replace("~", "~0").replace("/", "~1") for part in location)
 
 
+def _canonicalize_configuration_value(value):
+    """Convert unordered configuration containers into stable JSON data."""
+    if isinstance(value, dict):
+        return {str(key): _canonicalize_configuration_value(item) for key, item in value.items()}
+    if isinstance(value, set | frozenset):
+        return sorted((_canonicalize_configuration_value(item) for item in value), key=str)
+    if isinstance(value, list | tuple):
+        return [_canonicalize_configuration_value(item) for item in value]
+    return value
+
+
+def _configuration_fingerprint(config: CombinedConfig) -> str:
+    canonical_data = _canonicalize_configuration_value(config.model_dump(mode="python"))
+    canonical = json.dumps(canonical_data, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode()).hexdigest()
+
+
 def validate_combined_config_data(payload: Mapping[str, Any]) -> ConfigurationValidationResult:
     """Validate untrusted combined configuration data into a structured result.
 
@@ -80,8 +97,7 @@ def validate_combined_config_data(payload: Mapping[str, Any]) -> ConfigurationVa
             )
         return ConfigurationValidationResult(is_valid=False, diagnostics=tuple(diagnostics))
 
-    canonical = json.dumps(config.model_dump(mode="json"), sort_keys=True, separators=(",", ":"))
     return ConfigurationValidationResult(
         is_valid=True,
-        configuration_fingerprint=hashlib.sha256(canonical.encode()).hexdigest(),
+        configuration_fingerprint=_configuration_fingerprint(config),
     )

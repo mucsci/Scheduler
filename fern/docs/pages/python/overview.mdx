@@ -39,6 +39,12 @@ if not validation.is_valid:
 Valid input includes a stable `configuration_fingerprint`. See **Diagnostics and auditing** for the validation
 contract.
 
+Global resources are `RoomConfig(name=..., capacity=..., features=..., times=...)` and
+`LabConfig(name=..., capacity=..., features=..., times=...)` objects; course candidate lists and faculty preference
+keys continue to use resource-name strings. Every `CourseConfig` requires a positive expected-enrollment `capacity`
+and can additionally declare `section_id`, `modality`, required resource features, and
+`reserve_room_during_lab`.
+
 ## Construct a scheduler
 
 ```python
@@ -98,7 +104,9 @@ can raise `KeyError` while preference scoring is enabled.
 
 The root package exports the stable solver-independent contracts used by validation, diagnosis, and auditing,
 including `ConfigurationValidationResult`, `ScheduleDiagnosis`, `ConstraintDiagnostic`, `RepairSetDiagnostic`,
-`ScheduleAudit`, `FacultyWorkloadDiagnostic`, and `ObjectiveScoreDiagnostic`. Their complete field documentation is
+`CandidateDomainDiagnostic`, `CapacityDiagnostic`, `DayFeasibilityDiagnostic`,
+`ProvenanceEdge`, `RelaxationSuggestion`, `ScheduleAudit`, `FacultyWorkloadDiagnostic`,
+`ResourceUsageDiagnostic`, and `ObjectiveScoreDiagnostic`. Their complete field documentation is
 available under **Reference**.
 
 ## Writers
@@ -117,14 +125,16 @@ with JSONWriter("schedules.json") as json_writer, CSVWriter("schedules.csv") as 
 ## Naming: two different `Course` concepts
 
 - `scheduler.config.Course` is a string course-id type alias used by JSON configuration.
-- `scheduler.models.Course` is the runtime class containing credits, section identity, and compatibility mirrors.
+- `scheduler.models.Course` is the Z3-free runtime class containing credits and section identity.
 - Generated values are `CourseInstance`; use `.course.course_id` for the base configuration id.
+- `.lab` is the assigned lab name and `.lab_index` identifies its lab-marked meeting; both are `None` for no-lab
+  sections.
 
 ## Full API surface
 
 See **Reference** for Fern-generated pages covering importable modules, public callables, parameters, exceptions,
 execution semantics, and datatype fields. `Scheduler` is the stable façade; `SchedulingProblem`, `SolverEngine`,
-`DiagnosticEngine`, and `ScheduleAuditor` are internal architectural components despite being importable from their
+`RoomConfig` and `LabConfig` are public configuration models. `DiagnosticEngine` and `ScheduleAuditor` are internal architectural components despite being importable from their
 implementation modules.
 
 ## Local regeneration

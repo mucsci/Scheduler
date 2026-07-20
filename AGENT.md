@@ -52,6 +52,10 @@ skills/            # task playbooks (SKILL.md per subfolder) for assistants and 
 5. **Documentation parity**: Configuration fields, public façade methods, REST routes, API limit variables, and
    canonical examples are checked by `tests/test_documentation_parity.py`; update the corresponding Fern guide
    whenever one of those implementation surfaces changes.
+6. **Physical resources and sections**: `SchedulerConfig.rooms` and `labs` contain capacity-, feature-, and
+   availability-bearing objects, while references and output remain name-based. Courses can require features and
+   one optional lab assignment per course section. Keep capacity, feature, availability, delivery, and room-during-lab rules
+   separately tracked in the solver, diagnostics, and auditor.
 
 ## Skills
 

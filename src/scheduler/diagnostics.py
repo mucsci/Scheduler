@@ -17,11 +17,12 @@ from .contracts import (
     RepairSetDiagnostic,
     ScheduleDiagnosis,
 )
-from .models import Course, Day, TimeSlot
+from .models import Course, Day, TimeInstance, TimeSlot
 from .problem import SchedulingProblem
 from .solver import DiagnosticConstraintArtifact, SolverArtifacts
 
 MAX_REJECTED_PATTERN_DIAGNOSTICS = 128
+MAX_RESOURCE_CAPACITY_REJECTION_DIAGNOSTICS = 128
 MAX_PAIR_PATTERN_COMPARISONS = 4_096
 
 
@@ -46,6 +47,15 @@ class DiagnosticEngine:
         self._ranges = problem.slot_ranges
         self._course_config_paths = problem.course_config_paths
         self._course_faculty_origins = problem.course_faculty_origins
+        self._courses_by_name = {str(course): course for course in self._courses}
+        self._room_capacities = {name: policy.capacity for name, policy in problem.room_policies.items()}
+        self._lab_capacities = {name: policy.capacity for name, policy in problem.lab_policies.items()}
+        self._room_features = {name: policy.features for name, policy in problem.room_policies.items()}
+        self._lab_features = {name: policy.features for name, policy in problem.lab_policies.items()}
+        self._room_availability = {name: policy.availability for name, policy in problem.room_policies.items()}
+        self._lab_availability = {name: policy.availability for name, policy in problem.lab_policies.items()}
+        self._room_config_paths = {name: policy.config_path for name, policy in problem.room_policies.items()}
+        self._lab_config_paths = {name: policy.config_path for name, policy in problem.lab_policies.items()}
         policies = problem.faculty_policies
         self._faculty_config_paths = {name: policy.config_path for name, policy in policies.items()}
         self._faculty_maximum_credits = {name: policy.maximum_credits for name, policy in policies.items()}
@@ -134,7 +144,21 @@ class DiagnosticEngine:
             "course_time_pattern": "credits",
             "course_lab_eligibility": "lab",
             "course_room_eligibility": "room",
+            "course_room_capacity": "capacity",
+            "course_room_capacity_shortfall": "capacity",
+            "course_room_candidate_capacity": "capacity",
+            "course_room_features": "required_room_features",
+            "course_room_feature_shortfall": "required_room_features",
+            "course_room_availability": "room",
+            "course_room_resource_shortfall": "room",
             "course_faculty_eligibility": "faculty",
+            "course_lab_capacity": "capacity",
+            "course_lab_capacity_shortfall": "capacity",
+            "course_lab_candidate_capacity": "capacity",
+            "course_lab_features": "required_lab_features",
+            "course_lab_feature_shortfall": "required_lab_features",
+            "course_lab_availability": "lab",
+            "course_lab_resource_shortfall": "lab",
             "course_conflict": "conflicts",
             "faculty_availability": "times",
             "faculty_credit_range": None,
@@ -150,6 +174,58 @@ class DiagnosticEngine:
             if faculty_path is not None:
                 field = field_by_kind.get(kind)
                 locations.append(f"{faculty_path}/{field}" if field else faculty_path)
+            if subject in self._room_config_paths and "room" in kind and "capacity" in kind:
+                locations.append(self._room_config_paths[subject] + "/capacity")
+            if subject in self._room_config_paths and "room" in kind and "feature" in kind:
+                locations.append(self._room_config_paths[subject] + "/features")
+            if subject in self._room_config_paths and "room" in kind and "availability" in kind:
+                locations.append(self._room_config_paths[subject] + "/times")
+            if subject in self._lab_config_paths and "lab" in kind and "capacity" in kind:
+                locations.append(self._lab_config_paths[subject] + "/capacity")
+            if subject in self._lab_config_paths and "lab" in kind and "feature" in kind:
+                locations.append(self._lab_config_paths[subject] + "/features")
+            if subject in self._lab_config_paths and "lab" in kind and "availability" in kind:
+                locations.append(self._lab_config_paths[subject] + "/times")
+        if kind in {"course_room_capacity", "course_room_capacity_shortfall"} and subjects:
+            course = self._courses_by_name.get(subjects[0])
+            if course is not None:
+                locations.extend(self._room_config_paths[room] + "/capacity" for room in course.rooms)
+        if kind in {"course_lab_capacity", "course_lab_capacity_shortfall"} and subjects:
+            course = self._courses_by_name.get(subjects[0])
+            if course is not None:
+                locations.extend(self._lab_config_paths[lab] + "/capacity" for lab in course.labs)
+        if kind in {"course_room_features", "course_room_feature_shortfall"} and subjects:
+            course = self._courses_by_name.get(subjects[0])
+            if course is not None:
+                locations.extend(self._room_config_paths[room] + "/features" for room in course.rooms)
+        if kind in {"course_lab_features", "course_lab_feature_shortfall"} and subjects:
+            course = self._courses_by_name.get(subjects[0])
+            if course is not None:
+                locations.extend(self._lab_config_paths[lab] + "/features" for lab in course.labs)
+        if kind == "course_room_availability" and subjects:
+            course = self._courses_by_name.get(subjects[0])
+            if course is not None:
+                locations.extend(self._room_config_paths[room] + "/times" for room in course.rooms)
+        if kind == "course_lab_availability" and subjects:
+            course = self._courses_by_name.get(subjects[0])
+            if course is not None:
+                locations.extend(self._lab_config_paths[lab] + "/times" for lab in course.labs)
+        if kind == "course_room_resource_shortfall" and subjects:
+            course = self._courses_by_name.get(subjects[0])
+            if course is not None:
+                locations.extend(
+                    self._room_config_paths[room] + suffix
+                    for room in course.rooms
+                    for suffix in ("/capacity", "/features", "/times")
+                )
+        if kind == "course_lab_resource_shortfall" and subjects:
+            course = self._courses_by_name.get(subjects[0])
+            if course is not None:
+                locations.extend(
+                    self._lab_config_paths[lab] + suffix
+                    for lab in course.labs
+                    for suffix in ("/capacity", "/features", "/times")
+                )
         if kind in {"course_time_pattern", "course_lab_eligibility", "faculty_availability"}:
             locations.append("/time_slot_config/classes")
         if kind in {"shared_room_overlap", "same_course_room"}:
@@ -169,6 +245,47 @@ class DiagnosticEngine:
 
     def _compatible_slots(self, course: Course) -> tuple[TimeSlot, ...]:
         return self._problem.compatible_slots(course)
+
+    @staticmethod
+    def _times_available(times: tuple[TimeInstance, ...], availability: tuple[TimeInstance, ...] | None) -> bool:
+        if availability is None:
+            return True
+        return all(
+            any(
+                meeting.day == window.day and window.start <= meeting.start and meeting.stop <= window.stop
+                for window in availability
+            )
+            for meeting in times
+        )
+
+    def _lab_time_available(self, slot: TimeSlot, availability: tuple[TimeInstance, ...] | None) -> bool:
+        lab_time = slot.lab_time()
+        return lab_time is not None and self._times_available((lab_time,), availability)
+
+    @staticmethod
+    def _room_times(course: Course, slot: TimeSlot) -> tuple[TimeInstance, ...]:
+        """Return meetings that occupy the course's lecture room for one slot."""
+        times = list(slot.physical_lecture_times())
+        lab_time = slot.lab_time()
+        if course.reserve_room_during_lab and lab_time is not None:
+            times.append(lab_time)
+        return tuple(times)
+
+    @staticmethod
+    def _meetings_overlap(left: tuple[TimeInstance, ...], right: tuple[TimeInstance, ...]) -> bool:
+        """Return whether any two meetings in the supplied occupancy sets overlap."""
+        return any(TimeSlot._overlaps(first, second) for first in left for second in right)
+
+    def _room_is_required_for_all_patterns(self, course: Course) -> bool:
+        """Return whether every compatible pattern requires a lecture room."""
+        compatible_slots = self._compatible_slots(course)
+        return bool(compatible_slots) and all(
+            self._problem._slot_requires_room(
+                slot,
+                reserve_room_during_lab=course.reserve_room_during_lab,
+            )
+            for slot in compatible_slots
+        )
 
     @staticmethod
     def _any_pattern_pair(
@@ -212,7 +329,14 @@ class DiagnosticEngine:
                 rejected_pattern_count += 1
                 if len(rejected_patterns) >= MAX_REJECTED_PATTERN_DIAGNOSTICS:
                     continue
-                reason = "credit count" if slot not in credit_slots else "lab requirement"
+                if slot not in credit_slots:
+                    reason = "credit count"
+                elif slot.has_lab() != bool(course.labs):
+                    reason = "lab requirement"
+                elif self._problem._slot_modality(slot) != course.modality:
+                    reason = "delivery modality"
+                else:
+                    reason = "lecture-room occupancy"
                 rejected_patterns.append(
                     self._make_diagnostic(
                         "rejected_time_pattern",
@@ -220,6 +344,34 @@ class DiagnosticEngine:
                         f"Course {course} rejects pattern {slot} because its {reason} does not match",
                     )
                 )
+            compatible_rooms = tuple(room for room in course.rooms if self._room_capacities[room] >= course.capacity)
+            compatible_labs = tuple(lab for lab in course.labs if self._lab_capacities[lab] >= course.capacity)
+            feature_compatible_rooms = tuple(
+                room for room in course.rooms if course.required_room_features <= self._room_features[room]
+            )
+            feature_compatible_labs = tuple(
+                lab for lab in course.labs if course.required_lab_features <= self._lab_features[lab]
+            )
+            rejected_rooms = [room for room in course.rooms if room not in compatible_rooms]
+            rejected_labs = [lab for lab in course.labs if lab not in compatible_labs]
+            room_capacity_rejections = tuple(
+                self._make_diagnostic(
+                    "course_room_candidate_capacity",
+                    (str(course), room),
+                    f"Room {room} has capacity {self._room_capacities[room]}, below course {course}'s "
+                    f"required capacity {course.capacity}",
+                )
+                for room in rejected_rooms[:MAX_RESOURCE_CAPACITY_REJECTION_DIAGNOSTICS]
+            )
+            lab_capacity_rejections = tuple(
+                self._make_diagnostic(
+                    "course_lab_candidate_capacity",
+                    (str(course), lab),
+                    f"Lab {lab} has capacity {self._lab_capacities[lab]}, below course {course}'s "
+                    f"required capacity {course.capacity}",
+                )
+                for lab in rejected_labs[:MAX_RESOURCE_CAPACITY_REJECTION_DIAGNOSTICS]
+            )
             domains.append(
                 CandidateDomainDiagnostic(
                     course=str(course),
@@ -228,11 +380,26 @@ class DiagnosticEngine:
                     faculty_origin=self._course_faculty_origins[str(course)],
                     room_candidates=tuple(course.rooms),
                     lab_candidates=tuple(course.labs),
+                    section_capacity=course.capacity,
+                    capacity_compatible_room_candidates=compatible_rooms,
+                    capacity_compatible_lab_candidates=compatible_labs,
+                    room_capacity_rejections=room_capacity_rejections,
+                    room_capacity_rejection_count=len(rejected_rooms),
+                    room_capacity_rejections_truncated=len(rejected_rooms) > len(room_capacity_rejections),
+                    lab_capacity_rejections=lab_capacity_rejections,
+                    lab_capacity_rejection_count=len(rejected_labs),
+                    lab_capacity_rejections_truncated=len(rejected_labs) > len(lab_capacity_rejections),
                     compatible_time_patterns=tuple(map(str, compatible_slots)),
                     availability_by_faculty=tuple(availability),
                     rejected_patterns=tuple(rejected_patterns),
                     rejected_pattern_count=rejected_pattern_count,
                     rejected_patterns_truncated=rejected_pattern_count > len(rejected_patterns),
+                    modality=course.modality,
+                    required_room_features=tuple(sorted(course.required_room_features)),
+                    required_lab_features=tuple(sorted(course.required_lab_features)),
+                    feature_compatible_room_candidates=feature_compatible_rooms,
+                    feature_compatible_lab_candidates=feature_compatible_labs,
+                    reserve_room_during_lab=course.reserve_room_during_lab,
                 )
             )
         return tuple(domains)
@@ -240,6 +407,35 @@ class DiagnosticEngine:
     def _capacity_analysis(self) -> tuple[CapacityDiagnostic, ...]:
         """Evaluate cheap necessary conditions and forced-resource bottlenecks."""
         diagnostics: list[CapacityDiagnostic] = []
+        for course in self._courses:
+            if course.rooms and self._room_is_required_for_all_patterns(course):
+                diagnostics.append(
+                    CapacityDiagnostic(
+                        kind="course_room_capacity_coverage",
+                        subjects=(str(course), *course.rooms),
+                        message=f"Largest allowed room capacity available to course {course}",
+                        required=course.capacity,
+                        available=max(self._room_capacities[room] for room in course.rooms),
+                        locations=(
+                            self._course_config_paths[str(course)] + "/capacity",
+                            *(self._room_config_paths[room] + "/capacity" for room in course.rooms),
+                        ),
+                    )
+                )
+            if course.labs:
+                diagnostics.append(
+                    CapacityDiagnostic(
+                        kind="course_lab_capacity_coverage",
+                        subjects=(str(course), *course.labs),
+                        message=f"Largest allowed lab capacity available to course {course}",
+                        required=course.capacity,
+                        available=max(self._lab_capacities[lab] for lab in course.labs),
+                        locations=(
+                            self._course_config_paths[str(course)] + "/capacity",
+                            *(self._lab_config_paths[lab] + "/capacity" for lab in course.labs),
+                        ),
+                    )
+                )
         total_credits = sum(course.credits for course in self._courses)
         diagnostics.append(
             CapacityDiagnostic(
@@ -347,11 +543,25 @@ class DiagnosticEngine:
                         f"non-overlapping pattern pairs for courses forced to faculty {first.faculties[0]}",
                     )
                 )
-            if first.rooms == second.rooms and len(first.rooms) == 1:
+            if (
+                first.rooms == second.rooms
+                and len(first.rooms) == 1
+                and self._room_is_required_for_all_patterns(first)
+                and self._room_is_required_for_all_patterns(second)
+            ):
                 requirements.append(
                     (
                         "forced_shared_room_separation",
-                        self._any_pattern_pair(first_slots, second_slots, lambda left, right: not left.overlaps(right)),
+                        self._any_pattern_pair(
+                            first_slots,
+                            second_slots,
+                            lambda left, right, first_course=first, second_course=second: (
+                                not self._meetings_overlap(
+                                    self._room_times(first_course, left),
+                                    self._room_times(second_course, right),
+                                )
+                            ),
+                        ),
                         (
                             self._course_config_paths[str(first)] + "/room",
                             self._course_config_paths[str(second)] + "/room",
@@ -410,7 +620,8 @@ class DiagnosticEngine:
             for course in self._courses:
                 candidates = getattr(course, attribute)
                 compatible_slots = self._compatible_slots(course)
-                if len(candidates) == 1 and len(compatible_slots) == 1:
+                room_candidate_is_forced = resource_kind != "room" or self._room_is_required_for_all_patterns(course)
+                if len(candidates) == 1 and len(compatible_slots) == 1 and room_candidate_is_forced:
                     bottleneck_groups[(candidates[0], str(compatible_slots[0]))].append(course)
             for (resource, pattern), courses in bottleneck_groups.items():
                 if len(courses) < 2:
@@ -503,6 +714,7 @@ class DiagnosticEngine:
         """Surface deterministic impossibilities before an unsat core is inspected."""
         findings: list[ConstraintDiagnostic] = []
         for domain in domains:
+            course = self._courses_by_name[domain.course]
             if domain.faculty_origin == "derived_from_preferences":
                 findings.append(
                     self._make_diagnostic(
@@ -520,6 +732,61 @@ class DiagnosticEngine:
                         f"Course {domain.course} has no meeting pattern matching its credits and lab requirement",
                     )
                 )
+            room_is_required = self._room_is_required_for_all_patterns(course)
+            if room_is_required and not domain.feature_compatible_room_candidates:
+                findings.append(
+                    self._make_diagnostic(
+                        "course_room_feature_shortfall",
+                        (domain.course, *course.rooms),
+                        f"No allowed room provides all features required by {domain.course}: "
+                        f"{sorted(course.required_room_features)}",
+                    )
+                )
+            if course.labs and not domain.feature_compatible_lab_candidates:
+                findings.append(
+                    self._make_diagnostic(
+                        "course_lab_feature_shortfall",
+                        (domain.course, *course.labs),
+                        f"No allowed lab provides all features required by {domain.course}: "
+                        f"{sorted(course.required_lab_features)}",
+                    )
+                )
+
+            compatible_slots = self._compatible_slots(course)
+            if room_is_required and not any(
+                self._room_capacities[room] >= course.capacity
+                and course.required_room_features <= self._room_features[room]
+                and any(
+                    self._times_available(
+                        self._room_times(course, slot),
+                        self._room_availability[room],
+                    )
+                    for slot in compatible_slots
+                )
+                for room in course.rooms
+            ):
+                findings.append(
+                    self._make_diagnostic(
+                        "course_room_resource_shortfall",
+                        (domain.course, *course.rooms),
+                        "No allowed room simultaneously satisfies capacity, features, and availability for "
+                        f"{domain.course}",
+                    )
+                )
+            if course.labs and not any(
+                self._lab_capacities[lab] >= course.capacity
+                and course.required_lab_features <= self._lab_features[lab]
+                and any(self._lab_time_available(slot, self._lab_availability[lab]) for slot in compatible_slots)
+                for lab in course.labs
+            ):
+                findings.append(
+                    self._make_diagnostic(
+                        "course_lab_resource_shortfall",
+                        (domain.course, *course.labs),
+                        f"No allowed lab simultaneously satisfies capacity, features, and availability for "
+                        f"{domain.course}",
+                    )
+                )
             for availability in domain.availability_by_faculty:
                 if availability.message.split(" in ", 1)[1].startswith("0 of"):
                     findings.append(
@@ -532,9 +799,13 @@ class DiagnosticEngine:
                     )
         for capacity in capacities:
             if capacity.required > capacity.available:
+                finding_kind = {
+                    "course_room_capacity_coverage": "course_room_capacity_shortfall",
+                    "course_lab_capacity_coverage": "course_lab_capacity_shortfall",
+                }.get(capacity.kind, "capacity_shortfall")
                 findings.append(
                     self._make_diagnostic(
-                        "capacity_shortfall",
+                        finding_kind,
                         capacity.subjects,
                         f"{capacity.message}: required {capacity.required}, available {capacity.available}",
                     )
@@ -560,12 +831,100 @@ class DiagnosticEngine:
             )
             edges.append(
                 ProvenanceEdge(
+                    source=course_path + "/required_room_features",
+                    target=f"candidate-domain:{domain.course}",
+                    relationship="filters_room_features",
+                    subjects=(domain.course,),
+                )
+            )
+            edges.append(
+                ProvenanceEdge(
+                    source=course_path + "/required_lab_features",
+                    target=f"candidate-domain:{domain.course}",
+                    relationship="filters_lab_features",
+                    subjects=(domain.course,),
+                )
+            )
+            edges.append(
+                ProvenanceEdge(
                     source="/time_slot_config/classes",
                     target=f"candidate-domain:{domain.course}",
                     relationship="generates_compatible_patterns",
                     subjects=(domain.course,),
                 )
             )
+            edges.append(
+                ProvenanceEdge(
+                    source=course_path + "/capacity",
+                    target=f"candidate-domain:{domain.course}",
+                    relationship="defines_section_capacity",
+                    subjects=(domain.course,),
+                )
+            )
+            compatible_rooms = set(domain.capacity_compatible_room_candidates)
+            for room in domain.room_candidates:
+                edges.append(
+                    ProvenanceEdge(
+                        source=self._room_config_paths[room] + "/capacity",
+                        target=f"candidate:{domain.course}:room:{room}",
+                        relationship=(
+                            "satisfies_section_capacity" if room in compatible_rooms else "below_section_capacity"
+                        ),
+                        subjects=(domain.course, room),
+                    )
+                )
+                edges.append(
+                    ProvenanceEdge(
+                        source=self._room_config_paths[room] + "/features",
+                        target=f"candidate:{domain.course}:room:{room}",
+                        relationship=(
+                            "satisfies_required_features"
+                            if room in domain.feature_compatible_room_candidates
+                            else "missing_required_features"
+                        ),
+                        subjects=(domain.course, room),
+                    )
+                )
+                edges.append(
+                    ProvenanceEdge(
+                        source=self._room_config_paths[room] + "/times",
+                        target=f"candidate:{domain.course}:room:{room}",
+                        relationship="defines_resource_availability",
+                        subjects=(domain.course, room),
+                    )
+                )
+            compatible_labs = set(domain.capacity_compatible_lab_candidates)
+            for lab in domain.lab_candidates:
+                edges.append(
+                    ProvenanceEdge(
+                        source=self._lab_config_paths[lab] + "/capacity",
+                        target=f"candidate:{domain.course}:lab:{lab}",
+                        relationship=(
+                            "satisfies_section_capacity" if lab in compatible_labs else "below_section_capacity"
+                        ),
+                        subjects=(domain.course, lab),
+                    )
+                )
+                edges.append(
+                    ProvenanceEdge(
+                        source=self._lab_config_paths[lab] + "/features",
+                        target=f"candidate:{domain.course}:lab:{lab}",
+                        relationship=(
+                            "satisfies_required_features"
+                            if lab in domain.feature_compatible_lab_candidates
+                            else "missing_required_features"
+                        ),
+                        subjects=(domain.course, lab),
+                    )
+                )
+                edges.append(
+                    ProvenanceEdge(
+                        source=self._lab_config_paths[lab] + "/times",
+                        target=f"candidate:{domain.course}:lab:{lab}",
+                        relationship="defines_resource_availability",
+                        subjects=(domain.course, lab),
+                    )
+                )
             for faculty in domain.faculty_candidates:
                 source = (
                     self._faculty_config_paths[faculty] + "/course_preferences"
@@ -779,7 +1138,7 @@ class DiagnosticEngine:
                     )
                 )
 
-            if len(course.rooms) == 1:
+            if len(course.rooms) == 1 and self._room_is_required_for_all_patterns(course):
                 facts.append(
                     ConstraintDiagnostic(
                         kind="forced_course_room",
@@ -796,12 +1155,38 @@ class DiagnosticEngine:
                     )
                 )
 
-            start, stop = self._ranges[course.credits]
-            compatible_patterns = [
-                slot
-                for index, slot in enumerate(self._slots)
-                if start <= index <= stop and slot.has_lab() == bool(course.labs)
-            ]
+            if any(
+                diagnostic.kind == "course_room_capacity" and diagnostic.subjects[0] == str(course)
+                for diagnostic in conflicts
+            ):
+                for room in course.rooms:
+                    facts.append(
+                        ConstraintDiagnostic(
+                            kind="course_room_candidate_capacity",
+                            subjects=(str(course), room),
+                            message=(
+                                f"Room {room} provides capacity {self._room_capacities[room]} for course {course}, "
+                                f"which requires {course.capacity}"
+                            ),
+                        )
+                    )
+            if any(
+                diagnostic.kind == "course_lab_capacity" and diagnostic.subjects[0] == str(course)
+                for diagnostic in conflicts
+            ):
+                for lab in course.labs:
+                    facts.append(
+                        ConstraintDiagnostic(
+                            kind="course_lab_candidate_capacity",
+                            subjects=(str(course), lab),
+                            message=(
+                                f"Lab {lab} provides capacity {self._lab_capacities[lab]} for course "
+                                f"{course}, which requires {course.capacity}"
+                            ),
+                        )
+                    )
+
+            compatible_patterns = self._compatible_slots(course)
             if len(compatible_patterns) == 1:
                 facts.append(
                     ConstraintDiagnostic(
@@ -831,15 +1216,7 @@ class DiagnosticEngine:
                 for diagnostic in conflicts
             ):
                 for course in forced_courses:
-                    start, stop = self._ranges[course.credits]
-                    days = sorted(
-                        {
-                            time.day.name
-                            for index, slot in enumerate(self._slots)
-                            if start <= index <= stop and slot.has_lab() == bool(course.labs)
-                            for time in slot.times
-                        }
-                    )
+                    days = sorted({time.day.name for slot in self._compatible_slots(course) for time in slot.times})
                     facts.append(
                         ConstraintDiagnostic(
                             kind="course_possible_teaching_days",
@@ -868,12 +1245,7 @@ class DiagnosticEngine:
             for course in self._courses:
                 if faculty not in course.faculties:
                     continue
-                start, stop = self._ranges[course.credits]
-                compatible = [
-                    slot
-                    for index, slot in enumerate(self._slots)
-                    if start <= index <= stop and slot.has_lab() == bool(course.labs)
-                ]
+                compatible = self._compatible_slots(course)
                 day_compatible = [slot for slot in compatible if any(time.day == day for time in slot.times)]
                 if not day_compatible:
                     facts.append(
@@ -958,6 +1330,72 @@ class DiagnosticEngine:
                         subjects=conflict.subjects,
                         message=(
                             f"Add another room or lab candidate for {conflict.subjects[0]} or {conflict.subjects[1]}"
+                        ),
+                    )
+                )
+            elif conflict.kind in {"course_room_features", "course_lab_features"} and conflict.subjects:
+                resource_kind = "room" if conflict.kind == "course_room_features" else "lab"
+                course = self._courses_by_name[conflict.subjects[0]]
+                required = (
+                    sorted(course.required_room_features)
+                    if resource_kind == "room"
+                    else sorted(course.required_lab_features)
+                )
+                suggestions.append(
+                    RelaxationSuggestion(
+                        kind=f"provide_required_{resource_kind}_features",
+                        subjects=conflict.subjects,
+                        message=(
+                            f"Add an allowed {resource_kind} providing {required}, add those features to an allowed "
+                            f"resource, or remove requirements that are not essential"
+                        ),
+                    )
+                )
+            elif conflict.kind in {"course_room_availability", "course_lab_availability"} and conflict.subjects:
+                resource_kind = "room" if conflict.kind == "course_room_availability" else "lab"
+                suggestions.append(
+                    RelaxationSuggestion(
+                        kind=f"expand_{resource_kind}_availability",
+                        subjects=conflict.subjects,
+                        message=(
+                            f"Expand an allowed {resource_kind}'s availability, add another available candidate, "
+                            "or enable a compatible meeting pattern"
+                        ),
+                    )
+                )
+            elif conflict.kind in {"course_room_capacity", "course_lab_capacity"} and conflict.subjects:
+                course_name = conflict.subjects[0]
+                course = self._courses_by_name[course_name]
+                resource_kind = "room" if conflict.kind == "course_room_capacity" else "lab"
+                candidates = course.rooms if resource_kind == "room" else course.labs
+                capacities = self._room_capacities if resource_kind == "room" else self._lab_capacities
+                required_capacity = course.capacity
+                suggestions.extend(
+                    (
+                        RelaxationSuggestion(
+                            kind=f"add_capacity_compatible_{resource_kind}_candidate",
+                            subjects=(course_name,),
+                            message=(
+                                f"Add an allowed {resource_kind} with capacity of at least {required_capacity} "
+                                f"for course {course}"
+                            ),
+                        ),
+                        RelaxationSuggestion(
+                            kind=f"increase_{resource_kind}_capacity",
+                            subjects=(course_name, *candidates),
+                            message=(
+                                f"Correct or increase an allowed {resource_kind}'s capacity to at least "
+                                f"{required_capacity}; current capacities are "
+                                + ", ".join(f"{name}={capacities[name]}" for name in candidates)
+                            ),
+                        ),
+                        RelaxationSuggestion(
+                            kind="reduce_section_capacity",
+                            subjects=(course_name,),
+                            message=(
+                                f"Reduce the configured demand from {required_capacity} to no more than "
+                                f"{max(capacities[name] for name in candidates)}"
+                            ),
                         ),
                     )
                 )

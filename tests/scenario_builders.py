@@ -21,6 +21,7 @@ def two_course_config_data(*, same_course: bool = False) -> dict[str, Any]:
         {
             "course_id": second_id,
             "credits": 4,
+            "capacity": 30,
             "room": ["R1"],
             "lab": ["L1"],
             "conflicts": [],

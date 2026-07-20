@@ -27,16 +27,22 @@
       "assignments": [
         "CS101.01"
       ],
+      "capacity": 30,
+      "capacity_violations": [],
       "collisions": [],
       "kind": "room",
+      "maximum_assigned_section_capacity": 30,
       "resource": "R1"
     },
     {
       "assignments": [
         "CS101.01"
       ],
+      "capacity": 30,
+      "capacity_violations": [],
       "collisions": [],
       "kind": "lab",
+      "maximum_assigned_section_capacity": 30,
       "resource": "L1"
     }
   ]

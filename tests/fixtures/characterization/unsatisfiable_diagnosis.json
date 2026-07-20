@@ -18,6 +18,12 @@
           ]
         }
       ],
+      "capacity_compatible_lab_candidates": [
+        "L1"
+      ],
+      "capacity_compatible_room_candidates": [
+        "R1"
+      ],
       "compatible_time_patterns": [
         "MON 08:00-09:50^,WED 08:00-09:50",
         "MON 09:00-10:50^,WED 09:00-10:50",
@@ -36,18 +42,35 @@
         "F1"
       ],
       "faculty_origin": "configured",
+      "feature_compatible_lab_candidates": [
+        "L1"
+      ],
+      "feature_compatible_room_candidates": [
+        "R1"
+      ],
       "lab_candidates": [
         "L1"
       ],
+      "lab_capacity_rejection_count": 0,
+      "lab_capacity_rejections": [],
+      "lab_capacity_rejections_truncated": false,
       "locations": [
         "/config/courses/0"
       ],
+      "modality": "in_person",
       "rejected_pattern_count": 0,
       "rejected_patterns": [],
       "rejected_patterns_truncated": false,
+      "required_lab_features": [],
+      "required_room_features": [],
+      "reserve_room_during_lab": true,
       "room_candidates": [
         "R1"
-      ]
+      ],
+      "room_capacity_rejection_count": 0,
+      "room_capacity_rejections": [],
+      "room_capacity_rejections_truncated": false,
+      "section_capacity": 30
     },
     {
       "availability_by_faculty": [
@@ -64,6 +87,12 @@
             "F1"
           ]
         }
+      ],
+      "capacity_compatible_lab_candidates": [
+        "L1"
+      ],
+      "capacity_compatible_room_candidates": [
+        "R1"
       ],
       "compatible_time_patterns": [
         "MON 08:00-09:50^,WED 08:00-09:50",
@@ -83,21 +112,94 @@
         "F1"
       ],
       "faculty_origin": "configured",
+      "feature_compatible_lab_candidates": [
+        "L1"
+      ],
+      "feature_compatible_room_candidates": [
+        "R1"
+      ],
       "lab_candidates": [
         "L1"
       ],
+      "lab_capacity_rejection_count": 0,
+      "lab_capacity_rejections": [],
+      "lab_capacity_rejections_truncated": false,
       "locations": [
         "/config/courses/1"
       ],
+      "modality": "in_person",
       "rejected_pattern_count": 0,
       "rejected_patterns": [],
       "rejected_patterns_truncated": false,
+      "required_lab_features": [],
+      "required_room_features": [],
+      "reserve_room_during_lab": true,
       "room_candidates": [
         "R1"
-      ]
+      ],
+      "room_capacity_rejection_count": 0,
+      "room_capacity_rejections": [],
+      "room_capacity_rejections_truncated": false,
+      "section_capacity": 30
     }
   ],
   "capacity_analysis": [
+    {
+      "available": 30,
+      "kind": "course_room_capacity_coverage",
+      "locations": [
+        "/config/courses/0/capacity",
+        "/config/rooms/0/capacity"
+      ],
+      "message": "Largest allowed room capacity available to course CS101.01",
+      "required": 30,
+      "subjects": [
+        "CS101.01",
+        "R1"
+      ]
+    },
+    {
+      "available": 30,
+      "kind": "course_lab_capacity_coverage",
+      "locations": [
+        "/config/courses/0/capacity",
+        "/config/labs/0/capacity"
+      ],
+      "message": "Largest allowed lab capacity available to course CS101.01",
+      "required": 30,
+      "subjects": [
+        "CS101.01",
+        "L1"
+      ]
+    },
+    {
+      "available": 30,
+      "kind": "course_room_capacity_coverage",
+      "locations": [
+        "/config/courses/1/capacity",
+        "/config/rooms/0/capacity"
+      ],
+      "message": "Largest allowed room capacity available to course CS102.01",
+      "required": 30,
+      "subjects": [
+        "CS102.01",
+        "R1"
+      ]
+    },
+    {
+      "available": 30,
+      "kind": "course_lab_capacity_coverage",
+      "locations": [
+        "/config/courses/1/capacity",
+        "/config/labs/0/capacity"
+      ],
+      "message": "Largest allowed lab capacity available to course CS102.01",
+      "required": 30,
+      "subjects": [
+        "CS102.01",
+        "L1"
+      ]
+    },
     {
       "available": 4,
       "kind": "global_faculty_maximum_credits",
@@ -199,7 +301,7 @@
       ]
     }
   ],
-  "configuration_fingerprint": "d1773703c35be6dcccc3b8aac82cfa7b9865c858fdb3a8109984385fdfef5b2a",
+  "configuration_fingerprint": "c644b6c8c70b170b765ba29359c9110f56adde253b887902700bafd278306a76",
   "conflicting_constraints": [
     {
       "code": "SCHED.FACULTY.CREDIT.RANGE",
@@ -312,7 +414,7 @@
     }
   ],
   "diagnostic_completeness": "bounded_unsat_cores",
-  "diagnostic_version": "1",
+  "diagnostic_version": "3",
   "elapsed_ms": 0,
   "preflight_findings": [
     {
@@ -344,12 +446,90 @@
       "target": "candidate-domain:CS101.01"
     },
     {
+      "relationship": "filters_room_features",
+      "source": "/config/courses/0/required_room_features",
+      "subjects": [
+        "CS101.01"
+      ],
+      "target": "candidate-domain:CS101.01"
+    },
+    {
+      "relationship": "filters_lab_features",
+      "source": "/config/courses/0/required_lab_features",
+      "subjects": [
+        "CS101.01"
+      ],
+      "target": "candidate-domain:CS101.01"
+    },
+    {
       "relationship": "generates_compatible_patterns",
       "source": "/time_slot_config/classes",
       "subjects": [
         "CS101.01"
       ],
       "target": "candidate-domain:CS101.01"
+    },
+    {
+      "relationship": "defines_section_capacity",
+      "source": "/config/courses/0/capacity",
+      "subjects": [
+        "CS101.01"
+      ],
+      "target": "candidate-domain:CS101.01"
+    },
+    {
+      "relationship": "satisfies_section_capacity",
+      "source": "/config/rooms/0/capacity",
+      "subjects": [
+        "CS101.01",
+        "R1"
+      ],
+      "target": "candidate:CS101.01:room:R1"
+    },
+    {
+      "relationship": "satisfies_required_features",
+      "source": "/config/rooms/0/features",
+      "subjects": [
+        "CS101.01",
+        "R1"
+      ],
+      "target": "candidate:CS101.01:room:R1"
+    },
+    {
+      "relationship": "defines_resource_availability",
+      "source": "/config/rooms/0/times",
+      "subjects": [
+        "CS101.01",
+        "R1"
+      ],
+      "target": "candidate:CS101.01:room:R1"
+    },
+    {
+      "relationship": "satisfies_section_capacity",
+      "source": "/config/labs/0/capacity",
+      "subjects": [
+        "CS101.01",
+        "L1"
+      ],
+      "target": "candidate:CS101.01:lab:L1"
+    },
+    {
+      "relationship": "satisfies_required_features",
+      "source": "/config/labs/0/features",
+      "subjects": [
+        "CS101.01",
+        "L1"
+      ],
+      "target": "candidate:CS101.01:lab:L1"
+    },
+    {
+      "relationship": "defines_resource_availability",
+      "source": "/config/labs/0/times",
+      "subjects": [
+        "CS101.01",
+        "L1"
+      ],
+      "target": "candidate:CS101.01:lab:L1"
     },
     {
       "relationship": "configured",
@@ -369,12 +549,90 @@
       "target": "candidate-domain:CS102.01"
     },
     {
+      "relationship": "filters_room_features",
+      "source": "/config/courses/1/required_room_features",
+      "subjects": [
+        "CS102.01"
+      ],
+      "target": "candidate-domain:CS102.01"
+    },
+    {
+      "relationship": "filters_lab_features",
+      "source": "/config/courses/1/required_lab_features",
+      "subjects": [
+        "CS102.01"
+      ],
+      "target": "candidate-domain:CS102.01"
+    },
+    {
       "relationship": "generates_compatible_patterns",
       "source": "/time_slot_config/classes",
       "subjects": [
         "CS102.01"
       ],
       "target": "candidate-domain:CS102.01"
+    },
+    {
+      "relationship": "defines_section_capacity",
+      "source": "/config/courses/1/capacity",
+      "subjects": [
+        "CS102.01"
+      ],
+      "target": "candidate-domain:CS102.01"
+    },
+    {
+      "relationship": "satisfies_section_capacity",
+      "source": "/config/rooms/0/capacity",
+      "subjects": [
+        "CS102.01",
+        "R1"
+      ],
+      "target": "candidate:CS102.01:room:R1"
+    },
+    {
+      "relationship": "satisfies_required_features",
+      "source": "/config/rooms/0/features",
+      "subjects": [
+        "CS102.01",
+        "R1"
+      ],
+      "target": "candidate:CS102.01:room:R1"
+    },
+    {
+      "relationship": "defines_resource_availability",
+      "source": "/config/rooms/0/times",
+      "subjects": [
+        "CS102.01",
+        "R1"
+      ],
+      "target": "candidate:CS102.01:room:R1"
+    },
+    {
+      "relationship": "satisfies_section_capacity",
+      "source": "/config/labs/0/capacity",
+      "subjects": [
+        "CS102.01",
+        "L1"
+      ],
+      "target": "candidate:CS102.01:lab:L1"
+    },
+    {
+      "relationship": "satisfies_required_features",
+      "source": "/config/labs/0/features",
+      "subjects": [
+        "CS102.01",
+        "L1"
+      ],
+      "target": "candidate:CS102.01:lab:L1"
+    },
+    {
+      "relationship": "defines_resource_availability",
+      "source": "/config/labs/0/times",
+      "subjects": [
+        "CS102.01",
+        "L1"
+      ],
+      "target": "candidate:CS102.01:lab:L1"
     },
     {
       "relationship": "configured",

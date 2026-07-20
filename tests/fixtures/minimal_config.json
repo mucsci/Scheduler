@@ -1,11 +1,12 @@
 {
   "config": {
-    "rooms": ["R1"],
-    "labs": ["L1"],
+    "rooms": [{"name": "R1", "capacity": 30}],
+    "labs": [{"name": "L1", "capacity": 30}],
     "courses": [
       {
         "course_id": "CS101",
         "credits": 4,
+        "capacity": 30,
         "room": ["R1"],
         "lab": ["L1"],
         "conflicts": [],

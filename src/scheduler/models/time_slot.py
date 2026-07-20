@@ -1,4 +1,4 @@
-from typing import Self
+from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_serializer
 
@@ -262,6 +262,12 @@ class TimeInstance(BaseModel):
     The duration of the time instance
     """
 
+    delivery: Literal["in_person", "online"] = Field(
+        default="in_person",
+        description="Whether this meeting consumes a physical room",
+    )
+    """Meeting delivery mode used for room occupancy and serialized output."""
+
     @property
     def stop(self) -> TimePoint:
         """Calculate the exclusive stop point of this meeting interval.
@@ -282,7 +288,8 @@ class TimeInstance(BaseModel):
         return TimePoint(timepoint=(self.start.value + self.duration.value))
 
     def __str__(self) -> str:
-        return f"{self.day.name} {str(self.start)}-{str(self.stop)}"
+        suffix = "@online" if self.delivery == "online" else ""
+        return f"{self.day.name} {str(self.start)}-{str(self.stop)}{suffix}"
 
 
 class TimeSlot(BaseModel):
@@ -367,6 +374,75 @@ class TimeSlot(BaseModel):
             Checks marker presence only and does not dereference or validate the index.
         """
         return self.lab_index is not None
+
+    def lecture_times(self) -> tuple[TimeInstance, ...]:
+        """Return every non-lab meeting in configured order.
+
+        Args:
+            None.
+
+        Returns:
+            Tuple containing all meetings except the lab-marked index.
+
+        Raises:
+            None.
+
+        Behavior:
+            Preserves configured order and treats a no-lab slot as entirely lecture.
+        """
+        return tuple(time for index, time in enumerate(self.times) if index != self.lab_index)
+
+    def physical_lecture_times(self) -> tuple[TimeInstance, ...]:
+        """Return in-person non-lab meetings that consume the assigned room.
+
+        Args:
+            None.
+
+        Returns:
+            Ordered in-person lecture meeting tuple.
+
+        Raises:
+            None.
+
+        Behavior:
+            Excludes both the lab-marked meeting and meetings delivered online.
+        """
+        return tuple(time for time in self.lecture_times() if time.delivery == "in_person")
+
+    def same_lectures(self, other: "TimeSlot") -> bool:
+        """Compare two slots while ignoring their independently selected lab times.
+
+        Args:
+            other: Slot whose non-lab meetings are compared.
+
+        Returns:
+            Whether ordered lecture meetings are exactly equal.
+
+        Raises:
+            None.
+
+        Behavior:
+            Uses full meeting equality, including delivery mode, day, start, and duration.
+        """
+        return self.lecture_times() == other.lecture_times()
+
+    def lab_overlaps_slot(self, other: "TimeSlot") -> bool:
+        """Check whether this slot's lab overlaps any meeting in another slot.
+
+        Args:
+            other: Complete slot compared with this slot's lab meeting.
+
+        Returns:
+            False when this slot has no lab; otherwise whether it overlaps any other meeting.
+
+        Raises:
+            IndexError: If this slot contains an invalid lab index.
+
+        Behavior:
+            Evaluates the marked lab against every meeting in ``other`` using exclusive stops.
+        """
+        lab = self.lab_time()
+        return lab is not None and any(self._overlaps(lab, time) for time in other.times)
 
     @staticmethod
     def _diff_between_slots(t1: TimeInstance, t2: TimeInstance) -> Duration:

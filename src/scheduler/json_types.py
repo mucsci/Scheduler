@@ -12,7 +12,7 @@ from scheduler.json_types import CourseInstanceJSON
 ```
 """
 
-from typing import NotRequired, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 
 class TimeInstanceJSON(TypedDict):
@@ -53,6 +53,9 @@ class TimeInstanceJSON(TypedDict):
     {"day": 1, "start": 480, "duration": 120}
     ```
     """
+
+    delivery: Literal["in_person", "online"]
+    """Meeting delivery mode: ``in_person`` or ``online``."""
 
 
 class CourseInstanceJSON(TypedDict):
@@ -96,14 +99,7 @@ class CourseInstanceJSON(TypedDict):
     """
 
     lab: NotRequired[str | None]
-    """
-    Lab string representation (e.g., "Lab 101")
-
-    **Usage:**
-    ```python
-    {"course": "CS101.01", "faculty": "Dr. Smith", "lab": "Lab 101", "times": []}
-    ```
-    """
+    """Assigned lab resource name, or null for a no-lab section."""
 
     times: list[TimeInstanceJSON]
     """
@@ -116,11 +112,4 @@ class CourseInstanceJSON(TypedDict):
     """
 
     lab_index: NotRequired[int | None]
-    """
-    Lab index (e.g., 0)
-
-    **Usage:**
-    ```python
-    {"course": "CS101.01", "faculty": "Dr. Smith", "times": [], "lab_index": 0}
-    ```
-    """
+    """Index of the lab meeting in ``times``, or null for a no-lab section."""

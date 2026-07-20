@@ -19,9 +19,9 @@ A powerful constraint satisfaction solver for generating academic course schedul
 The Course Constraint Scheduler is designed to solve complex academic scheduling problems by modeling them as constraint satisfaction problems. It can handle:
 
 - **Faculty constraints**: Availability, credit ranges, teaching-day rules, distinct-course limits, and preferences
-- **Resource constraints**: Eligible room/lab assignment and collision prevention
-- **Time constraints**: Credit/lab-compatible meeting patterns, fixed starts, alignment, overlap, and adjacency
-- **Course constraints**: Repeated sections, declared conflicts, faculty eligibility, and no-lab schedules
+- **Resource constraints**: Capacity, required features, resource availability, eligibility, and collision prevention
+- **Time constraints**: Credit/lab/modality-compatible meeting patterns, fixed starts, delivery modes, overlap, and adjacency
+- **Course constraints**: Stable section ids, expected enrollment, one optional lab assignment, declared conflicts, faculty eligibility, and no-lab schedules
 - **Diagnostics and optimization**: Unsat cores, verified repairs, independent audits, and Pareto objectives
 
 ## Features
@@ -187,8 +187,8 @@ A short pointer to the new docs location: [docs/configuration.md](./docs/configu
 
 The scheduler uses a JSON configuration file that defines:
 
-- **Rooms and Labs**: Available facilities and their constraints
-- **Courses**: Course requirements, conflicts, and faculty assignments
+- **Rooms and Labs**: Named facilities with required positive student capacities
+- **Courses**: Section enrollment, resource requirements, conflicts, and faculty assignments
 - **Faculty**: Availability, preferences, and teaching constraints
 - **Time Slots**: Available time blocks and class patterns
 - **Optimization**: Flags for different optimization strategies
@@ -201,7 +201,7 @@ every required field, default, validation rule, lab semantic, and time-slot gene
 
 The scheduler is built with a modular architecture:
 
-- **SchedulingProblem**: Z3-free normalized policies, resources, time domains, source paths, and compatibility cache
+- **SchedulingProblem**: Z3-free normalized policies, resource capacities, time domains, source paths, and compatibility cache
 - **SolverEngine**: Z3 symbols, relation tables, hard constraints, objectives, decoding, and model blocking
 - **DiagnosticEngine**: Preflight analysis, provenance, unsat cores, suggestions, and verified repairs
 - **ScheduleAuditor**: Independent hard-rule verification, summaries, and objective scoring

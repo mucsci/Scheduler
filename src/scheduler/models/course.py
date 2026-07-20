@@ -1,6 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
-import z3
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from .time_slot import TimeInstance, TimeSlot
@@ -13,7 +12,7 @@ class Course:
 
     **Usage:**
     ```python
-    Course(course_id="CS 101", section=1, labs=[], rooms=[], conflicts=[], faculties=[])
+    Course(course_id="CS 101", section=1, credits=3, capacity=30, labs=[], rooms=[], conflicts=[], faculties=[])
     ```
     """
 
@@ -25,6 +24,11 @@ class Course:
     credits: int
     """
     The number of credits for the course
+    """
+
+    capacity: int
+    """
+    Expected section enrollment that the assigned room and lab must accommodate
     """
 
     section: int
@@ -52,25 +56,20 @@ class Course:
     The list of potential faculty for the course
     """
 
-    lab: z3.ExprRef | None = None
-    """
-    The z3 variable used for assigning a lab
-    """
+    section_id: str | None = None
+    """Explicit stable section suffix, or null when input-order numbering is used."""
 
-    room: z3.ExprRef | None = None
-    """
-    The z3 variable used for assigning a room
-    """
+    modality: str = "in_person"
+    """Configured course delivery modality."""
 
-    time: z3.ExprRef | None = None
-    """
-    The z3 variable used for assigning a time slot
-    """
+    required_room_features: frozenset[str] = field(default_factory=frozenset)
+    """Feature tags required on the selected lecture room."""
 
-    faculty: z3.ExprRef | None = None
-    """
-    The z3 variable used for assigning a faculty
-    """
+    required_lab_features: frozenset[str] = field(default_factory=frozenset)
+    """Feature tags required on every selected lab."""
+
+    reserve_room_during_lab: bool = True
+    """Whether lab meetings also occupy the assigned lecture room."""
 
     def __str__(self) -> str:
         """
@@ -81,16 +80,17 @@ class Course:
         str(course)
         ```
         """
-        return f"{self.course_id}.{self.section:02d}"
+        suffix = self.section_id or f"{self.section:02d}"
+        return f"{self.course_id}.{suffix}"
 
 
 class CourseInstance(BaseModel):
     """
-    A course instance with a course, time, faculty, room, and lab.
+    A decoded course assignment with its meetings, faculty, room, and optional lab.
 
     **Usage:**
     ```python
-    CourseInstance(course=c, time=slot, faculty="Dr. Smith", room="R1", lab=None)
+    CourseInstance(course=c, time=slot, faculty="Dr. Smith", room="R1")
     ```
     """
 
@@ -119,10 +119,8 @@ class CourseInstance(BaseModel):
     The assigned room
     """
 
-    lab: str | None = Field(default=None, description="The assigned lab")
-    """
-    The assigned lab
-    """
+    lab: str | None = Field(default=None, description="The assigned lab, or null for a no-lab section")
+    """The assigned lab resource name."""
 
     @computed_field(alias="course")
     @property
@@ -167,22 +165,22 @@ class CourseInstance(BaseModel):
     @computed_field
     @property
     def lab_index(self) -> int | None:
-        """Return the meeting index reserved for the assigned lab, when any.
+        """Return the lab meeting's index in ``times`` when a lab is assigned.
 
         Args:
             None.
 
         Returns:
-            Selected slot lab index, or ``None`` when no lab resource is assigned.
+            The selected slot's lab index, or ``None`` for a no-lab section.
 
         Raises:
             None.
 
         Behavior:
-            Hides the internal slot lab marker for documented no-lab assignments so
-            external payloads consistently report both ``lab`` and ``lab_index`` null.
+            Exposes the selected pattern marker only when a concrete lab resource
+            was decoded.
         """
-        return self.time.lab_index if (self.lab is not None) else None
+        return self.time.lab_index if self.lab is not None else None
 
     def as_csv(self) -> str:
         """Serialize the assignment as one scheduler CSV row without a header.
@@ -197,12 +195,11 @@ class CourseInstance(BaseModel):
             None.
 
         Behavior:
-            Preserves meeting order and the lab caret marker for lab assignments;
-            removes that internal marker when the decoded assignment has no lab.
+            Preserves meeting order and marks the lab meeting with a caret. For a
+            no-lab section, any internal marker is omitted.
         """
         room_str = str(self.room)
-        lab_str = str(self.lab)
         time_str = str(self.time)
         if self.lab is None:
             time_str = time_str.replace("^", "")
-        return f"{self.course},{self.faculty},{room_str},{lab_str},{time_str}"
+        return f"{self.course},{self.faculty},{room_str},{self.lab},{time_str}"
