@@ -2,6 +2,7 @@
 
 import itertools
 from collections import defaultdict
+from copy import deepcopy
 
 from .config import OptimizerFlags
 from .contracts import (
@@ -11,7 +12,7 @@ from .contracts import (
     ResourceUsageDiagnostic,
     ScheduleAudit,
 )
-from .models import Course, CourseInstance, Day, TimeInstance, TimeSlot
+from .models import Course, CourseInstance, Day, Duration, TimeInstance, TimeSlot
 from .problem import SchedulingProblem
 
 
@@ -22,7 +23,9 @@ class ScheduleAuditor:
         self._problem = problem
         self._optimizer_flags = problem.optimizer_flags
         self._faculty = problem.faculty
-        self._courses = problem.courses
+        self._courses = deepcopy(problem.courses)
+        self._courses_by_name = {str(course): course for course in self._courses}
+        self._max_time_gap = Duration(duration=problem.full_config.time_slot_config.max_time_gap)
         self._course_config_paths = problem.course_config_paths
         self._room_capacities = {name: policy.capacity for name, policy in problem.room_policies.items()}
         self._lab_capacities = {name: policy.capacity for name, policy in problem.lab_policies.items()}
@@ -121,17 +124,40 @@ class ScheduleAuditor:
             for meeting in times
         )
 
-    @staticmethod
-    def _room_times(instance: CourseInstance) -> tuple[TimeInstance, ...]:
+    def _room_times(self, instance: CourseInstance) -> tuple[TimeInstance, ...]:
         times = [
             time
             for index, time in enumerate(instance.time.times)
             if index != instance.time.lab_index and time.delivery == "in_person"
         ]
         lab_time = instance.time.lab_time()
-        if instance.course.reserve_room_during_lab and lab_time is not None:
+        course = self._courses_by_name.get(str(instance.course))
+        if course is not None and course.reserve_room_during_lab and lab_time is not None:
             times.append(lab_time)
         return tuple(times)
+
+    @staticmethod
+    def _meetings_next_to(
+        left: tuple[TimeInstance, ...],
+        right: tuple[TimeInstance, ...],
+        max_time_gap,
+    ) -> bool:
+        """Return whether two physical occupancy sets contain an adjacent pair."""
+        return any(TimeSlot._diff_between_slots(first, second) <= max_time_gap for first in left for second in right)
+
+    def _labs_next_to(self, left: TimeSlot, right: TimeSlot) -> bool:
+        """Reproduce configured lab adjacency without trusting decoded slot policy."""
+        first = left.lab_time()
+        second = right.lab_time()
+        if first is None or second is None:
+            return False
+        if first.day != second.day:
+            return (
+                first.start < second.stop
+                and second.start < first.stop
+                and abs(first.start - second.start) <= self._max_time_gap
+            )
+        return TimeSlot._diff_between_slots(first, second) <= self._max_time_gap
 
     def audit_schedule(self, schedule: list["CourseInstance"]) -> ScheduleAudit:
         """Independently audit one emitted schedule and explain its soft scores.
@@ -144,7 +170,7 @@ class ScheduleAuditor:
             scores and explanations for every enabled objective.
 
         Raises:
-            KeyError: If a preference-enabled assignment names unknown faculty.
+            None.
 
         Behavior:
             Reconstructs coverage by course name, validates every assignment and
@@ -290,9 +316,10 @@ class ScheduleAuditor:
         workloads: list[FacultyWorkloadDiagnostic] = []
         for faculty in self._faculty:
             assigned = [instance for instance in schedule if instance.faculty == faculty]
-            credits = sum(instance.course.credits for instance in assigned)
+            canonical = [self._courses_by_name.get(str(instance.course)) for instance in assigned]
+            credits = sum(course.credits for course in canonical if course is not None)
             days = tuple(sorted({time.day.name for instance in assigned for time in instance.time.times}))
-            course_ids = {instance.course.course_id for instance in assigned}
+            course_ids = {course.course_id for course in canonical if course is not None}
             mandatory = self._faculty_mandatory_days[faculty]
             mandatory_satisfied = mandatory <= {Day[day] for day in days}
             workloads.append(
@@ -335,7 +362,7 @@ class ScheduleAuditor:
                         f"{self._faculty_unique_course_limits[faculty]}",
                     )
                 )
-            for day in mandatory - {Day[day] for day in days}:
+            for day in sorted(mandatory - {Day[day] for day in days}):
                 violations.append(
                     self._make_diagnostic(
                         "faculty_mandatory_day",
@@ -372,7 +399,12 @@ class ScheduleAuditor:
                     collisions=tuple(collisions),
                     capacity=self._room_capacities.get(resource),
                     maximum_assigned_section_capacity=max(
-                        (instance.course.capacity for instance in assignments), default=0
+                        (
+                            course.capacity
+                            for instance in assignments
+                            if (course := self._courses_by_name.get(str(instance.course))) is not None
+                        ),
+                        default=0,
                     ),
                     capacity_violations=tuple(
                         violation
@@ -412,7 +444,12 @@ class ScheduleAuditor:
                     collisions=tuple(collisions),
                     capacity=self._lab_capacities.get(resource),
                     maximum_assigned_section_capacity=max(
-                        (instance.course.capacity for instance in assignments), default=0
+                        (
+                            course.capacity
+                            for instance in assignments
+                            if (course := self._courses_by_name.get(str(instance.course))) is not None
+                        ),
+                        default=0,
                     ),
                     capacity_violations=tuple(
                         violation
@@ -424,7 +461,10 @@ class ScheduleAuditor:
             violations.extend(collisions)
 
         for first, second in itertools.combinations(schedule, 2):
-            left, right = first.course, second.course
+            left = self._courses_by_name.get(str(first.course))
+            right = self._courses_by_name.get(str(second.course))
+            if left is None or right is None:
+                continue
             if (right.course_id in left.conflicts or left.course_id in right.conflicts) and first.time.overlaps(
                 second.time
             ):
@@ -475,7 +515,11 @@ class ScheduleAuditor:
                             f"Sections {left} and {right} taught by one faculty use different labs",
                         )
                     )
-                if not first.time.lecture_next_to(second.time):
+                if not self._meetings_next_to(
+                    tuple(first.time.times),
+                    tuple(second.time.times),
+                    self._max_time_gap,
+                ):
                     violations.append(
                         self._make_diagnostic(
                             "same_course_lecture_adjacency",
@@ -483,7 +527,7 @@ class ScheduleAuditor:
                             f"Sections {left} and {right} taught by one faculty are not adjacent",
                         )
                     )
-                if left.labs and right.labs and not first.time.lab_next_to(second.time):
+                if left.labs and right.labs and not self._labs_next_to(first.time, second.time):
                     violations.append(
                         self._make_diagnostic(
                             "same_course_lab_adjacency",
@@ -492,7 +536,11 @@ class ScheduleAuditor:
                         )
                     )
             else:
-                if first.time.lecture_next_to(second.time):
+                if self._meetings_next_to(
+                    tuple(first.time.times),
+                    tuple(second.time.times),
+                    self._max_time_gap,
+                ):
                     violations.append(
                         self._make_diagnostic(
                             "different_course_lecture_separation",
@@ -500,7 +548,7 @@ class ScheduleAuditor:
                             f"Different courses {left} and {right} taught by one faculty are adjacent",
                         )
                     )
-                if left.labs and right.labs and first.time.lab_next_to(second.time):
+                if left.labs and right.labs and self._labs_next_to(first.time, second.time):
                     violations.append(
                         self._make_diagnostic(
                             "different_course_lab_separation",
@@ -536,6 +584,9 @@ class ScheduleAuditor:
             score = 0
             upper_bound = 0
             for instance in schedule:
+                course = self._courses_by_name.get(str(instance.course))
+                if course is None:
+                    continue
                 preferences = (
                     self._faculty_course_preferences
                     if target == "course"
@@ -543,22 +594,35 @@ class ScheduleAuditor:
                     if target == "room"
                     else self._faculty_lab_preferences
                 )
-                values = [instance.course.course_id if target == "course" else getattr(instance, target)]
-                for value in values:
-                    assigned = preferences[instance.faculty].get(value, 0) if value is not None else 0
-                    score += assigned
-                    potential = [preferences[faculty].get(value, 0) for faculty in instance.course.faculties]
-                    upper_bound += max(potential, default=0)
-                    if assigned < max(potential, default=0):
-                        outcomes.append(
-                            self._make_diagnostic(
-                                "preference_not_selected",
-                                (str(instance.course), instance.faculty, objective),
-                                f"Course {instance.course} receives {assigned}/{max(potential, default=0)} "
-                                f"available {objective} preference points; hard constraints or competing objectives "
-                                "selected a lower-scoring eligible assignment",
-                            )
+                selected_value = course.course_id if target == "course" else getattr(instance, target)
+                assigned = (
+                    preferences.get(instance.faculty, {}).get(selected_value, 0) if selected_value is not None else 0
+                )
+                score += assigned
+                candidate_values = (
+                    (course.course_id,)
+                    if target == "course"
+                    else tuple(course.rooms)
+                    if target == "room"
+                    else tuple(course.labs)
+                )
+                potential = [
+                    preferences.get(faculty, {}).get(value, 0)
+                    for faculty in course.faculties
+                    for value in candidate_values
+                ]
+                best = max(potential, default=0)
+                upper_bound += best
+                if assigned < best:
+                    outcomes.append(
+                        self._make_diagnostic(
+                            "preference_not_selected",
+                            (str(course), instance.faculty, objective),
+                            f"Course {course} receives {assigned}/{best} "
+                            f"available {objective} preference points; hard constraints or competing objectives "
+                            "selected a lower-scoring eligible assignment",
                         )
+                    )
             scores.append(
                 ObjectiveScoreDiagnostic(
                     objective=objective,
@@ -579,25 +643,51 @@ class ScheduleAuditor:
             score = 0
             upper_bound = 0
             for first, second in itertools.combinations(schedule, 2):
-                first_candidates = getattr(first.course, f"{resource}s")
-                second_candidates = getattr(second.course, f"{resource}s")
+                first_course = self._courses_by_name.get(str(first.course))
+                second_course = self._courses_by_name.get(str(second.course))
+                if first_course is None or second_course is None:
+                    continue
+                first_candidates = getattr(first_course, f"{resource}s")
+                second_candidates = getattr(second_course, f"{resource}s")
                 if not set(first_candidates) & set(second_candidates):
                     continue
-                if objective.startswith("pack_") and first.course.course_id == second.course.course_id:
+                if resource == "room" and (
+                    not any(
+                        self._problem._slot_requires_room(
+                            slot,
+                            reserve_room_during_lab=first_course.reserve_room_during_lab,
+                        )
+                        for slot in self._compatible_slots(first_course)
+                    )
+                    or not any(
+                        self._problem._slot_requires_room(
+                            slot,
+                            reserve_room_during_lab=second_course.reserve_room_during_lab,
+                        )
+                        for slot in self._compatible_slots(second_course)
+                    )
+                ):
+                    continue
+                if objective.startswith("pack_") and first_course.course_id == second_course.course_id:
                     continue
                 if resource == "lab":
                     same_resource = first.lab == second.lab
                     satisfactions = [
                         first.faculty == second.faculty and same_resource
                         if objective == "same_lab"
-                        else same_resource and first.time.lab_next_to(second.time)
+                        else same_resource and self._labs_next_to(first.time, second.time)
                     ]
                 else:
                     same_resource = first.room is not None and second.room is not None and first.room == second.room
                     satisfactions = [
                         first.faculty == second.faculty and same_resource
                         if objective == "same_room"
-                        else same_resource and first.time.lecture_next_to(second.time)
+                        else same_resource
+                        and self._meetings_next_to(
+                            self._room_times(first),
+                            self._room_times(second),
+                            self._max_time_gap,
+                        )
                     ]
                 for satisfied in satisfactions:
                     upper_bound += 1
@@ -606,8 +696,8 @@ class ScheduleAuditor:
                         outcomes.append(
                             self._make_diagnostic(
                                 "objective_pair_not_selected",
-                                (str(first.course), str(second.course), objective),
-                                f"Pair {first.course}/{second.course} does not receive the {objective} point; "
+                                (str(first_course), str(second_course), objective),
+                                f"Pair {first_course}/{second_course} does not receive the {objective} point; "
                                 "the selected schedule trades it against hard constraints or another objective",
                             )
                         )

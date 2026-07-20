@@ -113,3 +113,6 @@ class CourseInstanceJSON(TypedDict):
 
     lab_index: NotRequired[int | None]
     """Index of the lab meeting in ``times``, or null for a no-lab section."""
+
+    reserve_room_during_lab: bool
+    """Whether the lab-marked meeting also occupies the assigned room."""

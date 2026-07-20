@@ -1,6 +1,6 @@
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_serializer
+from pydantic import BaseModel, ConfigDict, Field, model_serializer, model_validator
 
 from .day import Day
 
@@ -328,6 +328,14 @@ class TimeSlot(BaseModel):
     Maximum gap used by meeting and lab adjacency checks
     """
 
+    @model_validator(mode="after")
+    def _validate_structure(self) -> "TimeSlot":
+        if not self.times:
+            raise ValueError("A time slot must contain at least one meeting")
+        if self.lab_index is not None and not 0 <= self.lab_index < len(self.times):
+            raise ValueError("Lab index must identify a meeting in the time slot")
+        return self
+
     def __hash__(self) -> int:
         """
         Hash the time slot by its string representation
@@ -349,12 +357,14 @@ class TimeSlot(BaseModel):
             Lab meeting instance, or ``None`` when no lab index is present.
 
         Raises:
-            IndexError: If a malformed slot contains an out-of-range lab index.
+            None.
 
         Behavior:
             Uses only ``lab_index``; it does not infer lab status from duration or day.
+            A slot mutated into an invalid index is treated as having no lab so
+            independent audit code can report incompatibility instead of crashing.
         """
-        if self.lab_index is None:
+        if self.lab_index is None or not 0 <= self.lab_index < len(self.times):
             return None
         return self.times[self.lab_index]
 
@@ -436,7 +446,7 @@ class TimeSlot(BaseModel):
             False when this slot has no lab; otherwise whether it overlaps any other meeting.
 
         Raises:
-            IndexError: If this slot contains an invalid lab index.
+            None.
 
         Behavior:
             Evaluates the marked lab against every meeting in ``other`` using exclusive stops.
@@ -476,7 +486,7 @@ class TimeSlot(BaseModel):
             Whether both labs exist and are within the configured maximum gap.
 
         Raises:
-            IndexError: If either slot contains an invalid lab index.
+            None.
 
         Behavior:
             Same-day labs use minimum interval separation; labs on different days
@@ -510,8 +520,8 @@ class TimeSlot(BaseModel):
             Scans meeting pairs in stored order and returns on the first witness;
             cross-day comparisons use corresponding clock-time separation.
         """
-        for _i1, t1 in enumerate(self.times):
-            for _i2, t2 in enumerate(other.times):
+        for t1 in self.times:
+            for t2 in other.times:
                 if TimeSlot._diff_between_slots(t1, t2) <= self.max_time_gap:
                     return True
         return False
@@ -544,7 +554,7 @@ class TimeSlot(BaseModel):
             ``False`` if either lab is absent; otherwise interval overlap status.
 
         Raises:
-            IndexError: If either slot contains an invalid lab index.
+            None.
 
         Behavior:
             Ignores all non-lab meetings and applies the same exclusive-stop overlap

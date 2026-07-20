@@ -1,3 +1,5 @@
+import csv
+import io
 from dataclasses import dataclass, field
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
@@ -70,6 +72,18 @@ class Course:
 
     reserve_room_during_lab: bool = True
     """Whether lab meetings also occupy the assigned lecture room."""
+
+    time: object | None = field(default=None, repr=False, compare=False)
+    """Legacy mirror of the solver-owned time assignment variable, when initialized."""
+
+    faculty: object | None = field(default=None, repr=False, compare=False)
+    """Legacy mirror of the solver-owned faculty assignment variable, when initialized."""
+
+    room: object | None = field(default=None, repr=False, compare=False)
+    """Legacy mirror of the solver-owned room assignment variable, when initialized."""
+
+    lab: object | None = field(default=None, repr=False, compare=False)
+    """Legacy mirror of the solver-owned lab assignment variable, when initialized."""
 
     def __str__(self) -> str:
         """
@@ -182,6 +196,26 @@ class CourseInstance(BaseModel):
         """
         return self.time.lab_index if self.lab is not None else None
 
+    @computed_field
+    @property
+    def reserve_room_during_lab(self) -> bool:
+        """Return whether the lab meeting also occupies the assigned room.
+
+        Args:
+            None.
+
+        Returns:
+            The normalized course policy controlling lab-time room occupancy.
+
+        Raises:
+            None.
+
+        Behavior:
+            Exposes the compatibility course mirror as serialized metadata so
+            schedule consumers can render physical room use correctly.
+        """
+        return self.course.reserve_room_during_lab
+
     def as_csv(self) -> str:
         """Serialize the assignment as one scheduler CSV row without a header.
 
@@ -189,17 +223,23 @@ class CourseInstance(BaseModel):
             None.
 
         Returns:
-            ``course,faculty,room,lab,times`` using display representations.
+            RFC-compatible ``course,faculty,room,lab,times`` fields using display
+            representations. Missing room and lab assignments are empty fields.
 
         Raises:
             None.
 
         Behavior:
+            Uses the standard CSV writer so commas, quotes, and newlines are escaped.
             Preserves meeting order and marks the lab meeting with a caret. For a
             no-lab section, any internal marker is omitted.
         """
-        room_str = str(self.room)
+        room_str = self.room or ""
         time_str = str(self.time)
         if self.lab is None:
             time_str = time_str.replace("^", "")
-        return f"{self.course},{self.faculty},{room_str},{self.lab},{time_str}"
+        output = io.StringIO(newline="")
+        csv.writer(output, lineterminator="").writerow(
+            [str(self.course), self.faculty, room_str, self.lab or "", time_str]
+        )
+        return output.getvalue()

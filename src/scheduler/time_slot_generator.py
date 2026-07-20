@@ -34,7 +34,7 @@ class TimeSlotGenerator:
         **Args:**
         - config: The TimeSlotConfig containing time blocks and class patterns
         """
-        self.config = config
+        self.config = config.model_copy(deep=True)
 
     def _parse_time(self, time_str: str) -> int:
         """
@@ -144,7 +144,6 @@ class TimeSlotGenerator:
         start_times = Counter(t.start.timepoint for t in time_combination)
         return max(start_times.values()) >= 2
 
-    @cache
     def time_slots(self, credits: int) -> list[TimeSlot]:
         """
         Generate every distinct valid meeting arrangement for a credit value.
@@ -169,12 +168,18 @@ class TimeSlotGenerator:
             starts. Cartesian products are retained only when meetings do not
             overlap, meet cross-day overlap and matching-start rules, and produce a
             new slot. The pattern's lab-marked meeting determines ``lab_index``.
-            Results are cached by credit value on this generator instance.
+            Immutable results are cached by credit value on this generator instance;
+            every call returns fresh deep copies so callers cannot corrupt the cache.
         """
+        return [slot.model_copy(deep=True) for slot in self._time_slots(credits)]
+
+    @cache
+    def _time_slots(self, credits: int) -> tuple[TimeSlot, ...]:
+        """Return the immutable cached implementation of :meth:`time_slots`."""
         # Find matching class patterns for the requested credits
         matching_patterns = [p for p in self.config.classes if p.credits == credits and not p.disabled]
         if not matching_patterns:
-            return []
+            return ()
 
         result = []
         for pattern in matching_patterns:
@@ -217,4 +222,4 @@ class TimeSlotGenerator:
                 if slot not in result:
                     result.append(slot)
 
-        return result
+        return tuple(result)

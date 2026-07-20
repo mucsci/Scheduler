@@ -3,8 +3,8 @@ title: Courses
 description: Course sections, stable ids, delivery, resource requirements, capacity, and labs.
 ---
 
-The required **`courses`** list at `config.courses` contains each course section the solver must schedule. The list
-itself may be empty, although a normal scheduling problem contains at least one course.
+The required **`courses`** list at `config.courses` contains each course section the solver must schedule. It must
+contain at least one course.
 
 ## Example
 
@@ -45,6 +45,10 @@ itself may be empty, although a normal scheduling problem contains at least one 
 ## Validation rules
 
 - Room, lab, and faculty names must exist in the corresponding global lists.
+- The `room`, `lab`, `faculty`, and `conflicts` lists cannot repeat the same name; duplicates are rejected instead
+  of implicitly changing optimizer weights.
+- Course ids, section ids, faculty names, resource names, and feature tags cannot be blank or contain leading or
+  trailing whitespace.
 - Final display ids must be unique. An explicit `section_id` is used verbatim after `course_id.`; otherwise the
   section number is generated in input order (`01`, `02`, ...).
 - `capacity` must be a positive integer. Resource capacity equality is accepted; undersized candidate resources

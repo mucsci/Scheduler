@@ -50,7 +50,7 @@
     "/submit": {
       "post": {
         "summary": "Submit Schedule",
-        "description": "Create an API generation session for a validated combined configuration.\n\nArgs:\n    request: Pydantic-validated combined scheduler configuration from the body.\n\nReturns:\n    A new session identifier and its base schedule endpoint.\n\nRaises:\n    HTTPException: Status 429 when active-session capacity is full; status 422\n        for course, schedule, or candidate-slot limits; status 500 if work cannot\n        be submitted; or status 400 for other request setup failures.\n\nBehavior:\n    Expired sessions and all built-in request limits are checked before work is\n    accepted. Scheduler construction is queued on the shared executor with the\n    API solver timeout. A UUID-backed session is registered immediately with\n    empty results so later requests can await initialization asynchronously.",
+        "description": "Create an API generation session for a validated combined configuration.\n\nArgs:\n    request: Pydantic-validated combined scheduler configuration from the body.\n\nReturns:\n    A new session identifier and its base schedule endpoint.\n\nRaises:\n    HTTPException: Status 422 when any built-in submission limit is exceeded;\n        status 500 if work cannot be submitted; or status 400 for other request\n        setup failures.\n\nBehavior:\n    Expired sessions and all built-in request limits are checked before work is\n    accepted. Scheduler construction is queued on the shared executor with the\n    API solver timeout. A UUID-backed session is registered immediately with\n    empty results so later requests can await initialization asynchronously.",
         "operationId": "submit_schedule_submit_post",
         "requestBody": {
           "content": {
@@ -1067,8 +1067,7 @@
               "type": "string"
             },
             "type": "array",
-            "title": "Locations",
-            "default": []
+            "title": "Locations"
           }
         },
         "type": "object",
@@ -1385,6 +1384,11 @@
             ],
             "title": "Lab Index",
             "description": "Index into `times` for the lab meeting."
+          },
+          "reserve_room_during_lab": {
+            "type": "boolean",
+            "title": "Reserve Room During Lab",
+            "description": "Whether the lab meeting also occupies the assigned room."
           }
         },
         "additionalProperties": false,
@@ -1392,10 +1396,11 @@
         "required": [
           "course",
           "faculty",
-          "times"
+          "times",
+          "reserve_room_during_lab"
         ],
         "title": "CourseInstanceResponse",
-        "description": "One course assignment in the JSON representation of a generated schedule.\n\nFields:\n    course: Course identifier including its generated section suffix.\n    faculty: Faculty member assigned to teach the course.\n    times: Ordered lecture and optional lab meeting instances.\n    room: Assigned lecture room, or null when absent.\n    lab: Assigned lab resource, or null for a no-lab section.\n    lab_index: Index of the lab meeting in ``times``, or null for no lab."
+        "description": "One course assignment in the JSON representation of a generated schedule.\n\nFields:\n    course: Course identifier including its generated section suffix.\n    faculty: Faculty member assigned to teach the course.\n    times: Ordered lecture and optional lab meeting instances.\n    room: Assigned lecture room, or null when absent.\n    lab: Assigned lab resource, or null for a no-lab section.\n    lab_index: Index of the lab meeting in ``times``, or null for no lab.\n    reserve_room_during_lab: Whether the lab meeting also occupies the room."
       },
       "CourseModality": {
         "type": "string",
@@ -1849,6 +1854,7 @@
         "properties": {
           "status": {
             "type": "string",
+            "const": "healthy",
             "title": "Status"
           },
           "active_sessions": {
@@ -2611,6 +2617,11 @@
           },
           "status": {
             "type": "string",
+            "enum": [
+              "satisfiable",
+              "unsatisfiable",
+              "unknown"
+            ],
             "title": "Status"
           },
           "conflicting_constraints": {
@@ -2790,7 +2801,7 @@
           "reason"
         ],
         "title": "ScheduleDiagnosisResponse",
-        "description": "Structured hard-constraint feasibility analysis for a schedule session.\n\nFields:\n    schedule_id: Session whose configuration was diagnosed.\n    status: Solver feasibility status: satisfiable, unsatisfiable, or unknown.\n    conflicting_constraints: Minimal primary set of conflicting hard rules.\n    alternative_conflict_sets: Other independently discovered conflict cores.\n    supporting_facts: Relevant non-core facts that explain the conflict.\n    relaxation_suggestions: Ranked configuration changes derived from findings.\n    repair_sets: Solver-verified combinations of relaxations.\n    candidate_domains: Per-course candidate resources and eliminations.\n    capacity_analysis: Necessary resource and workload capacity calculations.\n    day_feasibility: Per-faculty, per-day availability feasibility facts.\n    preflight_findings: Static contradictions found before core extraction.\n    provenance: Edges linking facts, configuration, and conclusions.\n    configuration_fingerprint: Stable digest of the diagnosed configuration.\n    core_is_minimal: Whether the primary conflict core was proven minimal.\n    alternative_cores_complete: Whether alternative-core enumeration completed.\n    repair_sets_complete: Whether repair-set enumeration completed.\n    diagnostic_completeness: Overall completeness classification.\n    diagnostic_version: Version of the diagnostic response semantics.\n    elapsed_ms: Total diagnostic execution time in milliseconds.\n    solver_timeout_ms: Solver timeout used, or null when no timeout was set.\n    reason: Solver or diagnostic explanation for an indeterminate result."
+        "description": "Structured hard-constraint feasibility analysis for a schedule session.\n\nFields:\n    schedule_id: Session whose configuration was diagnosed.\n    status: Solver feasibility status: satisfiable, unsatisfiable, or unknown.\n    conflicting_constraints: Primary set of conflicting hard rules; consult\n        ``core_is_minimal`` to determine whether subset-minimality was proved.\n    alternative_conflict_sets: Other independently discovered conflict cores.\n    supporting_facts: Relevant non-core facts that explain the conflict.\n    relaxation_suggestions: Ranked configuration changes derived from findings.\n    repair_sets: Solver-verified combinations of relaxations.\n    candidate_domains: Per-course candidate resources and eliminations.\n    capacity_analysis: Necessary resource and workload capacity calculations.\n    day_feasibility: Per-faculty, per-day availability feasibility facts.\n    preflight_findings: Static contradictions found before core extraction.\n    provenance: Edges linking facts, configuration, and conclusions.\n    configuration_fingerprint: Stable digest of the diagnosed configuration.\n    core_is_minimal: Whether the primary conflict core was proven minimal.\n    alternative_cores_complete: Whether alternative-core enumeration completed.\n    repair_sets_complete: Whether repair-set enumeration completed.\n    diagnostic_completeness: Overall completeness classification.\n    diagnostic_version: Version of the diagnostic response semantics.\n    elapsed_ms: Total diagnostic execution time in milliseconds.\n    solver_timeout_ms: Solver timeout used, or null when no timeout was set.\n    reason: Solver or diagnostic explanation for an indeterminate result."
       },
       "ScheduleResponse": {
         "properties": {
@@ -2860,6 +2871,7 @@
               "$ref": "#/components/schemas/CourseConfig-Input"
             },
             "type": "array",
+            "minItems": 1,
             "title": "Courses",
             "description": "List of course configurations",
             "example": [
@@ -2887,6 +2899,7 @@
               "$ref": "#/components/schemas/FacultyConfig-Input"
             },
             "type": "array",
+            "minItems": 1,
             "title": "Faculty",
             "description": "List of faculty configurations",
             "example": [
@@ -2967,6 +2980,7 @@
               "$ref": "#/components/schemas/CourseConfig-Output"
             },
             "type": "array",
+            "minItems": 1,
             "title": "Courses",
             "description": "List of course configurations",
             "example": [
@@ -2994,6 +3008,7 @@
               "$ref": "#/components/schemas/FacultyConfig-Output"
             },
             "type": "array",
+            "minItems": 1,
             "title": "Faculty",
             "description": "List of faculty configurations",
             "example": [
@@ -3046,10 +3061,23 @@
           },
           "state": {
             "type": "string",
+            "enum": [
+              "initializing",
+              "generating",
+              "complete",
+              "ready"
+            ],
             "title": "State"
           },
           "background_state": {
             "type": "string",
+            "enum": [
+              "not_started",
+              "running",
+              "cancelled",
+              "failed",
+              "completed"
+            ],
             "title": "Background State"
           },
           "background_error": {
@@ -3084,6 +3112,11 @@
           },
           "enumeration_scope": {
             "type": "string",
+            "enum": [
+              "exhausted",
+              "bounded_by_requested_limit",
+              "indeterminate"
+            ],
             "title": "Enumeration Scope"
           },
           "known_distinct_schedules": {
@@ -3134,7 +3167,7 @@
           "max_schedules_per_session"
         ],
         "title": "SessionDiagnosticResponse",
-        "description": "Operational state, resource safeguards, and completion metadata for a session.\n\nFields:\n    schedule_id: Unique identifier for the generation session.\n    state: Overall state: initializing, generating, complete, or ready.\n    background_state: Lifecycle state of the generate-all background task.\n    background_error: Last background failure text, if generation failed.\n    completion_reason: Machine-oriented explanation for terminal generation.\n    generated_schedules: Number of schedules currently retained.\n    requested_schedule_limit: Client-requested maximum enumeration count.\n    enumeration_scope: Whether results exhausted the space or stopped at a bound.\n    known_distinct_schedules: Distinct schedules observed in this session.\n    idle_seconds: Rounded seconds since the session was last accessed.\n    session_ttl_seconds: Configured idle expiry threshold.\n    solver_timeout_ms: Configured timeout for each solver check.\n    max_courses: Configured course-count submission limit.\n    max_candidate_slots: Configured candidate-slot estimate limit.\n    max_schedules_per_session: Configured per-session enumeration limit."
+        "description": "Operational state, resource safeguards, and completion metadata for a session.\n\nFields:\n    schedule_id: Unique identifier for the generation session.\n    state: Overall state: initializing, generating, complete, or ready.\n    background_state: Lifecycle state of the generate-all background task.\n    background_error: Last background failure text, if generation failed.\n    completion_reason: Machine-oriented explanation for terminal generation.\n    generated_schedules: Number of schedules currently retained.\n    requested_schedule_limit: Client-requested maximum enumeration count.\n    enumeration_scope: Whether results exhausted the space, stopped at the\n        requested bound, or remain indeterminate.\n    known_distinct_schedules: Distinct schedules observed in this session.\n    idle_seconds: Rounded seconds since the session was last accessed.\n    session_ttl_seconds: Configured idle expiry threshold.\n    solver_timeout_ms: Configured timeout for each solver check.\n    max_courses: Configured course-count submission limit.\n    max_candidate_slots: Configured candidate-slot estimate limit.\n    max_schedules_per_session: Configured per-session enumeration limit."
       },
       "SubmitResponse": {
         "properties": {

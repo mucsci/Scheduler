@@ -96,9 +96,9 @@ if not audit.is_valid:
         print(violation.message)
 ```
 
-`audit_schedule()` does not query Z3. The independent auditor validates the supplied decoded schedule against normalized policies
-and reports workload, resource use, enabled objective scores, and unmet preference outcomes. Unknown faculty names
-can raise `KeyError` while preference scoring is enabled.
+`audit_schedule()` does not query Z3. The independent auditor validates the supplied decoded schedule against
+normalized policies and reports workload, resource use, enabled objective scores, and unmet preference outcomes.
+Unknown or ineligible assignment values are returned as violations rather than causing lookup failures.
 
 ## Diagnostic contracts
 
@@ -122,6 +122,10 @@ with JSONWriter("schedules.json") as json_writer, CSVWriter("schedules.csv") as 
         csv_writer.add_schedule(schedule)
 ```
 
+JSON rows include `reserve_room_during_lab` so consumers can distinguish lecture-room occupancy from the separate
+lab assignment. CSV uses standard quoting for commas, quotes, and newlines; absent room/lab assignments are empty
+fields rather than the string `None`.
+
 ## Naming: two different `Course` concepts
 
 - `scheduler.config.Course` is a string course-id type alias used by JSON configuration.
@@ -133,9 +137,9 @@ with JSONWriter("schedules.json") as json_writer, CSVWriter("schedules.csv") as 
 ## Full API surface
 
 See **Reference** for Fern-generated pages covering importable modules, public callables, parameters, exceptions,
-execution semantics, and datatype fields. `Scheduler` is the stable façade; `SchedulingProblem`, `SolverEngine`,
-`RoomConfig` and `LabConfig` are public configuration models. `DiagnosticEngine` and `ScheduleAuditor` are internal architectural components despite being importable from their
-implementation modules.
+execution semantics, and datatype fields. `Scheduler`, `RoomConfig`, and `LabConfig` are public interfaces.
+`SchedulingProblem`, `SolverEngine`, `DiagnosticEngine`, and `ScheduleAuditor` are internal architectural
+components despite being importable from their implementation modules.
 
 ## Local regeneration
 

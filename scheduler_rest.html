@@ -119,7 +119,11 @@
             <div id="faculty" class="gap grid"></div>
         </div>
 
-        <script src="https://d3js.org/d3.v7.min.js"></script>
+        <script
+            src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"
+            integrity="sha384-CjloA8y00+1SDAUkjs099PVfnY2KmDC2BZnws9kh8D/lX1s46w6EPhpXdqMfjK6i"
+            crossorigin="anonymous"
+        ></script>
         <script type="text/javascript">
             // Layout constants
             const DAY_WIDTH = 110;
@@ -131,7 +135,6 @@
             let currentSessionId = null;
             let currentIndex = -1;
             let totalGenerated = 0;
-            let scheduleLimit = 10;
             let cleanupTriggered = false;
             let cachedCountData = null; // Cache for count data
 
@@ -203,7 +206,6 @@
                     if (response.ok) {
                         const result = await response.json();
                         currentSessionId = result.schedule_id;
-                        scheduleLimit = configData.limit;
                         currentIndex = -1;
                         totalGenerated = 0;
                         cleanupTriggered = false;
@@ -325,14 +327,14 @@
                     clearInterval(countPollingInterval);
                 }
 
-                // Poll every 2 seconds
+                // Poll every second
                 countPollingInterval = setInterval(async () => {
                     const countData = await getScheduleCount();
                     if (countData) {
                         totalGenerated = countData.current_count;
                         updateNavigation(countData); // Pass the fresh data
 
-                        // Stop polsling if generation is complete
+                        // Stop polling if generation is complete
                         if (countData.is_complete) {
                             clearInterval(countPollingInterval);
                             countPollingInterval = null;
@@ -380,12 +382,13 @@
 
             function map_course(c) {
                 const result = [];
-                const {course, faculty, room, times, lab, lab_index} = c;
+                const {course, faculty, room, times, lab, lab_index, reserve_room_during_lab} = c;
 
                 for (const t in times) {
                     const entry = {...times[t]};
                     entry['name'] = course;
-                    entry['room'] = room;
+                    const isLab = Number(t) === lab_index;
+                    entry['room'] = entry.delivery === 'online' || (isLab && !reserve_room_during_lab) ? null : room;
                     entry['faculty'] = faculty;
                     result.push(entry);
                 }
@@ -514,8 +517,9 @@
                         .attr('x', 0).attr('y', d => (d - minHour) * 60 + SVG_PADDING)
                         .attr('dy', 12)
                         .text(d => {
-                            const h = (d > 12) ? d - 12 : d;
-                            const ap = (d >= 12) ? "PM" : "AM";
+                            const normalized = d % 24;
+                            const h = normalized % 12 || 12;
+                            const ap = normalized >= 12 ? "PM" : "AM";
                             return h + ":00" + ap;
                         })
                         .style("font-size", "10px");
@@ -559,8 +563,9 @@
                             const fn = (t) => {
                                 const hh = Math.floor(t / 60);
                                 const mm = t % 60;
-                                const h = (hh > 12) ? hh - 12 : hh;
-                                const ap = (hh >= 12) ? "PM" : "AM";
+                                const normalized = hh % 24;
+                                const h = normalized % 12 || 12;
+                                const ap = normalized >= 12 ? "PM" : "AM";
                                 return h + ":" + String(mm).padStart(2, '0') + ap;
                             };
                             return fn(d.start) + "-" + fn(d.start + d.duration);
@@ -672,8 +677,9 @@
                         .attr('x', 0).attr('y', d => (d - minHour) * 60 + SVG_PADDING)
                         .attr('dy', 12)
                         .text(d => {
-                            const h = (d > 12) ? d - 12 : d;
-                            const ap = (d >= 12) ? "PM" : "AM";
+                            const normalized = d % 24;
+                            const h = normalized % 12 || 12;
+                            const ap = normalized >= 12 ? "PM" : "AM";
                             return h + ":00" + ap;
                         })
                         .style("font-size", "10px");
@@ -688,8 +694,12 @@
                                 entry['faculty'] = c.faculty;
 
                                 // Consolidate room and lab information
-                                if (c.lab && t == c.lab_index) {
-                                    entry['room'] = `${c.room} (${c.lab})`;
+                                if (entry.delivery === 'online') {
+                                    entry['room'] = 'Online';
+                                } else if (c.lab && t == c.lab_index) {
+                                    entry['room'] = c.reserve_room_during_lab && c.room
+                                        ? `${c.room} (${c.lab})`
+                                        : c.lab;
                                 } else {
                                     entry['room'] = c.room;
                                 }
@@ -738,8 +748,9 @@
                             const fn = (t) => {
                                 const hh = Math.floor(t / 60);
                                 const mm = t % 60;
-                                const h = (hh > 12) ? hh - 12 : hh;
-                                const ap = (hh >= 12) ? "PM" : "AM";
+                                const normalized = hh % 24;
+                                const h = normalized % 12 || 12;
+                                const ap = normalized >= 12 ? "PM" : "AM";
                                 return h + ":" + String(mm).padStart(2, '0') + ap;
                             };
                             return fn(d.start) + "-" + fn(d.start + d.duration);

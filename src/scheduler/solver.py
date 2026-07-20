@@ -4,6 +4,7 @@ import itertools
 import time
 from collections import defaultdict
 from collections.abc import Callable, Generator, Mapping, Sequence
+from copy import copy, deepcopy
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import cast
@@ -32,6 +33,8 @@ class RelationTables:
         lab_next_to: Relation indicating lab-meeting adjacency.
         room_overlaps: Cached, total room-occupancy relations keyed by the two
             courses' lab-reservation policies.
+        room_next_to: Cached, total room-occupancy adjacency relations keyed by
+            the two courses' lab-reservation policies.
     """
 
     constraints: tuple[z3.BoolRef, ...]
@@ -41,6 +44,7 @@ class RelationTables:
     faculty_available: z3.FuncDeclRef
     lab_next_to: z3.FuncDeclRef
     room_overlaps: Mapping[RoomOverlapKey, z3.FuncDeclRef]
+    room_next_to: Mapping[RoomOverlapKey, z3.FuncDeclRef]
 
 
 @dataclass(frozen=True)
@@ -59,7 +63,7 @@ class Z3Symbols:
     """
 
     time_slot_sort: z3.SortRef
-    time_slot_constants: frozenbidict[TimeSlot, z3.ExprRef]
+    time_slot_constants: frozenbidict[TimeSlot | None, z3.ExprRef]
     faculty_sort: z3.SortRef
     faculty_constants: frozenbidict[str, z3.ExprRef]
     room_sort: z3.SortRef
@@ -127,7 +131,7 @@ class SolverEngine:
     """Own the complete Z3 lifecycle for one normalized problem."""
 
     def _create_course_variables(self, z3_data: Z3Symbols) -> None:
-        """Create solver-owned variables without mutating normalized courses."""
+        """Create solver-owned variables and populate legacy course mirrors."""
         for course in self._courses:
             variables = CourseVariables(
                 time=z3.Const(f"{course}_time", z3_data.time_slot_sort),
@@ -136,6 +140,10 @@ class SolverEngine:
                 lab=z3.Const(f"{course}_lab", z3_data.lab_sort),
             )
             self._course_variables[str(course)] = variables
+            course.time = variables.time
+            course.faculty = variables.faculty
+            course.room = variables.room
+            course.lab = variables.lab
 
     def _variables(self, course: Course) -> CourseVariables:
         return self._course_variables[str(course)]
@@ -159,6 +167,26 @@ class SolverEngine:
         """
         return self._artifacts
 
+    @property
+    def enumeration_completion_reason(self) -> str | None:
+        """Return why the most recently consumed model generator terminated.
+
+        Args:
+            None.
+
+        Returns:
+            A stable completion reason after solver exhaustion or an unknown result,
+            otherwise ``None`` while enumeration is active or has not started.
+
+        Raises:
+            None.
+
+        Behavior:
+            Reports metadata recorded by the latest ``get_models`` generator without
+            advancing, restarting, or otherwise mutating that generator.
+        """
+        return self._enumeration_completion_reason
+
     def _create_z3_enumsorts(self) -> Z3Symbols:
         """
         Create Z3 EnumSorts for time slots, faculty, rooms, and labs.
@@ -173,10 +201,13 @@ class SolverEngine:
         # Use one enum value per distinct slot so no unreachable enum constant is
         # left unconstrained when the value-to-symbol lookup deduplicates them.
         unique_slots = tuple(dict.fromkeys(self._slots))
-        time_slot_names = [f"time_slot_{i}" for i in range(len(unique_slots))]
+        time_slot_values: tuple[TimeSlot | None, ...] = unique_slots or (None,)
+        time_slot_names = (
+            ["time_slot_none"] if not unique_slots else [f"time_slot_{i}" for i in range(len(unique_slots))]
+        )
         time_slot_sort, time_slot_constants = z3.EnumSort("TimeSlot", time_slot_names, ctx=self._ctx)
         time_slot_constants_dict = frozenbidict(
-            {time_slot: time_slot_constants[i] for i, time_slot in enumerate(unique_slots)}
+            {time_slot: time_slot_constants[i] for i, time_slot in enumerate(time_slot_values)}
         )
 
         # Create Faculty EnumSort
@@ -235,10 +266,15 @@ class SolverEngine:
         # Normalize all solver-independent configuration once. The aliases below
         # preserve the existing internal consumers until they move behind their
         # dedicated engines.
+        if solver_timeout_ms is not None and (
+            isinstance(solver_timeout_ms, bool) or not isinstance(solver_timeout_ms, int) or solver_timeout_ms <= 0
+        ):
+            raise ValueError("solver_timeout_ms must be a positive integer or None")
         self._problem = problem
         self._optimizer_flags = self._problem.optimizer_flags
         self._limit = self._problem.limit
         self._solver_timeout_ms = solver_timeout_ms
+        self._enumeration_completion_reason: str | None = None
         self._full_config = self._problem.full_config
 
         # Initialize Z3 context
@@ -266,7 +302,9 @@ class SolverEngine:
         self._lab_features = {name: policy.features for name, policy in self._problem.lab_policies.items()}
         self._room_availability = {name: policy.availability for name, policy in self._problem.room_policies.items()}
         self._lab_availability = {name: policy.availability for name, policy in self._problem.lab_policies.items()}
-        self._courses = self._problem.courses
+        # Solver-owned copies carry legacy Z3 variable mirrors while the normalized
+        # SchedulingProblem remains independent of Z3 state.
+        self._courses = deepcopy(self._problem.courses)
         self._slots = self._problem.slots
         self._ranges = self._problem.slot_ranges
         self._compatible_slots_by_course = self._problem._compatible_slots_by_course
@@ -401,6 +439,15 @@ class SolverEngine:
         """Return whether any meetings in two occupancy sets overlap."""
         return any(TimeSlot._overlaps(first, second) for first in left for second in right)
 
+    @staticmethod
+    def _meetings_next_to(
+        left: Sequence[TimeInstance],
+        right: Sequence[TimeInstance],
+        max_time_gap,
+    ) -> bool:
+        """Return whether any meetings in two occupancy sets satisfy adjacency."""
+        return any(TimeSlot._diff_between_slots(first, second) <= max_time_gap for first in left for second in right)
+
     def _room_overlap_key(self, left: Course, right: Course) -> RoomOverlapKey:
         """Return the reusable room-occupancy relation key for a course pair."""
         return (left.reserve_room_during_lab, right.reserve_room_during_lab)
@@ -424,18 +471,61 @@ class SolverEngine:
         # Define the relation over the complete enum domain. Diagnostics may
         # intentionally relax course time-domain constraints; a partial table
         # would make those repair checks depend on unconstrained function values.
-        for left_slot in self._slots:
-            for right_slot in self._slots:
+        for left_slot in z3_data.time_slot_constants:
+            for right_slot in z3_data.time_slot_constants:
                 constants = (
                     z3_data.time_slot_constants[left_slot],
                     z3_data.time_slot_constants[right_slot],
                 )
-                overlaps = self._meetings_overlap(
-                    self._room_times(left_slot, include_lab=reserve_left),
-                    self._room_times(right_slot, include_lab=reserve_right),
+                overlaps = (
+                    left_slot is not None
+                    and right_slot is not None
+                    and self._meetings_overlap(
+                        self._room_times(left_slot, include_lab=reserve_left),
+                        self._room_times(right_slot, include_lab=reserve_right),
+                    )
                 )
                 (true if overlaps else false).append(constants)
 
+        constraints: list[z3.BoolRef] = []
+        if true:
+            constraints.append(cast(z3.BoolRef, z3.And([z3fn(left, right) for left, right in true])))
+        if false:
+            constraints.append(cast(z3.BoolRef, z3.And([z3.Not(z3fn(left, right)) for left, right in false])))
+        return z3fn, constraints
+
+    def _z3ify_room_adjacency_constraint(
+        self,
+        z3_data: Z3Symbols,
+        name: str,
+        key: RoomOverlapKey,
+    ) -> tuple[z3.FuncDeclRef, list[z3.BoolRef]]:
+        """Define one room-occupancy adjacency relation over the complete slot enum."""
+        reserve_left, reserve_right = key
+        z3fn = z3.Function(
+            name,
+            z3_data.time_slot_sort,
+            z3_data.time_slot_sort,
+            z3.BoolSort(ctx=self._ctx),
+        )
+        true: list[tuple[z3.ExprRef, z3.ExprRef]] = []
+        false: list[tuple[z3.ExprRef, z3.ExprRef]] = []
+        for left_slot in z3_data.time_slot_constants:
+            for right_slot in z3_data.time_slot_constants:
+                constants = (
+                    z3_data.time_slot_constants[left_slot],
+                    z3_data.time_slot_constants[right_slot],
+                )
+                adjacent = (
+                    left_slot is not None
+                    and right_slot is not None
+                    and self._meetings_next_to(
+                        self._room_times(left_slot, include_lab=reserve_left),
+                        self._room_times(right_slot, include_lab=reserve_right),
+                        left_slot.max_time_gap,
+                    )
+                )
+                (true if adjacent else false).append(constants)
         constraints: list[z3.BoolRef] = []
         if true:
             constraints.append(cast(z3.BoolRef, z3.And([z3fn(left, right) for left, right in true])))
@@ -456,10 +546,10 @@ class SolverEngine:
         true: list[tuple[z3.BoolRef, z3.BoolRef]] = []
         false: list[tuple[z3.BoolRef, z3.BoolRef]] = []
 
-        for slot_i, slot_j in itertools.combinations_with_replacement(self._slots, 2):
+        for slot_i, slot_j in itertools.combinations_with_replacement(z3_data.time_slot_constants, 2):
             c_i = cast(z3.BoolRef, z3_data.time_slot_constants[slot_i])
             c_j = cast(z3.BoolRef, z3_data.time_slot_constants[slot_j])
-            if self._cached_slot_relationship(name, slot_i, slot_j):
+            if slot_i is not None and slot_j is not None and self._cached_slot_relationship(name, slot_i, slot_j):
                 true.append((c_i, c_j))
                 true.append((c_j, c_i))
             else:
@@ -491,9 +581,9 @@ class SolverEngine:
 
         true: list[z3.BoolRef] = []
         false: list[z3.BoolRef] = []
-        for slot in self._slots:
+        for slot in z3_data.time_slot_constants:
             c = cast(z3.BoolRef, z3_data.time_slot_constants[slot])
-            if fn(slot):
+            if slot is not None and fn(slot):
                 true.append(c)
             else:
                 false.append(c)
@@ -520,9 +610,9 @@ class SolverEngine:
             false: list[tuple[z3.BoolRef, z3.BoolRef]] = []
             faculty_times = self._faculty_availability[faculty]
             faculty_constant = cast(z3.BoolRef, z3_data.faculty_constants[faculty])
-            for slot in self._slots:
+            for slot in z3_data.time_slot_constants:
                 slot_constant = cast(z3.BoolRef, z3_data.time_slot_constants[slot])
-                if slot.in_time_ranges(faculty_times):
+                if slot is not None and slot.in_time_ranges(faculty_times):
                     true.append((faculty_constant, slot_constant))
                 else:
                     false.append((faculty_constant, slot_constant))
@@ -574,6 +664,7 @@ class SolverEngine:
                 if key not in room_overlap_keys:
                     room_overlap_keys.append(key)
         room_overlaps: dict[RoomOverlapKey, z3.FuncDeclRef] = {}
+        room_next_to: dict[RoomOverlapKey, z3.FuncDeclRef] = {}
         room_overlap_constraints: list[z3.BoolRef] = []
         for index, key in enumerate(room_overlap_keys):
             relation, constraints = self._z3ify_room_overlap_constraint(
@@ -582,6 +673,13 @@ class SolverEngine:
                 key,
             )
             room_overlaps[key] = relation
+            room_overlap_constraints.extend(constraints)
+            adjacency, constraints = self._z3ify_room_adjacency_constraint(
+                z3_data,
+                f"room_next_to_{index}",
+                key,
+            )
+            room_next_to[key] = adjacency
             room_overlap_constraints.extend(constraints)
 
         function_constraints: list[z3.BoolRef] = []
@@ -600,6 +698,7 @@ class SolverEngine:
             faculty_available=faculty_available,
             lab_next_to=lab_next_to,
             room_overlaps=MappingProxyType(room_overlaps),
+            room_next_to=MappingProxyType(room_next_to),
         )
 
     def _build_faculty_constraints(self, z3_data: Z3Symbols) -> list[z3.BoolRef]:
@@ -722,7 +821,7 @@ class SolverEngine:
             )
 
             # Mandatory-day constraints
-            for mandatory_day in mandatory_days:
+            for mandatory_day in sorted(mandatory_days):
                 indicator = day_indicator_map.get(mandatory_day, z3.BoolVal(False, ctx=self._ctx))
                 faculty_constraints.append(self._simplify(indicator))
                 self._diagnostic_constraints.append(
@@ -1253,9 +1352,14 @@ class SolverEngine:
                 raise ValueError(f"Invalid model: {model}")
 
             # Create CourseInstance
+            decoded_course = copy(course)
+            decoded_course.labs = list(course.labs)
+            decoded_course.rooms = list(course.rooms)
+            decoded_course.conflicts = list(course.conflicts)
+            decoded_course.faculties = list(course.faculties)
             course_instance = CourseInstance(
-                course=course,
-                time=time,
+                course=decoded_course,
+                time=time.model_copy(deep=True),
                 faculty=faculty,
                 room=room,
                 lab=lab,
@@ -1280,40 +1384,16 @@ class SolverEngine:
         - `None`
         """
         m: z3.ModelRef = s.model()
-        rearranged = []
-        per_course = []
-        # group courses by faculty first
-        for _, group_iter in itertools.groupby(self._courses, key=lambda x: m[self._variables(x).faculty]):
-            group = list(group_iter)
-            for _, cs_iter in itertools.groupby(group, key=lambda x: x.course_id):
-                cs = list(cs_iter)
-                if len(cs) > 1:
-                    rearranged.append(
-                        z3.And(
-                            [
-                                z3.And(
-                                    self._variables(i).time != m[self._variables(j).time],
-                                    self._variables(j).time != m[self._variables(i).time],
-                                )
-                                for i, j in itertools.combinations(cs, 2)
-                            ]
-                        )
-                    )
-                for c in cs:
-                    per_instance = []
-                    per_instance.append(self._variables(c).time == m[self._variables(c).time])
-                    if c.rooms:
-                        per_instance.append(self._variables(c).room == m[self._variables(c).room])
-                    if c.labs:
-                        per_instance.append(self._variables(c).lab == m[self._variables(c).lab])
-                    per_course.append(z3.Not(z3.And(per_instance)))
-
-        if rearranged:
-            logger.debug(f"Adding 1 course rearrangement constraint with {len(rearranged)} predicates")
-            s.add(z3.And(rearranged))
-        if per_course:
-            logger.debug(f"Adding 1 per-course constraint with {len(per_course)} predicates")
-            s.add(z3.Or(per_course))
+        assignment_equalities = []
+        for course in self._courses:
+            variables = self._variables(course)
+            assignment_equalities.extend(
+                variable == m.eval(variable, model_completion=True)
+                for variable in (variables.time, variables.faculty, variables.room, variables.lab)
+            )
+        if assignment_equalities:
+            logger.debug("Blocking the complete emitted schedule assignment")
+            s.add(z3.Not(z3.And(assignment_equalities)))
 
     def get_models(self) -> Generator[list[CourseInstance], None, None]:
         """Generate optimized schedules lazily in stable model-blocking order.
@@ -1334,6 +1414,7 @@ class SolverEngine:
             optimal model, yields it, and blocks the emitted arrangement before the
             next check. Unknown and unsatisfiable results terminate enumeration.
         """
+        self._enumeration_completion_reason = None
         s = z3.Optimize(ctx=self._ctx)
 
         if self._solver_timeout_ms is not None:
@@ -1467,7 +1548,10 @@ class SolverEngine:
                                 self._room_is_assigned(self._variables(i).room),
                                 self._room_is_assigned(self._variables(j).room),
                                 self._variables(i).room == self._variables(j).room,
-                                self._function_data.lecture_next_to(self._variables(i).time, self._variables(j).time),
+                                self._function_data.room_next_to[self._room_overlap_key(i, j)](
+                                    self._variables(i).time,
+                                    self._variables(j).time,
+                                ),
                             ),
                             1,
                             0,
@@ -1516,7 +1600,8 @@ class SolverEngine:
 
         for i in range(self._limit):
             start_time = time.time()
-            if s.check() == z3.sat:
+            result = s.check()
+            if result == z3.sat:
                 generation_time = time.time() - start_time
                 logger.debug(f"Schedule {i + 1} generation took {generation_time:.2f}s")
                 yield self._get_schedule(s.model())
@@ -1524,6 +1609,13 @@ class SolverEngine:
                     self._update(s)
                     i += 1
             else:
+                if result == z3.unsat:
+                    self._enumeration_completion_reason = "solution_space_exhausted"
+                else:
+                    reason = s.reason_unknown().lower()
+                    self._enumeration_completion_reason = (
+                        "solver_timeout" if "timeout" in reason or "canceled" in reason else "solver_unknown"
+                    )
                 generation_time = time.time() - start_time
                 if i == 0:
                     logger.error("No solution found")

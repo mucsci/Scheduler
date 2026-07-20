@@ -1,5 +1,8 @@
 """Unit tests for solver-independent problem normalization."""
 
+import pytest
+from pydantic import ValidationError
+
 from scheduler import CombinedConfig
 from scheduler.problem import SchedulingProblem
 from tests.scenario_builders import config_from, minimal_config_data, no_lab_config_data
@@ -116,6 +119,27 @@ def test_problem_supports_globally_empty_labs_and_snapshots_preferences() -> Non
     assert problem.labs == []
     assert problem.faculty_policies["F1"].course_preferences == {"CS101": 8}
     assert all(not slot.has_lab() for slot in problem.compatible_slots(problem.courses[0]))
+
+
+def test_problem_snapshots_the_complete_input_configuration() -> None:
+    config = config_from(minimal_config_data())
+    problem = SchedulingProblem.from_config(config)
+    fingerprint = problem.configuration_fingerprint()
+
+    config.config.courses[0].capacity = 1
+    config.config.rooms[0].capacity = 1
+
+    assert problem.courses[0].capacity == 30
+    assert problem.room_policies["R1"].capacity == 30
+    assert problem.configuration_fingerprint() == fingerprint
+
+
+def test_problem_revalidates_nested_container_mutations() -> None:
+    config = config_from(minimal_config_data())
+    config.config.courses.clear()
+
+    with pytest.raises(ValidationError):
+        SchedulingProblem.from_config(config)
 
 
 def test_problem_normalizes_resource_and_section_capacities() -> None:

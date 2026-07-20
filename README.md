@@ -21,7 +21,8 @@ The Course Constraint Scheduler is designed to solve complex academic scheduling
 - **Faculty constraints**: Availability, credit ranges, teaching-day rules, distinct-course limits, and preferences
 - **Resource constraints**: Capacity, required features, resource availability, eligibility, and collision prevention
 - **Time constraints**: Credit/lab/modality-compatible meeting patterns, fixed starts, delivery modes, overlap, and adjacency
-- **Course constraints**: Stable section ids, expected enrollment, one optional lab assignment, declared conflicts, faculty eligibility, and no-lab schedules
+- **Course constraints**: Stable section ids, expected enrollment, either no lab or one required lab assignment,
+  declared conflicts, faculty eligibility, and no-lab schedules
 - **Diagnostics and optimization**: Unsat cores, verified repairs, independent audits, and Pareto objectives
 
 ## Features
@@ -88,7 +89,10 @@ first_schedule = next(scheduler.get_models())
 audit = scheduler.audit_schedule(first_schedule)
 ```
 
-**Note on naming:** `scheduler.config` defines `Course` as a **course-id string** type alias (used in JSON config). `scheduler.models` defines a `Course` **class** representing a course with credits and meetings. Schedules from `get_models()` yield `CourseInstance` objects whose `.course` attribute is the models `Course`; use `.course.course_id` to get the config-style course id.
+**Note on naming:** `scheduler.config` defines `Course` as a **course-id string** type alias (used in JSON config).
+`scheduler.models` defines a `Course` **class** containing normalized section policy and legacy solver-variable
+mirrors. Schedules from `get_models()` yield `CourseInstance` objects whose `.course` attribute is the models
+`Course`; use `.course.course_id` to get the config-style course id.
 
 `Scheduler(config, solver_timeout_ms=...)` applies an optional timeout to each Z3 check. Structured raw validation
 is available through `validate_combined_config_data`. The published **Diagnostics and auditing** guide documents
@@ -211,10 +215,10 @@ The scheduler is built with a modular architecture:
 
 ## Performance
 
-- **Small Problems** (< 10 courses): Near-instantaneous solving
-- **Medium Problems** (10-50 courses): Seconds to minutes
-- **Large Problems** (50+ courses): May take several minutes
-- **Optimization**: Use appropriate optimizer flags to reduce solving time
+Solve time depends on the generated candidate-slot domain, resource and faculty choices, pairwise constraints,
+enabled objectives, timeout, and Z3 version. Course count alone is not a reliable predictor, so benchmark
+representative configurations in the target environment. Narrow availability and resource domains where they match
+the real problem, and disable objectives that are not required for a particular run.
 
 ## Development
 
@@ -307,7 +311,7 @@ For questions, issues, or feature requests:
 - Structured validation codes and JSON Pointer locations
 - Per-course candidate domains and rejected-pattern explanations
 - Faculty/resource capacity and mandatory-day feasibility analysis
-- Subset-minimal primary and bounded alternative unsat cores
+- Primary and bounded alternative unsat cores with explicit minimality and completeness flags
 - Ranked relaxation suggestions and solver-verified repair sets
 - Provenance edges, configuration fingerprints, completeness flags, and timeout reasons
 - Independent schedule, workload, resource, preference, and objective audits

@@ -14,7 +14,6 @@ dependencies = [
     "bidict~=0.23",
     "click~=8.2",
     "fastapi~=0.116",
-    "requests~=2.32",
     "pydantic~=2.11",
     "uvicorn[standard]~=0.35",
     "z3-solver~=4.15",

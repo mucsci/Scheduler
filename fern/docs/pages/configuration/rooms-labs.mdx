@@ -26,9 +26,11 @@ Under **`config`**, **`rooms`** and **`labs`** define the physical resources the
 
 - **`rooms`** — Required non-empty list of `RoomConfig` objects.
 - **`labs`** — Required list of `LabConfig` objects; may be empty if no course uses a lab.
-- **`name`** — Required nonblank string, unique within the corresponding room or lab list.
+- **`name`** — Required nonblank string without leading/trailing whitespace, unique within the corresponding room
+  or lab list.
 - **`capacity`** — Required positive integer containing the number of students the resource accommodates.
-- **`features`** — Optional set/list of nonblank facility or equipment tags; defaults to empty.
+- **`features`** — Optional set/list of nonblank facility or equipment tags without leading/trailing whitespace;
+  defaults to empty.
 - **`times`** — Optional weekday map of availability ranges. `null` or omission means unrestricted. When a map is
   provided, missing weekdays and empty lists are unavailable.
 

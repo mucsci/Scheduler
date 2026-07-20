@@ -22,7 +22,9 @@ description: >-
 ## Naming trap: `Course`
 
 - **`scheduler.config`**: `Course` (and related types) align with **JSON config** — often **course id strings** and config-shaped structures.
-- **`scheduler.models`**: **`Course`** is a **class** (credits, meetings, …). Instances in schedules use **`CourseInstance`**; the config id is **`course_instance.course.course_id`**.
+- **`scheduler.models`**: **`Course`** is a **class** containing normalized section policy and legacy
+  solver-variable mirrors. Instances in schedules use **`CourseInstance`**; the config id is
+  **`course_instance.course.course_id`**.
 
 When touching types or docs, preserve this distinction to avoid breaking configs or the public API.
 
@@ -31,7 +33,8 @@ When touching types or docs, preserve this distinction to avoid breaking configs
 - Representative sample: **`example.json`**; smaller fixtures under **`tests/fixtures/`**.
 - Global rooms and labs are `RoomConfig` / `LabConfig` objects with positive capacity, feature tags, and optional
   availability. Courses and preference maps reference their names; every course section has expected enrollment
-  and may require features, stable identity, modality, and one optional lab assignment.
+  and may require features, stable identity, and modality. An empty course lab list means no lab; a non-empty list
+  requires exactly one assigned lab resource.
 - Capacity, features, resource availability, delivery mode, lab assignment, and optional lecture-room
   occupancy during labs are separate hard solver rules with tracked artifacts and independent auditor checks; do
   not fold them invisibly into reference validation.

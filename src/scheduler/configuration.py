@@ -36,7 +36,7 @@ def load_config_from_file[T: BaseModel](
     """
     with open(filename, encoding="utf-8") as config_file:
         data = json.load(config_file)
-    return config_cls(**data)
+    return config_cls.model_validate(data)
 
 
 def _json_pointer(location: tuple[object, ...]) -> str:

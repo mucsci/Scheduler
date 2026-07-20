@@ -10,12 +10,14 @@ from pathlib import Path
 
 import pytest
 from _pytest.outcomes import Skipped
+from click.testing import CliRunner
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from scheduler import CombinedConfig, Scheduler, load_config_from_file, validate_combined_config_data
 from scheduler import server as server_module
 from scheduler.config import CourseConfig
+from scheduler.main import main as scheduler_cli
 from scheduler.models import CourseInstance
 from scheduler.scheduler import get_faculty_availability
 from scheduler.server import (
@@ -28,6 +30,7 @@ from scheduler.server import (
     get_next_schedule,
     submit_schedule,
 )
+from scheduler.server import main as server_cli
 
 pytestmark = pytest.mark.integration
 
@@ -335,6 +338,36 @@ def test_cli_invalid_config_path_exits_nonzero(tmp_path: Path) -> None:
     assert result.returncode != 0
 
 
+def test_cli_accepts_optimizer_flags_and_rejects_nonpositive_limit(minimal_config_path: Path, tmp_path: Path) -> None:
+    output = tmp_path / "optimized"
+    valid = CliRunner().invoke(
+        scheduler_cli,
+        [
+            str(minimal_config_path),
+            "--limit",
+            "1",
+            "--format",
+            "json",
+            "--output",
+            str(output),
+            "-O",
+            "faculty_course",
+        ],
+    )
+    invalid = CliRunner().invoke(scheduler_cli, [str(minimal_config_path), "--limit", "0"])
+
+    assert valid.exit_code == 0, valid.output
+    assert output.with_suffix(".json").is_file()
+    assert invalid.exit_code == 2
+
+
+@pytest.mark.parametrize("args", [["--workers", "0"], ["--port", "0"], ["--port", "65536"]])
+def test_server_cli_rejects_invalid_numeric_bounds(args: list[str]) -> None:
+    result = CliRunner().invoke(server_cli, args)
+
+    assert result.exit_code == 2
+
+
 @pytest.fixture
 def client():
     return TestClient(app)
@@ -374,7 +407,11 @@ def test_server_submit_and_next_schedule(client: TestClient, minimal_combined_co
         assert status_body["state"] in {"ready", "complete"}
         assert status_body["solver_timeout_ms"] > 0
         assert status_body["max_candidate_slots"] > 0
-        assert status_body["enumeration_scope"] in {"exhausted", "bounded_by_requested_limit"}
+        assert status_body["enumeration_scope"] in {
+            "exhausted",
+            "bounded_by_requested_limit",
+            "indeterminate",
+        }
     finally:
         cleanup_session(schedule_id)
 
@@ -511,7 +548,7 @@ def test_server_enforces_active_session_limit(
         finally:
             cleanup_session(first.schedule_id)
 
-    assert asyncio.run(submit_twice()).status_code == 429
+    assert asyncio.run(submit_twice()).status_code == 422
 
 
 def test_server_expires_idle_sessions(minimal_combined_config: CombinedConfig, monkeypatch: pytest.MonkeyPatch) -> None:

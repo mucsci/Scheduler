@@ -59,18 +59,17 @@ end: End time must be after start time
 
 ## Performance
 
-Rough expectations (hardware-dependent):
-
-- **Small** — Few courses and faculty: often sub-second to seconds.
-- **Medium** — Tens of courses: seconds to minutes.
-- **Large** — Many courses and faculty: minutes possible.
+There is no fixed latency guarantee based on course count. Solve time depends on the generated candidate-slot
+domain, resource and faculty choices, pairwise constraints, enabled objectives, timeout, Z3 version, and hardware.
+Benchmark representative configurations in the environment where the scheduler will run.
 
 **Ideas to speed up or shrink search**
 
 - Tighten faculty `times` windows.
 - Reduce optional room/lab choices if not needed.
 - Fewer `optimizer_flags` while debugging.
-- Lower **`limit`**.
+- Lower REST **`limit`** to retain and transfer fewer schedules. This does not necessarily make finding the first
+  schedule faster.
 
 ## No schedules
 

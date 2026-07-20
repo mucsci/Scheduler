@@ -1,6 +1,7 @@
 """Public, solver-independent diagnostic result contracts."""
 
 from dataclasses import dataclass
+from typing import Literal
 
 
 @dataclass(frozen=True)
@@ -60,7 +61,8 @@ class ScheduleDiagnosis:
 
     Fields:
         status: Solver status: ``satisfiable``, ``unsatisfiable``, or ``unknown``.
-        conflicting_constraints: Primary subset-minimal unsatisfiable rule set.
+        conflicting_constraints: Primary unsatisfiable rule set, subset-minimized
+            when ``core_is_minimal`` is true.
         alternative_conflict_sets: Additional bounded subset-minimal rule sets.
         supporting_facts: Derived facts needed to interpret the primary conflict.
         relaxation_suggestions: Ranked configuration changes suggested by conflicts.
@@ -81,7 +83,7 @@ class ScheduleDiagnosis:
         reason: Solver-provided explanation when status is ``unknown``.
     """
 
-    status: str
+    status: Literal["satisfiable", "unsatisfiable", "unknown"]
     conflicting_constraints: tuple["ConstraintDiagnostic", ...] = ()
     alternative_conflict_sets: tuple[tuple["ConstraintDiagnostic", ...], ...] = ()
     supporting_facts: tuple["ConstraintDiagnostic", ...] = ()

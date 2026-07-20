@@ -30,7 +30,7 @@ def _get_writer(format: str, output_file: str | None) -> JSONWriter | CSVWriter:
 
 @click.command()
 @click.argument("config", type=click.Path(exists=True), required=True)
-@click.option("--limit", "-l", type=int, help="Maximum number of models to generate")
+@click.option("--limit", "-l", type=click.IntRange(min=1), help="Maximum number of models to generate")
 @click.option(
     "--format",
     "-f",
@@ -48,10 +48,10 @@ def _get_writer(format: str, output_file: str | None) -> JSONWriter | CSVWriter:
 )
 def main(
     config: str,
-    limit: int,
+    limit: int | None,
     format: str,
-    output: str,
-    optimizer_flags: list[OptimizerFlags],
+    output: str | None,
+    optimizer_flags: tuple[str, ...],
 ):
     """
     Run the command-line schedule generator and write selected models.
@@ -88,7 +88,7 @@ def main(
         full_config.limit = limit
     limit = full_config.limit
     if optimizer_flags:
-        full_config.optimizer_flags = optimizer_flags
+        full_config.optimizer_flags = [OptimizerFlags(flag) for flag in optimizer_flags]
 
     logger.info(f"Using limit={limit}")
 

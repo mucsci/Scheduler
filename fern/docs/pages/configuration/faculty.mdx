@@ -3,8 +3,8 @@ title: Faculty
 description: Faculty workload, availability, day caps, and preference maps under config.faculty.
 ---
 
-The required **`faculty`** list at `config.faculty` contains instructor policies. The list may be empty only for a
-configuration with no courses requiring an explicit or derived faculty candidate.
+The required **`faculty`** list at `config.faculty` contains instructor policies. It must contain at least one
+faculty policy.
 
 ## Example
 
@@ -51,6 +51,7 @@ configuration with no courses requiring an explicit or derived faculty candidate
 - `maximum_days` ≥ number of `mandatory_days`.
 - Preference keys must reference existing courses / rooms / labs.
 - Faculty `name` values must be unique.
+- Faculty names cannot be blank or contain leading or trailing whitespace.
 - Availability ranges require `end` later than `start`; ranges are not merged or inferred.
 
 ## Time format

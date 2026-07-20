@@ -4,6 +4,7 @@
     "faculty": "F1",
     "lab": "L1",
     "lab_index": 0,
+    "reserve_room_during_lab": true,
     "room": "R1",
     "times": [
       {

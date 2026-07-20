@@ -17,6 +17,8 @@ The Course Constraint Scheduler uses a **JSON** configuration that defines the s
 - **Cross-references** — Course rooms/labs/faculty/conflicts must name entities that exist in `config`.
 - **Business rules** — e.g. faculty min/max credits, mandatory days, no self-conflicts.
 - **Required capacities** — Resource capacities and each section's expected enrollment are positive integers.
+- **Stable identifiers** — Course, section, faculty, resource, and feature names reject blank values and
+  leading/trailing whitespace.
 - **Strict types** — Times and ranges use fixed string patterns (see below).
 - **No unknown keys** — Every model uses `extra="forbid"`; misspelled or future fields fail validation.
 - **No coercion** — `strict=True` rejects values such as a numeric string where an integer is required.

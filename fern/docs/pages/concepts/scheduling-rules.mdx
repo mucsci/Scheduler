@@ -72,7 +72,7 @@ inside `optimizer_flags` does not change that registration order.
 | `faculty_lab` | The assigned faculty member's configured score for the selected lab. No-lab courses add zero. |
 | `same_room` | One point for each eligible course pair taught by the same faculty member in the same non-null room. |
 | `same_lab` | One point for each eligible course-section pair taught by the same faculty member in the same lab. |
-| `pack_rooms` | One point for different-course pairs using the same non-null room when any meeting pair is adjacent. |
+| `pack_rooms` | One point for different-course pairs using the same non-null room when a pair of room-occupying physical meetings is adjacent. Online meetings and unreserved lab meetings do not count. |
 | `pack_labs` | One point for each different-course section pair using the same lab at adjacent lab times. |
 
 Missing preference keys and explicit preference value `0` contribute zero. Each generated schedule is blocked

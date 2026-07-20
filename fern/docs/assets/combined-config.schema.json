@@ -585,6 +585,7 @@
           "items": {
             "$ref": "#/$defs/CourseConfig"
           },
+          "minItems": 1,
           "title": "Courses",
           "type": "array"
         },
@@ -622,6 +623,7 @@
           "items": {
             "$ref": "#/$defs/FacultyConfig"
           },
+          "minItems": 1,
           "title": "Faculty",
           "type": "array"
         }

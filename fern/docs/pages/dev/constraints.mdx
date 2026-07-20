@@ -45,8 +45,10 @@ Aggregating unrelated faculty, course, or resource rules under one tracker makes
 - Preserve root exports and legacy imports from `scheduler.scheduler`.
 - Keep generated ordering, timeout handling, no-lab decoding, deterministic symbols, and model blocking covered by
   characterization tests.
-- Keep Z3 variables exclusively in `CourseVariables` inside solver artifacts. Normalized `Course` objects remain
-  solver-independent. Each course section has at most one optional lab assignment.
+- Create and own Z3 variables exclusively through `CourseVariables` inside solver artifacts. Solver-owned `Course`
+  copies retain the same variables as legacy compatibility mirrors, while `SchedulingProblem.courses` remains
+  solver-independent. Each course section has no lab when its candidate list is empty, or exactly one required lab
+  assignment when that list is non-empty.
 
 ## Testing layers
 

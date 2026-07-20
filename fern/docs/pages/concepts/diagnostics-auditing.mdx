@@ -55,8 +55,9 @@ The response can include:
   forced-resource, and singleton-pattern checks.
 - `day_feasibility`: every faculty/day cell with availability, eligible courses, and compatible/available patterns.
 - `preflight_findings`: deterministic contradictions and relevant derived facts found before core extraction.
-- `conflicting_constraints`: one subset-minimal unsatisfiable business-rule core.
-- `alternative_conflict_sets`: other bounded subset-minimal cores.
+- `conflicting_constraints`: one unsatisfiable business-rule core; `core_is_minimal` reports whether
+  subset-minimality was proved within the configured check conditions.
+- `alternative_conflict_sets`: other bounded cores that were subset-minimized within each completed search.
 - `supporting_facts`: configuration and workload facts needed to interpret the primary core.
 - `relaxation_suggestions`: ranked edits inferred from findings; these are suggestions, not solver proofs.
 - `repair_sets`: bounded rule combinations that the solver verified restore feasibility when relaxed.

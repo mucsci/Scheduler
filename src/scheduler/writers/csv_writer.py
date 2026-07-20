@@ -85,5 +85,5 @@ class CSVWriter:
         """
         if self.filename:
             content = "\n\n".join(self.schedules)
-            with open(self.filename, "w", encoding="utf-8") as f:
+            with open(self.filename, "w", encoding="utf-8", newline="") as f:
                 f.write(content)

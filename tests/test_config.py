@@ -229,6 +229,21 @@ def test_meeting_start_time_overrides_pattern_start_time() -> None:
     assert {slot.times[0].start.value for slot in slots} == {12 * 60}
 
 
+def test_time_slot_generator_cache_does_not_expose_mutable_results() -> None:
+    config = CombinedConfig.model_validate(minimal_config_data()).time_slot_config
+    generator = TimeSlotGenerator(config)
+    first = generator.time_slots(4)
+    expected = str(first[0])
+    first.clear()
+
+    second = generator.time_slots(4)
+    second[0].times.clear()
+    config.classes[0].disabled = True
+
+    assert generator.time_slots(4)
+    assert str(generator.time_slots(4)[0]) == expected
+
+
 # --- FacultyConfig ---
 
 
@@ -392,6 +407,54 @@ def _minimal_scheduler_kwargs():
     }
 
 
+@pytest.mark.parametrize("field", ["courses", "faculty"])
+def test_scheduler_config_requires_nonempty_courses_and_faculty(field: str) -> None:
+    kwargs = _minimal_scheduler_kwargs()
+    kwargs[field] = []
+
+    with pytest.raises(ValidationError) as error:
+        SchedulerConfig(**kwargs)
+
+    assert error.value.errors()[0]["loc"] == (field,)
+
+
+@pytest.mark.parametrize(
+    "mutate,expected_path",
+    [
+        (lambda data: data["config"]["courses"][0].update({"course_id": " "}), "/config/courses/0/course_id"),
+        (lambda data: data["config"]["faculty"][0].update({"name": "\t"}), "/config/faculty/0/name"),
+        (lambda data: data["config"]["courses"][0].update({"room": ["missing"]}), "/config/courses/0/room/0"),
+        (lambda data: data["config"]["courses"][0].update({"lab": ["missing"]}), "/config/courses/0/lab/0"),
+        (lambda data: data["config"]["courses"][0].update({"faculty": ["missing"]}), "/config/courses/0/faculty/0"),
+    ],
+)
+def test_raw_validation_reports_precise_identity_and_reference_paths(mutate, expected_path: str) -> None:
+    data = minimal_config_data()
+    mutate(data)
+
+    result = validate_combined_config_data(data)
+
+    assert result.is_valid is False
+    assert result.diagnostics[0].path == expected_path
+
+
+@pytest.mark.parametrize(
+    ("target", "expected_path"),
+    [("room", "/config/rooms/0/times/MON"), ("faculty", "/config/faculty/0/times/MON")],
+)
+def test_raw_validation_handles_malformed_availability_collections(target: str, expected_path: str) -> None:
+    data = minimal_config_data()
+    if target == "room":
+        data["config"]["rooms"][0]["times"] = {"MON": None}
+    else:
+        data["config"]["faculty"][0]["times"] = {"MON": None}
+
+    result = validate_combined_config_data(data)
+
+    assert result.is_valid is False
+    assert result.diagnostics[0].path == expected_path
+
+
 @pytest.mark.parametrize("model", [RoomConfig, LabConfig])
 def test_resource_config_requires_nonblank_name_and_positive_capacity(model) -> None:
     assert model(name="Resource", capacity=1).capacity == 1
@@ -399,6 +462,41 @@ def test_resource_config_requires_nonblank_name_and_positive_capacity(model) -> 
         model(name="   ", capacity=1)
     with pytest.raises(ValidationError):
         model(name="Resource", capacity=0)
+
+
+@pytest.mark.parametrize(
+    "constructor,field,value",
+    [
+        (RoomConfig, "name", " Room"),
+        (CourseConfig, "course_id", "CS101 "),
+        (FacultyConfig, "name", " F1"),
+    ],
+)
+def test_identifiers_reject_surrounding_whitespace(constructor, field: str, value: str) -> None:
+    if constructor is RoomConfig:
+        kwargs = {"name": "R1", "capacity": 1}
+    elif constructor is CourseConfig:
+        kwargs = {
+            "course_id": "CS101",
+            "credits": 3,
+            "capacity": 1,
+            "room": ["R1"],
+            "lab": [],
+            "conflicts": [],
+            "faculty": ["F1"],
+        }
+    else:
+        kwargs = {
+            "name": "F1",
+            "maximum_credits": 0,
+            "minimum_credits": 0,
+            "unique_course_limit": 1,
+            "times": {},
+        }
+    kwargs[field] = value
+
+    with pytest.raises(ValidationError, match="leading or trailing whitespace"):
+        constructor(**kwargs)
 
 
 def test_strict_capacity_schema_rejects_legacy_resources_and_missing_section_capacity() -> None:
@@ -435,6 +533,33 @@ def test_course_config_rejects_documented_invalid_values(field: str, value: obje
     values[field] = value
     with pytest.raises(ValidationError):
         CourseConfig.model_validate(values)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("room", ["R1", "R1"]),
+        ("lab", ["L1", "L1"]),
+        ("conflicts", ["CS102", "CS102"]),
+        ("faculty", ["F1", "F1"]),
+    ],
+)
+def test_course_config_rejects_duplicate_references(field: str, value: list[str]) -> None:
+    values: dict[str, object] = {
+        "course_id": "CS101",
+        "credits": 3,
+        "capacity": 30,
+        "room": ["R1"],
+        "lab": [],
+        "conflicts": [],
+        "faculty": ["F1"],
+    }
+    values[field] = value
+
+    with pytest.raises(ValidationError, match="must not contain duplicate names") as error:
+        CourseConfig.model_validate(values)
+
+    assert error.value.errors()[0]["loc"] == (field,)
 
 
 def test_scheduler_config_rejects_empty_rooms() -> None:
@@ -727,6 +852,19 @@ def test_strict_edit_mode_success() -> None:
         w.value = 2
     assert m.name == "b"
     assert m.value == 2
+    assert m.model_dump(exclude_unset=True) == {"name": "b", "value": 2}
+
+
+def test_strict_edit_mode_preserves_unset_defaults() -> None:
+    class Editable(StrictBaseModel):
+        name: str
+        value: int = 1
+
+    model = Editable(name="before")
+    with model.edit_mode() as working:
+        working.name = "after"
+
+    assert model.model_dump(exclude_unset=True) == {"name": "after"}
 
 
 def test_strict_edit_mode_rollback() -> None:
@@ -806,3 +944,11 @@ def test_load_config_from_file_bad_json(tmp_path: Path) -> None:
     p.write_text("{ not json", encoding="utf-8")
     with pytest.raises(json.JSONDecodeError):
         load_config_from_file(CombinedConfig, str(p))
+
+
+def test_load_config_from_file_reports_nonobject_json_as_validation_error(tmp_path: Path) -> None:
+    path = tmp_path / "array.json"
+    path.write_text("[]", encoding="utf-8")
+
+    with pytest.raises(ValidationError):
+        load_config_from_file(CombinedConfig, path)

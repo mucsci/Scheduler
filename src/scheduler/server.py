@@ -32,6 +32,7 @@ from .scheduler import (
 
 # Global thread pool executor for Z3 operations
 z3_executor: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=16, thread_name_prefix="z3-solver")
+_GENERATOR_EXHAUSTED = object()
 
 
 @dataclass(frozen=True)
@@ -105,6 +106,7 @@ class CourseInstanceResponse(BaseModel):
         room: Assigned lecture room, or null when absent.
         lab: Assigned lab resource, or null for a no-lab section.
         lab_index: Index of the lab meeting in ``times``, or null for no lab.
+        reserve_room_during_lab: Whether the lab meeting also occupies the room.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -115,6 +117,7 @@ class CourseInstanceResponse(BaseModel):
     room: str | None = Field(default=None, description="Assigned room when present.")
     lab: str | None = Field(default=None, description="Assigned lab when present.")
     lab_index: int | None = Field(default=None, description="Index into `times` for the lab meeting.")
+    reserve_room_during_lab: bool = Field(description="Whether the lab meeting also occupies the assigned room.")
 
 
 def _schedule_response_rows(courses: list[CourseInstance]) -> list[CourseInstanceResponse]:
@@ -135,7 +138,7 @@ class HealthCheck(BaseModel):
     - active_sessions: Number of active schedule generation sessions
     """
 
-    status: str
+    status: Literal["healthy"]
     active_sessions: int
 
 
@@ -269,7 +272,8 @@ class SessionDiagnosticResponse(BaseModel):
         completion_reason: Machine-oriented explanation for terminal generation.
         generated_schedules: Number of schedules currently retained.
         requested_schedule_limit: Client-requested maximum enumeration count.
-        enumeration_scope: Whether results exhausted the space or stopped at a bound.
+        enumeration_scope: Whether results exhausted the space, stopped at the
+            requested bound, or remain indeterminate.
         known_distinct_schedules: Distinct schedules observed in this session.
         idle_seconds: Rounded seconds since the session was last accessed.
         session_ttl_seconds: Configured idle expiry threshold.
@@ -280,13 +284,13 @@ class SessionDiagnosticResponse(BaseModel):
     """
 
     schedule_id: str
-    state: str
-    background_state: str
+    state: Literal["initializing", "generating", "complete", "ready"]
+    background_state: Literal["not_started", "running", "cancelled", "failed", "completed"]
     background_error: str | None
     completion_reason: str | None
     generated_schedules: int
     requested_schedule_limit: int
-    enumeration_scope: str
+    enumeration_scope: Literal["exhausted", "bounded_by_requested_limit", "indeterminate"]
     known_distinct_schedules: int
     idle_seconds: int
     session_ttl_seconds: int
@@ -303,7 +307,8 @@ class ScheduleDiagnosisResponse(BaseModel):
     Fields:
         schedule_id: Session whose configuration was diagnosed.
         status: Solver feasibility status: satisfiable, unsatisfiable, or unknown.
-        conflicting_constraints: Minimal primary set of conflicting hard rules.
+        conflicting_constraints: Primary set of conflicting hard rules; consult
+            ``core_is_minimal`` to determine whether subset-minimality was proved.
         alternative_conflict_sets: Other independently discovered conflict cores.
         supporting_facts: Relevant non-core facts that explain the conflict.
         relaxation_suggestions: Ranked configuration changes derived from findings.
@@ -325,7 +330,7 @@ class ScheduleDiagnosisResponse(BaseModel):
     """
 
     schedule_id: str
-    status: str
+    status: Literal["satisfiable", "unsatisfiable", "unknown"]
     conflicting_constraints: list["ConstraintDiagnosticResponse"]
     alternative_conflict_sets: list[list["ConstraintDiagnosticResponse"]]
     supporting_facts: list["ConstraintDiagnosticResponse"]
@@ -363,7 +368,7 @@ class ConstraintDiagnosticResponse(BaseModel):
     subjects: list[str]
     message: str
     code: str | None = None
-    locations: list[str] = []
+    locations: list[str] = Field(default_factory=list)
 
 
 class CandidateDomainDiagnosticResponse(BaseModel):
@@ -830,7 +835,7 @@ class ScheduleSession:
     """
 
     scheduler: Scheduler | None
-    scheduler_future: Future[Scheduler | None] | None
+    scheduler_future: Future[Scheduler] | None
     generator: Generator[list[CourseInstance], None, None] | None
     full_config: CombinedConfig
     generated_schedules: list[list[CourseInstanceResponse]]
@@ -888,9 +893,16 @@ def cleanup_session(schedule_id: str):
     logger.info(f"Cleaned up session {schedule_id}")
 
 
+async def _cleanup_session_after_response(schedule_id: str) -> None:
+    """Run deferred session cleanup on the application's event-loop thread."""
+    cleanup_session(schedule_id)
+
+
 def _session_has_active_work(session: ScheduleSession) -> bool:
-    return (session.scheduler_future is not None and not session.scheduler_future.done()) or (
-        session.background_task is not None and not session.background_task.done()
+    return (
+        session.generation_lock.locked()
+        or (session.scheduler_future is not None and not session.scheduler_future.done())
+        or (session.background_task is not None and not session.background_task.done())
     )
 
 
@@ -925,7 +937,11 @@ def _session_diagnostic_response(schedule_id: str, session: ScheduleSession) -> 
         generated_schedules=len(session.generated_schedules),
         requested_schedule_limit=session.full_config.limit,
         enumeration_scope=(
-            "exhausted" if session.completion_reason == "solution_space_exhausted" else "bounded_by_requested_limit"
+            "exhausted"
+            if session.completion_reason == "solution_space_exhausted"
+            else "bounded_by_requested_limit"
+            if session.completion_reason == "requested_schedule_limit_reached"
+            else "indeterminate"
         ),
         known_distinct_schedules=len(session.generated_schedules),
         idle_seconds=round(time.monotonic() - session.last_accessed_at),
@@ -952,9 +968,10 @@ def cleanup_expired_sessions() -> None:
 
     Behavior:
         A monotonic timestamp is sampled once, then a snapshot of the session
-        registry is inspected. Sessions with queued scheduler construction or a
-        running background task are preserved regardless of age. Other sessions at
-        or beyond the configured TTL are passed to ``cleanup_session``.
+        registry is inspected. Sessions with queued scheduler construction, a
+        running background task, or a locked foreground generation/diagnostic/audit
+        operation are preserved regardless of age. Other sessions at or beyond the
+        configured TTL are passed to ``cleanup_session``.
     """
     now = time.monotonic()
     for schedule_id, session in list(schedule_sessions.items()):
@@ -1001,7 +1018,7 @@ def _estimate_candidate_slots(request: CombinedConfig, limit: int) -> int:
 def _validate_submission_limits(request: CombinedConfig) -> None:
     cleanup_expired_sessions()
     if len(schedule_sessions) >= API_LIMITS.max_active_sessions:
-        raise HTTPException(status_code=429, detail="Active schedule-session limit reached")
+        raise HTTPException(status_code=422, detail="Active schedule-session limit reached")
     if len(request.config.courses) > API_LIMITS.max_courses:
         raise HTTPException(status_code=422, detail=f"At most {API_LIMITS.max_courses} courses are allowed per request")
     if request.limit > API_LIMITS.max_schedules_per_session:
@@ -1045,7 +1062,7 @@ async def ensure_scheduler_initialized(session_id: str, session: ScheduleSession
     assert session.scheduler_future is not None
     # Wrap the Future in an asyncio.Future so it can be awaited
     try:
-        session.scheduler = await asyncio.wrap_future(session.scheduler_future)
+        session.scheduler = await asyncio.shield(asyncio.wrap_future(session.scheduler_future))
         session.last_accessed_at = time.monotonic()
     except Exception as e:
         cleanup_session(session_id)
@@ -1085,9 +1102,9 @@ async def ensure_generator_initialized(session_id: str, session: ScheduleSession
         if session.generator is not None:
             return
 
-        # Initialize generator in thread pool
+        # Creating a Python generator does not execute its body or invoke Z3.
         try:
-            session.generator = await asyncio.wrap_future(z3_executor.submit(session.scheduler.get_models))
+            session.generator = session.scheduler.get_models()
             session.last_accessed_at = time.monotonic()
             logger.debug(f"Initialized generator for session {session_id}")
         except asyncio.CancelledError:
@@ -1098,47 +1115,94 @@ async def ensure_generator_initialized(session_id: str, session: ScheduleSession
             raise HTTPException(status_code=500, detail=f"Generator initialization failed: {str(e)}") from e
 
 
-async def _advance_session(schedule_id: str, session: ScheduleSession) -> ScheduleResponse:
-    """Advance one generator safely and store exactly one schedule result."""
-    async with session.generation_lock:
-        if len(session.generated_schedules) >= session.full_config.limit:
-            session.is_exhausted = True
-            session.completion_reason = "requested_schedule_limit_reached"
-            raise HTTPException(
-                status_code=400,
-                detail=f"All {session.full_config.limit} schedules have been generated",
-            )
-        if session.is_exhausted:
-            raise HTTPException(status_code=400, detail="No more schedules available")
-        try:
-            assert session.generator is not None
-            model = cast(
-                list[CourseInstance],
-                await asyncio.wrap_future(z3_executor.submit(next, session.generator)),
-            )
-        except StopIteration:
-            session.is_exhausted = True
-            session.completion_reason = "solution_space_exhausted"
-            raise HTTPException(status_code=400, detail="No more schedules available") from None
-        except Exception as e:
-            if "StopIteration" in str(e):
-                session.is_exhausted = True
-                session.completion_reason = "solution_space_exhausted"
-                raise HTTPException(status_code=400, detail="No more schedules available") from e
-            session.completion_reason = "generation_error"
-            raise HTTPException(status_code=500, detail=f"Schedule generation failed: {str(e)}") from e
+def _next_or_exhausted(generator: Generator[list[CourseInstance], None, None]) -> list[CourseInstance] | object:
+    """Advance a generator without propagating ``StopIteration`` through a future."""
+    return next(generator, _GENERATOR_EXHAUSTED)
 
-        rows = _schedule_response_rows(model)
-        session.generated_schedules.append(rows)
-        session.generated_models.append(model)
-        session.last_accessed_at = time.monotonic()
-        current_index = len(session.generated_schedules) - 1
-        return ScheduleResponse(
-            schedule_id=schedule_id,
-            schedule=rows,
-            index=current_index,
-            total_generated=len(session.generated_schedules),
-        )
+
+async def _finish_atomic_task_after_cancellation[T](task: asyncio.Task[T]) -> T:
+    """Await a session operation without cancelling its lock-owning child task."""
+    try:
+        return await asyncio.shield(task)
+    except asyncio.CancelledError:
+        # A solver thread cannot be stopped safely. Keep the child alive so it
+        # retains the session lock through result storage, then preserve the
+        # caller's cancellation after the atomic operation has settled.
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            # Repeated cancellation may prevent this waiter from staying alive;
+            # the shielded child still owns the lock and completes independently.
+            pass
+        except Exception:
+            # The cancelled caller observes cancellation; normal callers receive
+            # the operation exception directly through the first await above.
+            pass
+        raise
+
+
+async def _run_locked_executor[T](session: ScheduleSession, function, *args) -> T:
+    """Run one executor callable while a cancellation-safe child owns the lock."""
+
+    async def run() -> T:
+        async with session.generation_lock:
+            return await asyncio.wrap_future(z3_executor.submit(function, *args))
+
+    return await _finish_atomic_task_after_cancellation(asyncio.create_task(run()))
+
+
+async def _advance_session(
+    schedule_id: str,
+    session: ScheduleSession,
+    *,
+    allow_background: bool = False,
+) -> ScheduleResponse:
+    """Advance one generator safely and store exactly one schedule result."""
+
+    async def advance_locked() -> ScheduleResponse:
+        async with session.generation_lock:
+            if not allow_background and session.background_task is not None and not session.background_task.done():
+                raise HTTPException(status_code=409, detail="Background schedule generation is in progress")
+            if len(session.generated_schedules) >= session.full_config.limit:
+                session.is_exhausted = True
+                session.completion_reason = "requested_schedule_limit_reached"
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"All {session.full_config.limit} schedules have been generated",
+                )
+            if session.is_exhausted:
+                raise HTTPException(status_code=400, detail="No more schedules available")
+            try:
+                assert session.generator is not None
+                result = await asyncio.wrap_future(z3_executor.submit(_next_or_exhausted, session.generator))
+            except Exception as e:
+                session.completion_reason = "generation_error"
+                raise HTTPException(status_code=500, detail=f"Schedule generation failed: {str(e)}") from e
+
+            if result is _GENERATOR_EXHAUSTED:
+                session.is_exhausted = True
+                session.completion_reason = (
+                    session.scheduler._enumeration_completion_reason if session.scheduler is not None else None
+                ) or "solution_space_exhausted"
+                raise HTTPException(status_code=400, detail="No more schedules available")
+            model = cast(list[CourseInstance], result)
+
+            rows = _schedule_response_rows(model)
+            session.generated_schedules.append(rows)
+            session.generated_models.append(model)
+            session.last_accessed_at = time.monotonic()
+            if len(session.generated_schedules) >= session.full_config.limit:
+                session.is_exhausted = True
+                session.completion_reason = "requested_schedule_limit_reached"
+            current_index = len(session.generated_schedules) - 1
+            return ScheduleResponse(
+                schedule_id=schedule_id,
+                schedule=rows,
+                index=current_index,
+                total_generated=len(session.generated_schedules),
+            )
+
+    return await _finish_atomic_task_after_cancellation(asyncio.create_task(advance_locked()))
 
 
 @asynccontextmanager
@@ -1190,9 +1254,10 @@ app = FastAPI(
 # Use CORS_ORIGINS env (comma-separated) for explicit origins + credentials;
 # when unset, allow all origins without credentials (suitable for local dev).
 _cors_origins_env = os.getenv("CORS_ORIGINS", "").strip()
-if _cors_origins_env:
-    _cors_origins = [o.strip() for o in _cors_origins_env.split(",") if o.strip()]
-    _cors_credentials = True
+_configured_cors_origins = [origin.strip() for origin in _cors_origins_env.split(",") if origin.strip()]
+if _configured_cors_origins:
+    _cors_origins = _configured_cors_origins
+    _cors_credentials = "*" not in _cors_origins
 else:
     _cors_origins = ["*"]
     _cors_credentials = False
@@ -1246,9 +1311,9 @@ async def submit_schedule(request: SubmitRequest):
         A new session identifier and its base schedule endpoint.
 
     Raises:
-        HTTPException: Status 429 when active-session capacity is full; status 422
-            for course, schedule, or candidate-slot limits; status 500 if work cannot
-            be submitted; or status 400 for other request setup failures.
+        HTTPException: Status 422 when any built-in submission limit is exceeded;
+            status 500 if work cannot be submitted; or status 400 for other request
+            setup failures.
 
     Behavior:
         Expired sessions and all built-in request limits are checked before work is
@@ -1271,7 +1336,7 @@ async def submit_schedule(request: SubmitRequest):
         # Store session
         schedule_sessions[schedule_id] = ScheduleSession(
             scheduler=None,
-            scheduler_future=scheduler_future,  # type: ignore
+            scheduler_future=scheduler_future,
             generator=None,
             full_config=request,
             generated_schedules=[],
@@ -1353,11 +1418,10 @@ async def get_schedule_diagnosis(schedule_id: str) -> ScheduleDiagnosisResponse:
     session = schedule_sessions[schedule_id]
     await ensure_scheduler_initialized(schedule_id, session)
     assert session.scheduler is not None
-    async with session.generation_lock:
-        diagnosis = cast(
-            ScheduleDiagnosis,
-            await asyncio.wrap_future(z3_executor.submit(session.scheduler.diagnose)),
-        )
+    diagnosis = cast(
+        ScheduleDiagnosis,
+        await _run_locked_executor(session, session.scheduler.diagnose),
+    )
     session.last_accessed_at = time.monotonic()
     return ScheduleDiagnosisResponse(
         schedule_id=schedule_id,
@@ -1428,13 +1492,10 @@ async def get_schedule_audit(schedule_id: str, index: int) -> ScheduleAuditRespo
     if index < 0 or index >= len(session.generated_models):
         raise HTTPException(status_code=404, detail="Generated schedule not found")
     assert session.scheduler is not None
-    async with session.generation_lock:
-        audit = cast(
-            ScheduleAudit,
-            await asyncio.wrap_future(
-                z3_executor.submit(session.scheduler.audit_schedule, session.generated_models[index])
-            ),
-        )
+    audit = cast(
+        ScheduleAudit,
+        await _run_locked_executor(session, session.scheduler.audit_schedule, session.generated_models[index]),
+    )
     session.last_accessed_at = time.monotonic()
     return _schedule_audit_response(schedule_id, index, audit)
 
@@ -1527,7 +1588,7 @@ async def generate_all_schedules(schedule_id: str):
         raise HTTPException(status_code=409, detail="Background schedule generation is already in progress")
 
     # Check if we've already generated all schedules
-    if len(session.generated_schedules) >= session.full_config.limit:
+    if session.is_exhausted or len(session.generated_schedules) >= session.full_config.limit:
         raise HTTPException(
             status_code=400,
             detail=f"All {session.full_config.limit} schedules have already been generated",
@@ -1547,7 +1608,7 @@ async def generate_all_schedules(schedule_id: str):
                         logger.debug(f"Background generation cancelled for session {schedule_id}")
                         return
 
-                    await _advance_session(schedule_id, session)
+                    await _advance_session(schedule_id, session, allow_background=True)
                     n = len(session.generated_schedules)
                     logger.debug(f"Generated schedule {n} for session {schedule_id}")
 
@@ -1716,7 +1777,7 @@ async def delete_schedule_session(schedule_id: str, background_tasks: Background
         raise HTTPException(status_code=404, detail="Schedule session not found")
 
     # Schedule cleanup in background
-    background_tasks.add_task(cleanup_session, schedule_id)
+    background_tasks.add_task(_cleanup_session_after_response, schedule_id)
 
     return MessageResponse(message=f"Schedule session {schedule_id} marked for deletion")
 
@@ -1770,7 +1831,7 @@ async def health_check():
 
 
 @click.command()
-@click.option("--port", "-p", default=8000, help="Port to run the server on", type=int)
+@click.option("--port", "-p", default=8000, help="Port to run the server on", type=click.IntRange(1, 65535))
 @click.option(
     "--log-level",
     "-l",
@@ -1779,7 +1840,7 @@ async def health_check():
     help="Log level for the server",
 )
 @click.option("--host", "-h", default="0.0.0.0", help="Host to bind the server to")
-@click.option("--workers", "-w", default=16, help="Number of worker threads", type=int)
+@click.option("--workers", "-w", default=16, help="Number of worker threads", type=click.IntRange(min=1))
 def main(port: int, log_level: str, host: str, workers: int):
     """
     Run the Course Scheduler FastAPI application through Uvicorn.

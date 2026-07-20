@@ -185,6 +185,8 @@ class SchedulingProblem:
             A normalized problem with policies, provenance paths, and time domains.
 
         Raises:
+            pydantic.ValidationError: If a caller bypassed assignment validation
+                and mutated the supplied configuration into an invalid state.
             ValueError: If a configured time value cannot be normalized.
 
         Behavior:
@@ -192,6 +194,7 @@ class SchedulingProblem:
             derives only explicitly-null faculty lists from preferences, generates
             slot ranges once per required credit value, and copies mutable inputs.
         """
+        full_config = CombinedConfig.model_validate(full_config.model_dump(mode="python"))
         config = full_config.config
 
         def resource_availability(resource) -> tuple[TimeInstance, ...] | None:

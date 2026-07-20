@@ -4,6 +4,7 @@ import itertools
 import time
 from collections import defaultdict
 from collections.abc import Callable
+from typing import Literal
 
 import z3
 
@@ -84,9 +85,9 @@ class DiagnosticEngine:
         """
         started_at = time.perf_counter()
         status, conflicts, core_indexes, reason = self._diagnostic_core()
+        core_is_minimal: bool | None = None
         if status == "unsatisfiable":
-            conflicts, core_indexes = self._minimize_core(core_indexes)
-        elapsed_ms = round((time.perf_counter() - started_at) * 1000)
+            conflicts, core_indexes, core_is_minimal = self._minimize_core(core_indexes)
         candidate_domains = self._candidate_domains()
         capacity_analysis = self._capacity_analysis()
         day_feasibility = self._day_feasibility()
@@ -95,33 +96,38 @@ class DiagnosticEngine:
             alternatives, alternatives_complete = self._alternative_cores(core_indexes)
             repair_sets, repair_sets_complete = self._repair_sets()
             supporting_facts = self._supporting_facts(conflicts)
+            suggestions = self._relaxation_suggestions(conflicts, supporting_facts)
+            provenance = self._provenance(candidate_domains, conflicts)
+            elapsed_ms = round((time.perf_counter() - started_at) * 1000)
             return ScheduleDiagnosis(
                 status=status,
                 conflicting_constraints=conflicts,
                 alternative_conflict_sets=alternatives,
                 supporting_facts=supporting_facts,
-                relaxation_suggestions=self._relaxation_suggestions(conflicts, supporting_facts),
+                relaxation_suggestions=suggestions,
                 repair_sets=repair_sets,
                 candidate_domains=candidate_domains,
                 capacity_analysis=capacity_analysis,
                 day_feasibility=day_feasibility,
                 preflight_findings=preflight_findings,
-                provenance=self._provenance(candidate_domains, conflicts),
+                provenance=provenance,
                 configuration_fingerprint=self._configuration_fingerprint(),
-                core_is_minimal=True,
+                core_is_minimal=core_is_minimal,
                 alternative_cores_complete=alternatives_complete,
                 repair_sets_complete=repair_sets_complete,
                 diagnostic_completeness="bounded_unsat_cores",
                 elapsed_ms=elapsed_ms,
                 solver_timeout_ms=self._solver_timeout_ms,
             )
+        provenance = self._provenance(candidate_domains, ())
+        elapsed_ms = round((time.perf_counter() - started_at) * 1000)
         return ScheduleDiagnosis(
             status=status,
             candidate_domains=candidate_domains,
             capacity_analysis=capacity_analysis,
             day_feasibility=day_feasibility,
             preflight_findings=preflight_findings,
-            provenance=self._provenance(candidate_domains, ()),
+            provenance=provenance,
             configuration_fingerprint=self._configuration_fingerprint(),
             diagnostic_completeness="preflight_only" if status == "unknown" else "hard_constraint_feasibility",
             elapsed_ms=elapsed_ms,
@@ -294,10 +300,11 @@ class DiagnosticEngine:
         predicate: Callable[[TimeSlot, TimeSlot], bool],
     ) -> bool | None:
         """Return a witness for a pair relation, or ``None`` if the safe scan cap is reached."""
+        total = len(first_slots) * len(second_slots)
         for comparisons, (first, second) in enumerate(itertools.product(first_slots, second_slots), start=1):
             if predicate(first, second):
                 return True
-            if comparisons >= MAX_PAIR_PATTERN_COMPARISONS:
+            if comparisons >= MAX_PAIR_PATTERN_COMPARISONS and comparisons < total:
                 return None
         return False
 
@@ -491,7 +498,7 @@ class DiagnosticEngine:
                     locations=(self._faculty_config_paths[faculty] + "/unique_course_limit",),
                 )
             )
-            for mandatory_day in self._faculty_mandatory_days[faculty]:
+            for mandatory_day in sorted(self._faculty_mandatory_days[faculty]):
                 available_patterns = sum(
                     1
                     for course in eligible
@@ -956,7 +963,12 @@ class DiagnosticEngine:
         self,
         excluded_indexes: frozenset[int] = frozenset(),
         active_indexes: frozenset[int] | None = None,
-    ) -> tuple[str, tuple[ConstraintDiagnostic, ...], frozenset[int], str | None]:
+    ) -> tuple[
+        Literal["satisfiable", "unsatisfiable", "unknown"],
+        tuple[ConstraintDiagnostic, ...],
+        frozenset[int],
+        str | None,
+    ]:
         """Return one labeled unsat core, optionally relaxing selected tracked rules."""
         solver = z3.Solver(ctx=self._ctx)
         if self._solver_timeout_ms is not None:
@@ -994,14 +1006,20 @@ class DiagnosticEngine:
             return "satisfiable", (), frozenset(), None
         return "unknown", (), frozenset(), solver.reason_unknown()
 
-    def _minimize_core(self, core_indexes: frozenset[int]) -> tuple[tuple[ConstraintDiagnostic, ...], frozenset[int]]:
+    def _minimize_core(
+        self,
+        core_indexes: frozenset[int],
+    ) -> tuple[tuple[ConstraintDiagnostic, ...], frozenset[int], bool]:
         """Shrink a solver-provided core to a subset-minimal business-rule core."""
         active = set(core_indexes)
+        complete = True
         for index in tuple(sorted(active)):
             candidate = frozenset(active - {index})
             status, _core, _indexes, _reason = self._diagnostic_core(active_indexes=candidate)
             if status == "unsatisfiable":
                 active.remove(index)
+            elif status == "unknown":
+                complete = False
         minimized = frozenset(active)
         constraints = tuple(
             self._make_diagnostic(
@@ -1011,7 +1029,7 @@ class DiagnosticEngine:
             )
             for index in sorted(minimized)
         )
-        return constraints, minimized
+        return constraints, minimized, complete
 
     def _alternative_cores(
         self, primary_core_indexes: frozenset[int], max_alternatives: int = 16, max_solver_checks: int = 128
@@ -1025,7 +1043,7 @@ class DiagnosticEngine:
         """
         alternatives: list[tuple[ConstraintDiagnostic, ...]] = []
         seen = {primary_core_indexes}
-        pending = [frozenset({index}) for index in primary_core_indexes]
+        pending = [frozenset({index}) for index in sorted(primary_core_indexes)]
         visited: set[frozenset[int]] = set()
         checks = 0
         complete = True
@@ -1042,12 +1060,15 @@ class DiagnosticEngine:
                 continue
             if status != "unsatisfiable":
                 continue
-            minimized_core, minimized_indexes = self._minimize_core(core_indexes)
+            minimized_core, minimized_indexes, minimized_completely = self._minimize_core(core_indexes)
+            if not minimized_completely:
+                complete = False
+                continue
             if minimized_indexes in seen:
                 continue
             seen.add(minimized_indexes)
             alternatives.append(minimized_core)
-            for index in minimized_indexes:
+            for index in sorted(minimized_indexes):
                 child = excluded | frozenset({index})
                 if child not in visited:
                     pending.append(child)
@@ -1103,7 +1124,7 @@ class DiagnosticEngine:
             if status == "unknown" or not core_indexes:
                 completed = False
                 continue
-            for index in core_indexes:
+            for index in sorted(core_indexes):
                 child = excluded | frozenset({index})
                 if child not in visited and not any(existing <= child for existing in pending):
                     pending.append(child)
@@ -1196,7 +1217,7 @@ class DiagnosticEngine:
                     )
                 )
 
-        for faculty in constrained_faculty:
+        for faculty in (name for name in self._faculty if name in constrained_faculty):
             forced_courses = [course for course in self._courses if course.faculties == [faculty]]
             if any(
                 diagnostic.kind == "faculty_unique_course_limit" and diagnostic.subjects[0] == faculty

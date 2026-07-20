@@ -8,7 +8,7 @@ from scheduler.solver import SolverEngine
 from tests.scenario_builders import config_from, minimal_config_data, no_lab_config_data, two_course_config_data
 
 
-def test_solver_artifacts_are_read_only_and_courses_remain_z3_free(
+def test_solver_artifacts_are_read_only_and_legacy_mirrors_do_not_leak_into_problem(
     minimal_combined_config: CombinedConfig,
 ) -> None:
     problem = SchedulingProblem.from_config(minimal_combined_config)
@@ -16,10 +16,15 @@ def test_solver_artifacts_are_read_only_and_courses_remain_z3_free(
     course = problem.courses[0]
     variables = engine.artifacts.course_variables[str(course)]
 
-    assert not hasattr(course, "time")
-    assert not hasattr(course, "faculty")
-    assert not hasattr(course, "room")
-    assert not hasattr(course, "lab")
+    assert course.time is None
+    assert course.faculty is None
+    assert course.room is None
+    assert course.lab is None
+    solver_course = engine._courses[0]
+    assert solver_course.time is variables.time
+    assert solver_course.faculty is variables.faculty
+    assert solver_course.room is variables.room
+    assert solver_course.lab is variables.lab
     assert engine.artifacts.constraints
     assert engine.artifacts.diagnostic_constraints
     with pytest.raises(TypeError):
@@ -34,6 +39,9 @@ def test_solver_engine_enumerates_models_directly(
     schedule = next(engine.get_models())
 
     assert [str(instance.course) for instance in schedule] == ["CS101.01"]
+    assert schedule[0].course.time is engine.artifacts.course_variables["CS101.01"].time
+    schedule[0].course.rooms.append("caller mutation")
+    assert "caller mutation" not in engine._courses[0].rooms
 
 
 def _has_model(data: dict) -> bool:
@@ -143,6 +151,60 @@ def test_solver_decodes_no_lab_and_honors_each_check_timeout() -> None:
 
     assert schedule[0].lab is None
     assert engine._solver_timeout_ms == 250
+
+
+@pytest.mark.parametrize("timeout", [0, -1, True, 1.5, "250"])
+def test_solver_rejects_invalid_timeouts(timeout) -> None:
+    with pytest.raises(ValueError, match="positive integer"):
+        SolverEngine(SchedulingProblem.from_config(config_from(minimal_config_data())), solver_timeout_ms=timeout)
+
+
+def test_solver_enumerates_faculty_only_assignment_differences() -> None:
+    data = minimal_config_data()
+    data["limit"] = 10
+    data["time_slot_config"]["classes"][0]["start_time"] = "08:00"
+    data["config"]["faculty"][0]["minimum_credits"] = 0
+    data["config"]["faculty"].append(
+        {
+            "name": "F2",
+            "maximum_credits": 4,
+            "minimum_credits": 0,
+            "unique_course_limit": 1,
+            "times": {day: ["08:00-20:00"] for day in ("MON", "TUE", "WED", "THU", "FRI")},
+        }
+    )
+    data["config"]["courses"][0]["faculty"] = ["F1", "F2"]
+
+    schedules = list(SolverEngine(SchedulingProblem.from_config(config_from(data))).get_models())
+
+    assert {schedule[0].faculty for schedule in schedules} == {"F1", "F2"}
+    assert len(schedules) == 2
+
+
+def test_solver_handles_empty_generated_time_domain_as_unsatisfiable() -> None:
+    data = minimal_config_data()
+    data["time_slot_config"]["classes"][0]["start_time"] = "23:00"
+    problem = SchedulingProblem.from_config(config_from(data))
+    engine = SolverEngine(problem)
+
+    assert list(engine.get_models()) == []
+    assert engine.enumeration_completion_reason == "solution_space_exhausted"
+    assert str(engine.artifacts.symbols.time_slot_constants[None]) == "time_slot_none"
+
+
+def test_decoded_schedules_do_not_expose_solver_owned_mutable_objects() -> None:
+    data = minimal_config_data()
+    data["limit"] = 2
+    engine = SolverEngine(SchedulingProblem.from_config(config_from(data)))
+    models = engine.get_models()
+    first = next(models)
+    first[0].course.capacity = 1
+    first[0].time.times.clear()
+
+    second = next(models)
+
+    assert second[0].course.capacity == 30
+    assert second[0].time.times
 
 
 def test_solver_optimizes_faculty_course_room_and_lab_preferences() -> None:

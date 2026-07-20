@@ -196,7 +196,6 @@ dependencies = [
     { name = "click" },
     { name = "fastapi" },
     { name = "pydantic" },
-    { name = "requests" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "z3-solver" },
 ]
@@ -219,7 +218,6 @@ requires-dist = [
     { name = "click", specifier = "~=8.2" },
     { name = "fastapi", specifier = "~=0.116" },
     { name = "pydantic", specifier = "~=2.11" },
-    { name = "requests", specifier = "~=2.32" },
     { name = "uvicorn", extras = ["standard"], specifier = "~=0.35" },
     { name = "z3-solver", specifier = "~=4.15" },
 ]
