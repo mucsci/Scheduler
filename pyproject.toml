@@ -16,7 +16,7 @@ dependencies = [
     "fastapi~=0.116",
     "pydantic~=2.11",
     "uvicorn[standard]~=0.35",
-    "z3-solver~=4.15",
+    "z3-solver>=4.15,<6.0",
 ]
 
 classifiers = [
