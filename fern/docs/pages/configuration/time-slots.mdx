@@ -3,17 +3,11 @@ title: Time slots
 description: Time grids, meeting patterns, fixed starts, overlap alignment, and adjacency settings.
 ---
 
-`time_slot_config` has four fields:
-
-| Field | Required | Default | Meaning |
-|---|---:|---:|---|
-| `times` | Yes | — | A non-empty list of time blocks for every weekday. |
-| `classes` | Yes | — | Enabled and disabled meeting patterns grouped by credit value. |
-| `max_time_gap` | No | `30` | Maximum minutes between meetings for adjacency checks. |
-| `min_time_overlap` | No | `45` | Required clock-time overlap between meetings on different days in one pattern. |
+<Schema type="TimeSlotConfig-Input" />
 
 Both numeric settings are positive integers. `max_time_gap` is used by same-faculty hard rules and the packing
-objectives described under **Scheduling rules and objectives**.
+objectives described under **Scheduling rules and objectives**. `times` supplies the weekday blocks; `classes`
+supplies the enabled and disabled meeting patterns.
 
 ## Time blocks
 
@@ -29,11 +23,7 @@ Each of `MON`, `TUE`, `WED`, `THU`, and `FRI` must be present with at least one 
 }
 ```
 
-| Field | Description |
-|---|---|
-| `start` | First candidate start in 24-hour `HH:MM`. |
-| `spacing` | Positive minutes between consecutive candidate starts. |
-| `end` | Exclusive fitting boundary; a meeting must end at or before this value. |
+<Schema type="TimeBlock-Input" />
 
 `end` must be later than `start`. Multiple blocks per day are allowed. Candidate starts advance from `start` by
 `spacing` until the complete meeting would no longer fit.
@@ -52,12 +42,11 @@ Each of `MON`, `TUE`, `WED`, `THU`, and `FRI` must be present with at least one 
 }
 ```
 
-| Field | Required | Default | Description |
-|---|---:|---:|---|
-| `credits` | Yes | — | Positive credit value matched against courses. |
-| `meetings` | Yes | — | Non-empty meetings with distinct weekdays. |
-| `disabled` | No | `false` | Excludes the complete pattern when true. |
-| `start_time` | No | `null` | Pattern-level fixed `HH:MM` start fallback. |
+<Schema type="ClassPattern" />
+
+<Schema type="Meeting" />
+
+`credits` selects the course credit value, and `meetings` defines the non-empty set of distinct-weekday meetings.
 
 Each meeting has required `day` and positive `duration`, plus optional `lab` (default `false`), `start_time`
 (default `null`), and `delivery` (`in_person` by default, or `online`). A meeting-level start overrides the
