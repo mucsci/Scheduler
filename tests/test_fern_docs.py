@@ -83,3 +83,14 @@ def test_public_resource_models_declare_their_fern_documented_fields() -> None:
         assert set(model.__annotations__) == expected_fields
         assert "Fields:" in (model.__doc__ or "")
         assert all(model.model_fields[field].description for field in expected_fields)
+
+
+def test_combined_config_schema_descriptions_include_python_types() -> None:
+    """Keep the downloadable schema's JSON and Python type guidance aligned."""
+    schema = json.loads((ROOT / "fern" / "docs" / "assets" / "combined-config.schema.json").read_text(encoding="utf-8"))
+    course_properties = schema["$defs"]["CourseConfig"]["properties"]
+    room_properties = schema["$defs"]["RoomConfig"]["properties"]
+
+    assert "Python type: `list[Room]`." in course_properties["room"]["description"]
+    assert "Python type: `set[str]`." in course_properties["required_room_features"]["description"]
+    assert "Python type: `dict[Day, list[TimeRange]] | None`." in room_properties["times"]["description"]
