@@ -27,20 +27,13 @@ contain at least one course.
 
 ## Fields
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `course_id` | Yes | Base string id. Repeated values create separately numbered sections. |
-| `section_id` | No | Stable nonblank section suffix. `null` uses the zero-padded input-order number. |
-| `credits` | Yes | Positive integer; must match an allowed pattern in `time_slot_config.classes`. |
-| `capacity` | Yes | Positive expected section enrollment; every assigned room or lab must be at least this large. |
-| `modality` | No | `in_person` (default), `online`, or `hybrid`; the selected pattern must match exactly. |
-| `room` | Yes | Allowed room names. Use `[]` only when every compatible pattern needs no lecture room. If a course can choose both room-using and roomless patterns, the selected pattern determines whether a room is assigned. |
-| `lab` | No | Allowed lab names; defaults to `[]`, which means the course has no lab meeting. |
-| `required_room_features` | No | Set/list of nonblank feature tags the assigned room must provide; defaults to empty. |
-| `required_lab_features` | No | Set/list of nonblank feature tags every assigned lab must provide; defaults to empty. |
-| `reserve_room_during_lab` | No | Whether lab meetings also occupy the lecture room; defaults to `true`. |
-| `conflicts` | Yes | Other base `course_id` values that must not overlap; use `[]` for none. |
-| `faculty` | Yes | Non-empty list of faculty names, or `null` to derive candidates from matching faculty `course_preferences`. |
+<Schema type="CourseConfig-Input" />
+
+`room` may be `[]` only when a compatible pattern does not occupy a lecture room. `faculty` accepts either a non-empty
+candidate list or `null` to derive candidates from matching `course_preferences` entries.
+
+`credits` must match an enabled class pattern. `required_room_features` and `required_lab_features` constrain the
+assigned resources, and `reserve_room_during_lab` controls whether the lecture room remains occupied during a lab.
 
 ## Validation rules
 

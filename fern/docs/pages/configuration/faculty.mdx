@@ -31,18 +31,10 @@ faculty policy.
 
 ## Fields
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `name` | Yes | Unique display id; referenced from courses. |
-| `maximum_credits` | Yes | Inclusive upper bound on total credits; integer `0` or greater. |
-| `minimum_credits` | Yes | Inclusive lower bound on total credits; integer `0` or greater. |
-| `unique_course_limit` | Yes | Positive maximum number of distinct base course ids they may teach. |
-| `maximum_days` | No | Integer `0`–`5`; maximum distinct teaching weekdays (default `5`). |
-| `mandatory_days` | No | Weekdays on which they must teach at least once (default none). |
-| `times` | Yes | Map day → list of `HH:MM-HH:MM` availability ranges; omitted days and empty lists mean unavailable. |
-| `course_preferences` | No | Map `course_id` → score `0`–`10`. |
-| `room_preferences` | No | Map room name → score `0`–`10`. |
-| `lab_preferences` | No | Map lab name → score `0`–`10`. |
+<Schema type="FacultyConfig-Input" />
+
+`unique_course_limit` caps distinct base course ids. `room_preferences` and `lab_preferences` score matching
+resource assignments when their optimizer flags are enabled.
 
 ## Validation rules
 
