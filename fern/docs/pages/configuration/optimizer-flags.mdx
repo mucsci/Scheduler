@@ -3,7 +3,9 @@ title: Optimizer flags
 description: Optional optimizer_flags that steer soft objectives on top of hard constraints.
 ---
 
-**`optimizer_flags`** is an optional top-level array of string flags. Omit it or use `[]` for no extra optimization beyond feasibility.
+**`optimizer_flags`** is an optional top-level array of these flags. Omit it or use `[]` for no extra optimization beyond feasibility.
+
+<Schema type="OptimizerFlags" />
 
 ## Example
 
@@ -18,17 +20,12 @@ description: Optional optimizer_flags that steer soft objectives on top of hard 
 }
 ```
 
-## Available flags
+## Flag behavior
 
-| Flag | Role |
-|------|------|
-| `faculty_course` | Prefer faculty–course assignment by course preferences. |
-| `faculty_room` | Prefer faculty–room preferences. |
-| `faculty_lab` | Prefer faculty–lab preferences. |
-| `same_room` | Prefer eligible course pairs taught by one faculty member to share a room. |
-| `same_lab` | Prefer eligible lab-course pairs taught by one faculty member to share a lab. |
-| `pack_rooms` | Prefer different courses to use the same room when room-occupying physical meetings are adjacent. Online meetings and unreserved lab meetings do not count. |
-| `pack_labs` | Prefer different courses to use the same lab at adjacent lab times. |
+- `faculty_course`, `faculty_room`, and `faculty_lab` use the corresponding faculty preference maps.
+- `same_room` and `same_lab` prefer eligible courses taught by one faculty member to share a resource.
+- `pack_rooms` and `pack_labs` prefer different courses to use the same resource at adjacent meetings. Online
+  meetings and unreserved lab meetings do not count for `pack_rooms`.
 
 ## Practices
 

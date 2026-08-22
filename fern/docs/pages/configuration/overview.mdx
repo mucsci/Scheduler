@@ -7,10 +7,10 @@ The Course Constraint Scheduler uses a **JSON** configuration that defines the s
 
 ## Top-level structure
 
-1. **`config`** — Rooms, labs, courses, faculty.
-2. **`time_slot_config`** — Grid of time blocks and credit-hour **class patterns** (meeting shapes).
-3. **`limit`** — Maximum number of schedules to generate (default `10`). See **Schedule limit**.
-4. **`optimizer_flags`** — Optional soft-optimization hints. See **Optimizer flags**.
+<Schema type="CombinedConfig" description={true} />
+
+`config` contains rooms, labs, courses, and faculty. `time_slot_config` defines the time grid and credit-hour
+class patterns; see the dedicated configuration pages for behavior and examples.
 
 ## Validation behavior
 
@@ -25,16 +25,8 @@ The Course Constraint Scheduler uses a **JSON** configuration that defines the s
 
 ## Type aliases (conceptual)
 
-These are enforced in JSON via patterns and constraints:
-
-| Name | Meaning |
-|------|---------|
-| `TimeString` | `HH:MM` (24-hour, `00:00`–`23:59`) |
-| `TimeRangeString` | `HH:MM-HH:MM` |
-| `Preference` | Integer `0`–`10` |
-| `Day` | `MON`, `TUE`, `WED`, `THU`, or `FRI` |
-| Room / lab definitions | Objects with unique nonblank `name` and positive integer `capacity` |
-| Course / faculty / resource references | Strings; repeated course ids create sections, while room/lab references use definition names |
+Times use `HH:MM` (24-hour) and ranges use `HH:MM-HH:MM`; preferences are integers from `0` to `10`; weekdays are
+`MON` through `FRI`. The rendered schemas on the linked pages show the complete field types and constraints.
 
 ## JSON Schema
 

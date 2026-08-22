@@ -5,6 +5,10 @@ description: Top-level limit — maximum schedules to generate in the Python API
 
 **`limit`** is a positive integer on the root JSON object.
 
+<ParamField path="limit" type="integer" default="10">
+  Maximum number of distinct schedules to generate.
+</ParamField>
+
 ## Meaning
 
 - **Maximum number of distinct schedules** the engine will emit for that configuration.
