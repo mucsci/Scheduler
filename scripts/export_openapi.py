@@ -11,12 +11,16 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
+from export_config_schema import add_python_type_descriptions  # noqa: E402
+
 from scheduler.server import app  # noqa: E402
 
 
 def main() -> None:
     out = ROOT / "fern" / "openapi.json"
-    out.write_text(json.dumps(app.openapi(), indent=2) + "\n", encoding="utf-8")
+    schema = app.openapi()
+    add_python_type_descriptions(schema["components"], definitions_key="schemas", strip_schema_suffix=True)
+    out.write_text(json.dumps(schema, indent=2) + "\n", encoding="utf-8")
     print(f"Wrote {out}")
 
 

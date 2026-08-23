@@ -32,7 +32,9 @@ def _append_python_type(description: str, annotation: object) -> str:
     return f"{description}\n\nPython type: `{_python_type_name(annotation)}`."
 
 
-def add_python_type_descriptions(schema: dict[str, Any]) -> None:
+def add_python_type_descriptions(
+    schema: dict[str, Any], *, definitions_key: str = "$defs", strip_schema_suffix: bool = False
+) -> None:
     """Annotate generated schema descriptions with their source Python types.
 
     JSON Schema distinguishes only JSON primitives and containers. Configuration
@@ -40,10 +42,11 @@ def add_python_type_descriptions(schema: dict[str, Any]) -> None:
     a JSON array can represent ``list[Room]`` or ``set[str]``. The metadata is
     kept in descriptions so the schema remains valid standard JSON Schema.
     """
-    definitions = schema.get("$defs", {})
+    definitions = schema.get(definitions_key, {})
 
     for definition_name, definition in definitions.items():
-        source_type = getattr(config_module, definition_name, None)
+        source_name = definition_name.split("-", maxsplit=1)[0] if strip_schema_suffix else definition_name
+        source_type = getattr(config_module, source_name, None)
         if source_type is None or not isinstance(definition, dict):
             continue
 

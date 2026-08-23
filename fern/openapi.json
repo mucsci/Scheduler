@@ -761,7 +761,7 @@
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Credits",
-            "description": "Number of credit hours",
+            "description": "Number of credit hours\n\nPython type: `int`.",
             "example": 3
           },
           "meetings": {
@@ -770,7 +770,7 @@
             },
             "type": "array",
             "title": "Meetings",
-            "description": "List of meeting times",
+            "description": "List of meeting times\n\nPython type: `list[Meeting]`.",
             "example": [
               {
                 "day": "MON",
@@ -782,7 +782,7 @@
           "disabled": {
             "type": "boolean",
             "title": "Disabled",
-            "description": "Whether the pattern is disabled",
+            "description": "Whether the pattern is disabled\n\nPython type: `bool`.",
             "default": false
           },
           "start_time": {
@@ -794,7 +794,7 @@
                 "type": "null"
               }
             ],
-            "description": "Fixed start fallback for meetings without their own start time"
+            "description": "Fixed start fallback for meetings without their own start time\n\nPython type: `TimeString | None`."
           }
         },
         "additionalProperties": false,
@@ -804,13 +804,13 @@
           "meetings"
         ],
         "title": "ClassPattern",
-        "description": "Represents a class pattern.\n\n**Usage:**\n```python\nClassPattern(credits=3, meetings=[...])\n```"
+        "description": "Represents a class pattern.\n\n**Usage:**\n```python\nClassPattern(credits=3, meetings=[...])\n```\n\nPython type: `ClassPattern`."
       },
       "CombinedConfig": {
         "properties": {
           "config": {
             "$ref": "#/components/schemas/SchedulerConfig-Input",
-            "description": "Scheduler configuration",
+            "description": "Scheduler configuration\n\nPython type: `SchedulerConfig`.",
             "example": {
               "courses": [
                 {
@@ -870,7 +870,7 @@
           },
           "time_slot_config": {
             "$ref": "#/components/schemas/TimeSlotConfig-Input",
-            "description": "Time slot configuration",
+            "description": "Time slot configuration\n\nPython type: `TimeSlotConfig`.",
             "example": {
               "classes": [
                 {
@@ -927,7 +927,7 @@
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Limit",
-            "description": "Maximum number of schedules to generate",
+            "description": "Maximum number of schedules to generate\n\nPython type: `int`.",
             "default": 10,
             "example": 10
           },
@@ -937,7 +937,7 @@
             },
             "type": "array",
             "title": "Optimizer Flags",
-            "description": "List of optimizer flags",
+            "description": "List of optimizer flags\n\nPython type: `list[OptimizerFlags]`.",
             "example": [
               "faculty_course",
               "faculty_room",
@@ -956,7 +956,7 @@
           "time_slot_config"
         ],
         "title": "CombinedConfig",
-        "description": "Represents a combined configuration.\n\n**Usage:**\n```python\nCombinedConfig(config=..., time_slot_config=..., limit=10)\n```"
+        "description": "Represents a combined configuration.\n\n**Usage:**\n```python\nCombinedConfig(config=..., time_slot_config=..., limit=10)\n```\n\nPython type: `CombinedConfig`."
       },
       "ConfigurationDiagnosticResponse": {
         "properties": {
@@ -1081,14 +1081,14 @@
       },
       "Course": {
         "type": "string",
-        "description": "Course name",
+        "description": "Course name\n\nPython type: `Course`.",
         "example": "CS 101"
       },
       "CourseConfig-Input": {
         "properties": {
           "course_id": {
             "$ref": "#/components/schemas/Course",
-            "description": "Base course identifier; repeated values create separately numbered sections",
+            "description": "Base course identifier; repeated values create separately numbered sections\n\nPython type: `Course`.",
             "example": "CS 101"
           },
           "section_id": {
@@ -1101,20 +1101,20 @@
               }
             ],
             "title": "Section Id",
-            "description": "Optional stable section suffix; null uses the generated zero-padded input-order number"
+            "description": "Optional stable section suffix; null uses the generated zero-padded input-order number\n\nPython type: `str | None`."
           },
           "credits": {
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Credits",
-            "description": "Number of credit hours",
+            "description": "Number of credit hours\n\nPython type: `int`.",
             "example": 3
           },
           "capacity": {
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Capacity",
-            "description": "Expected section enrollment that any assigned rooms and labs must accommodate",
+            "description": "Expected section enrollment that any assigned rooms and labs must accommodate\n\nPython type: `int`.",
             "example": 30
           },
           "room": {
@@ -1123,7 +1123,7 @@
             },
             "type": "array",
             "title": "Room",
-            "description": "Allowed room names; empty is valid only for compatible patterns that do not occupy a room",
+            "description": "Allowed room names; empty is valid only for compatible patterns that do not occupy a room\n\nPython type: `list[Room]`.",
             "example": [
               "Room 101"
             ]
@@ -1134,7 +1134,7 @@
             },
             "type": "array",
             "title": "Lab",
-            "description": "Acceptable labs; an empty list means the course has no lab meeting",
+            "description": "Acceptable labs; an empty list means the course has no lab meeting\n\nPython type: `list[Lab]`.",
             "example": [
               "Lab 101"
             ]
@@ -1145,7 +1145,7 @@
             },
             "type": "array",
             "title": "Conflicts",
-            "description": "Base course IDs whose sections cannot overlap; an empty list means no declared conflicts"
+            "description": "Base course IDs whose sections cannot overlap; an empty list means no declared conflicts\n\nPython type: `list[Course]`."
           },
           "faculty": {
             "anyOf": [
@@ -1160,14 +1160,14 @@
               }
             ],
             "title": "Faculty",
-            "description": "Non-empty faculty candidates, or null to derive candidates from faculty course-preference keys",
+            "description": "Non-empty faculty candidates, or null to derive candidates from faculty course-preference keys\n\nPython type: `list[Faculty] | None`.",
             "example": [
               "Dr. Smith"
             ]
           },
           "modality": {
             "$ref": "#/components/schemas/CourseModality",
-            "description": "Required delivery composition of the selected class pattern",
+            "description": "Required delivery composition of the selected class pattern\n\nPython type: `CourseModality`.",
             "default": "in_person"
           },
           "required_room_features": {
@@ -1177,7 +1177,7 @@
             "type": "array",
             "uniqueItems": true,
             "title": "Required Room Features",
-            "description": "Feature tags every assigned lecture room must provide"
+            "description": "Feature tags every assigned lecture room must provide\n\nPython type: `set[str]`."
           },
           "required_lab_features": {
             "items": {
@@ -1186,12 +1186,12 @@
             "type": "array",
             "uniqueItems": true,
             "title": "Required Lab Features",
-            "description": "Feature tags every assigned lab must provide"
+            "description": "Feature tags every assigned lab must provide\n\nPython type: `set[str]`."
           },
           "reserve_room_during_lab": {
             "type": "boolean",
             "title": "Reserve Room During Lab",
-            "description": "Whether the lab meeting also occupies the section's assigned lecture room",
+            "description": "Whether the lab meeting also occupies the section's assigned lecture room\n\nPython type: `bool`.",
             "default": true
           }
         },
@@ -1206,13 +1206,13 @@
           "faculty"
         ],
         "title": "CourseConfig",
-        "description": "Represents a course configuration.\n\n**Usage:**\n```python\nCourseConfig(\n    course_id=\"CS 101\",\n    credits=3,\n    capacity=30,\n    room=[\"Room 101\"],\n    lab=[],\n    conflicts=[],\n    faculty=[\"Dr. Smith\"],\n)\n```"
+        "description": "Represents a course configuration.\n\n**Usage:**\n```python\nCourseConfig(\n    course_id=\"CS 101\",\n    credits=3,\n    capacity=30,\n    room=[\"Room 101\"],\n    lab=[],\n    conflicts=[],\n    faculty=[\"Dr. Smith\"],\n)\n```\n\nPython type: `CourseConfig`."
       },
       "CourseConfig-Output": {
         "properties": {
           "course_id": {
             "$ref": "#/components/schemas/Course",
-            "description": "Base course identifier; repeated values create separately numbered sections"
+            "description": "Base course identifier; repeated values create separately numbered sections\n\nPython type: `Course`."
           },
           "section_id": {
             "anyOf": [
@@ -1224,20 +1224,20 @@
               }
             ],
             "title": "Section Id",
-            "description": "Optional stable section suffix; null uses the generated zero-padded input-order number"
+            "description": "Optional stable section suffix; null uses the generated zero-padded input-order number\n\nPython type: `str | None`."
           },
           "credits": {
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Credits",
-            "description": "Number of credit hours",
+            "description": "Number of credit hours\n\nPython type: `int`.",
             "example": 3
           },
           "capacity": {
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Capacity",
-            "description": "Expected section enrollment that any assigned rooms and labs must accommodate",
+            "description": "Expected section enrollment that any assigned rooms and labs must accommodate\n\nPython type: `int`.",
             "example": 30
           },
           "room": {
@@ -1246,7 +1246,7 @@
             },
             "type": "array",
             "title": "Room",
-            "description": "Allowed room names; empty is valid only for compatible patterns that do not occupy a room",
+            "description": "Allowed room names; empty is valid only for compatible patterns that do not occupy a room\n\nPython type: `list[Room]`.",
             "example": [
               "Room 101"
             ]
@@ -1257,7 +1257,7 @@
             },
             "type": "array",
             "title": "Lab",
-            "description": "Acceptable labs; an empty list means the course has no lab meeting",
+            "description": "Acceptable labs; an empty list means the course has no lab meeting\n\nPython type: `list[Lab]`.",
             "example": [
               "Lab 101"
             ]
@@ -1268,7 +1268,7 @@
             },
             "type": "array",
             "title": "Conflicts",
-            "description": "Base course IDs whose sections cannot overlap; an empty list means no declared conflicts"
+            "description": "Base course IDs whose sections cannot overlap; an empty list means no declared conflicts\n\nPython type: `list[Course]`."
           },
           "faculty": {
             "anyOf": [
@@ -1283,14 +1283,14 @@
               }
             ],
             "title": "Faculty",
-            "description": "Non-empty faculty candidates, or null to derive candidates from faculty course-preference keys",
+            "description": "Non-empty faculty candidates, or null to derive candidates from faculty course-preference keys\n\nPython type: `list[Faculty] | None`.",
             "example": [
               "Dr. Smith"
             ]
           },
           "modality": {
             "$ref": "#/components/schemas/CourseModality",
-            "description": "Required delivery composition of the selected class pattern",
+            "description": "Required delivery composition of the selected class pattern\n\nPython type: `CourseModality`.",
             "default": "in_person"
           },
           "required_room_features": {
@@ -1300,7 +1300,7 @@
             "type": "array",
             "uniqueItems": true,
             "title": "Required Room Features",
-            "description": "Feature tags every assigned lecture room must provide"
+            "description": "Feature tags every assigned lecture room must provide\n\nPython type: `set[str]`."
           },
           "required_lab_features": {
             "items": {
@@ -1309,12 +1309,12 @@
             "type": "array",
             "uniqueItems": true,
             "title": "Required Lab Features",
-            "description": "Feature tags every assigned lab must provide"
+            "description": "Feature tags every assigned lab must provide\n\nPython type: `set[str]`."
           },
           "reserve_room_during_lab": {
             "type": "boolean",
             "title": "Reserve Room During Lab",
-            "description": "Whether the lab meeting also occupies the section's assigned lecture room",
+            "description": "Whether the lab meeting also occupies the section's assigned lecture room\n\nPython type: `bool`.",
             "default": true
           }
         },
@@ -1329,7 +1329,7 @@
           "faculty"
         ],
         "title": "CourseConfig",
-        "description": "Represents a course configuration.\n\n**Usage:**\n```python\nCourseConfig(\n    course_id=\"CS 101\",\n    credits=3,\n    capacity=30,\n    room=[\"Room 101\"],\n    lab=[],\n    conflicts=[],\n    faculty=[\"Dr. Smith\"],\n)\n```"
+        "description": "Represents a course configuration.\n\n**Usage:**\n```python\nCourseConfig(\n    course_id=\"CS 101\",\n    credits=3,\n    capacity=30,\n    room=[\"Room 101\"],\n    lab=[],\n    conflicts=[],\n    faculty=[\"Dr. Smith\"],\n)\n```\n\nPython type: `CourseConfig`."
       },
       "CourseInstanceResponse": {
         "properties": {
@@ -1410,7 +1410,7 @@
           "hybrid"
         ],
         "title": "CourseModality",
-        "description": "Required mixture of meeting delivery modes for a course section."
+        "description": "Required mixture of meeting delivery modes for a course section.\n\nPython type: `CourseModality`."
       },
       "Day": {
         "type": "string",
@@ -1421,7 +1421,7 @@
           "THU",
           "FRI"
         ],
-        "description": "Day of the week",
+        "description": "Day of the week\n\nPython type: `Day`.",
         "example": "MON"
       },
       "DayFeasibilityDiagnosticResponse": {
@@ -1489,24 +1489,24 @@
           "online"
         ],
         "title": "DeliveryMode",
-        "description": "Delivery mode for one generated meeting."
+        "description": "Delivery mode for one generated meeting.\n\nPython type: `DeliveryMode`."
       },
       "Faculty": {
         "type": "string",
-        "description": "Faculty name",
+        "description": "Faculty name\n\nPython type: `Faculty`.",
         "example": "Dr. Smith"
       },
       "FacultyConfig-Input": {
         "properties": {
           "name": {
             "$ref": "#/components/schemas/Faculty",
-            "description": "Faculty member\"s name"
+            "description": "Faculty member\"s name\n\nPython type: `Faculty`."
           },
           "maximum_credits": {
             "type": "integer",
             "minimum": 0.0,
             "title": "Maximum Credits",
-            "description": "Maximum credit hours they can teach",
+            "description": "Maximum credit hours they can teach\n\nPython type: `int`.",
             "example": 12
           },
           "maximum_days": {
@@ -1514,7 +1514,7 @@
             "maximum": 5.0,
             "minimum": 0.0,
             "title": "Maximum Days",
-            "description": "Maximum number of days they are willing to teach (0-5, optional)",
+            "description": "Maximum number of days they are willing to teach (0-5, optional)\n\nPython type: `int`.",
             "default": 5,
             "example": 3
           },
@@ -1522,14 +1522,14 @@
             "type": "integer",
             "minimum": 0.0,
             "title": "Minimum Credits",
-            "description": "Minimum credit hours they must teach",
+            "description": "Minimum credit hours they must teach\n\nPython type: `int`.",
             "example": 3
           },
           "unique_course_limit": {
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Unique Course Limit",
-            "description": "Maximum number of different courses they can teach",
+            "description": "Maximum number of different courses they can teach\n\nPython type: `int`.",
             "example": 3
           },
           "times": {
@@ -1544,7 +1544,7 @@
             },
             "type": "object",
             "title": "Times",
-            "description": "Availability ranges keyed by weekday; omitted days and empty lists mean unavailable",
+            "description": "Availability ranges keyed by weekday; omitted days and empty lists mean unavailable\n\nPython type: `dict[Day, list[TimeRange]]`.",
             "example": {
               "MON": [
                 "10:00-12:00"
@@ -1563,7 +1563,7 @@
             },
             "type": "object",
             "title": "Course Preferences",
-            "description": "Dictionary mapping course IDs to preference scores",
+            "description": "Dictionary mapping course IDs to preference scores\n\nPython type: `dict[Course, Preference]`.",
             "example": {
               "CS 101": 5
             }
@@ -1577,7 +1577,7 @@
             },
             "type": "object",
             "title": "Room Preferences",
-            "description": "Dictionary mapping room IDs to preference scores",
+            "description": "Dictionary mapping room IDs to preference scores\n\nPython type: `dict[Room, Preference]`.",
             "example": {
               "Room 101": 5
             }
@@ -1591,7 +1591,7 @@
             },
             "type": "object",
             "title": "Lab Preferences",
-            "description": "Dictionary mapping lab IDs to preference scores",
+            "description": "Dictionary mapping lab IDs to preference scores\n\nPython type: `dict[Lab, Preference]`.",
             "example": {
               "Lab 101": 5
             }
@@ -1603,7 +1603,7 @@
             "type": "array",
             "uniqueItems": true,
             "title": "Mandatory Days",
-            "description": "Set of days the faculty must teach on",
+            "description": "Set of days the faculty must teach on\n\nPython type: `set[Day]`.",
             "example": [
               "MON",
               "WED"
@@ -1620,19 +1620,19 @@
           "times"
         ],
         "title": "FacultyConfig",
-        "description": "Represents a faculty configuration.\n\n**Usage:**\n```python\nFacultyConfig(name=\"Dr. Smith\", maximum_credits=12, minimum_credits=3, ...)\n```"
+        "description": "Represents a faculty configuration.\n\n**Usage:**\n```python\nFacultyConfig(name=\"Dr. Smith\", maximum_credits=12, minimum_credits=3, ...)\n```\n\nPython type: `FacultyConfig`."
       },
       "FacultyConfig-Output": {
         "properties": {
           "name": {
             "$ref": "#/components/schemas/Faculty",
-            "description": "Faculty member\"s name"
+            "description": "Faculty member\"s name\n\nPython type: `Faculty`."
           },
           "maximum_credits": {
             "type": "integer",
             "minimum": 0.0,
             "title": "Maximum Credits",
-            "description": "Maximum credit hours they can teach",
+            "description": "Maximum credit hours they can teach\n\nPython type: `int`.",
             "example": 12
           },
           "maximum_days": {
@@ -1640,7 +1640,7 @@
             "maximum": 5.0,
             "minimum": 0.0,
             "title": "Maximum Days",
-            "description": "Maximum number of days they are willing to teach (0-5, optional)",
+            "description": "Maximum number of days they are willing to teach (0-5, optional)\n\nPython type: `int`.",
             "default": 5,
             "example": 3
           },
@@ -1648,14 +1648,14 @@
             "type": "integer",
             "minimum": 0.0,
             "title": "Minimum Credits",
-            "description": "Minimum credit hours they must teach",
+            "description": "Minimum credit hours they must teach\n\nPython type: `int`.",
             "example": 3
           },
           "unique_course_limit": {
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Unique Course Limit",
-            "description": "Maximum number of different courses they can teach",
+            "description": "Maximum number of different courses they can teach\n\nPython type: `int`.",
             "example": 3
           },
           "times": {
@@ -1670,7 +1670,7 @@
             },
             "type": "object",
             "title": "Times",
-            "description": "Availability ranges keyed by weekday; omitted days and empty lists mean unavailable",
+            "description": "Availability ranges keyed by weekday; omitted days and empty lists mean unavailable\n\nPython type: `dict[Day, list[TimeRange]]`.",
             "example": {
               "MON": [
                 "10:00-12:00"
@@ -1689,7 +1689,7 @@
             },
             "type": "object",
             "title": "Course Preferences",
-            "description": "Dictionary mapping course IDs to preference scores",
+            "description": "Dictionary mapping course IDs to preference scores\n\nPython type: `dict[Course, Preference]`.",
             "example": {
               "CS 101": 5
             }
@@ -1703,7 +1703,7 @@
             },
             "type": "object",
             "title": "Room Preferences",
-            "description": "Dictionary mapping room IDs to preference scores",
+            "description": "Dictionary mapping room IDs to preference scores\n\nPython type: `dict[Room, Preference]`.",
             "example": {
               "Room 101": 5
             }
@@ -1717,7 +1717,7 @@
             },
             "type": "object",
             "title": "Lab Preferences",
-            "description": "Dictionary mapping lab IDs to preference scores",
+            "description": "Dictionary mapping lab IDs to preference scores\n\nPython type: `dict[Lab, Preference]`.",
             "example": {
               "Lab 101": 5
             }
@@ -1729,7 +1729,7 @@
             "type": "array",
             "uniqueItems": true,
             "title": "Mandatory Days",
-            "description": "Set of days the faculty must teach on",
+            "description": "Set of days the faculty must teach on\n\nPython type: `set[Day]`.",
             "example": [
               "MON",
               "WED"
@@ -1746,7 +1746,7 @@
           "times"
         ],
         "title": "FacultyConfig",
-        "description": "Represents a faculty configuration.\n\n**Usage:**\n```python\nFacultyConfig(name=\"Dr. Smith\", maximum_credits=12, minimum_credits=3, ...)\n```"
+        "description": "Represents a faculty configuration.\n\n**Usage:**\n```python\nFacultyConfig(name=\"Dr. Smith\", maximum_credits=12, minimum_credits=3, ...)\n```\n\nPython type: `FacultyConfig`."
       },
       "FacultyWorkloadDiagnosticResponse": {
         "properties": {
@@ -1872,7 +1872,7 @@
       },
       "Lab": {
         "type": "string",
-        "description": "Lab name",
+        "description": "Lab name\n\nPython type: `Lab`.",
         "example": "Lab 101"
       },
       "LabConfig-Input": {
@@ -1881,13 +1881,13 @@
             "type": "string",
             "minLength": 1,
             "title": "Name",
-            "description": "Unique, nonblank lab name used by references and schedule output"
+            "description": "Unique, nonblank lab name used by references and schedule output\n\nPython type: `str`."
           },
           "capacity": {
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Capacity",
-            "description": "Maximum number of students the lab can accommodate"
+            "description": "Maximum number of students the lab can accommodate\n\nPython type: `int`."
           },
           "features": {
             "items": {
@@ -1896,7 +1896,7 @@
             "type": "array",
             "uniqueItems": true,
             "title": "Features",
-            "description": "Facility and equipment feature tags supplied by this lab"
+            "description": "Facility and equipment feature tags supplied by this lab\n\nPython type: `set[str]`."
           },
           "times": {
             "anyOf": [
@@ -1917,7 +1917,7 @@
               }
             ],
             "title": "Times",
-            "description": "Optional weekday lab availability windows; null means unrestricted availability"
+            "description": "Optional weekday lab availability windows; null means unrestricted availability\n\nPython type: `dict[Day, list[TimeRange]] | None`."
           }
         },
         "additionalProperties": false,
@@ -1927,7 +1927,7 @@
           "capacity"
         ],
         "title": "LabConfig",
-        "description": "A laboratory resource that can be assigned to a section's lab meeting.\n\nFields:\n    name: Unique, nonblank identifier used by course lab candidates, faculty\n        preferences, generated schedules, and diagnostics.\n    capacity: Positive count of usable student seats. Lab assignments require\n        a value at least as large as the course section capacity.\n    features: Facility or equipment tags supplied by the lab. A lab is\n        eligible only when it contains every feature required by the course.\n    times: Optional availability windows for every scheduler weekday. ``None``\n        means unrestricted availability; a mapping restricts the lab meeting\n        to the listed windows."
+        "description": "A laboratory resource that can be assigned to a section's lab meeting.\n\nFields:\n    name: Unique, nonblank identifier used by course lab candidates, faculty\n        preferences, generated schedules, and diagnostics.\n    capacity: Positive count of usable student seats. Lab assignments require\n        a value at least as large as the course section capacity.\n    features: Facility or equipment tags supplied by the lab. A lab is\n        eligible only when it contains every feature required by the course.\n    times: Optional availability windows for every scheduler weekday. ``None``\n        means unrestricted availability; a mapping restricts the lab meeting\n        to the listed windows.\n\nPython type: `LabConfig`."
       },
       "LabConfig-Output": {
         "properties": {
@@ -1935,13 +1935,13 @@
             "type": "string",
             "minLength": 1,
             "title": "Name",
-            "description": "Unique, nonblank lab name used by references and schedule output"
+            "description": "Unique, nonblank lab name used by references and schedule output\n\nPython type: `str`."
           },
           "capacity": {
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Capacity",
-            "description": "Maximum number of students the lab can accommodate"
+            "description": "Maximum number of students the lab can accommodate\n\nPython type: `int`."
           },
           "features": {
             "items": {
@@ -1950,7 +1950,7 @@
             "type": "array",
             "uniqueItems": true,
             "title": "Features",
-            "description": "Facility and equipment feature tags supplied by this lab"
+            "description": "Facility and equipment feature tags supplied by this lab\n\nPython type: `set[str]`."
           },
           "times": {
             "anyOf": [
@@ -1971,7 +1971,7 @@
               }
             ],
             "title": "Times",
-            "description": "Optional weekday lab availability windows; null means unrestricted availability"
+            "description": "Optional weekday lab availability windows; null means unrestricted availability\n\nPython type: `dict[Day, list[TimeRange]] | None`."
           }
         },
         "additionalProperties": false,
@@ -1981,7 +1981,7 @@
           "capacity"
         ],
         "title": "LabConfig",
-        "description": "A laboratory resource that can be assigned to a section's lab meeting.\n\nFields:\n    name: Unique, nonblank identifier used by course lab candidates, faculty\n        preferences, generated schedules, and diagnostics.\n    capacity: Positive count of usable student seats. Lab assignments require\n        a value at least as large as the course section capacity.\n    features: Facility or equipment tags supplied by the lab. A lab is\n        eligible only when it contains every feature required by the course.\n    times: Optional availability windows for every scheduler weekday. ``None``\n        means unrestricted availability; a mapping restricts the lab meeting\n        to the listed windows."
+        "description": "A laboratory resource that can be assigned to a section's lab meeting.\n\nFields:\n    name: Unique, nonblank identifier used by course lab candidates, faculty\n        preferences, generated schedules, and diagnostics.\n    capacity: Positive count of usable student seats. Lab assignments require\n        a value at least as large as the course section capacity.\n    features: Facility or equipment tags supplied by the lab. A lab is\n        eligible only when it contains every feature required by the course.\n    times: Optional availability windows for every scheduler weekday. ``None``\n        means unrestricted availability; a mapping restricts the lab meeting\n        to the listed windows.\n\nPython type: `LabConfig`."
       },
       "Meeting": {
         "properties": {
@@ -1997,24 +1997,24 @@
                 "type": "null"
               }
             ],
-            "description": "Fixed start for this meeting; overrides the containing pattern start time"
+            "description": "Fixed start for this meeting; overrides the containing pattern start time\n\nPython type: `TimeString | None`."
           },
           "duration": {
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Duration",
-            "description": "Duration of the meeting in minutes",
+            "description": "Duration of the meeting in minutes\n\nPython type: `int`.",
             "example": 150
           },
           "lab": {
             "type": "boolean",
             "title": "Lab",
-            "description": "Whether this is the pattern's single lab meeting",
+            "description": "Whether this is the pattern's single lab meeting\n\nPython type: `bool`.",
             "default": false
           },
           "delivery": {
             "$ref": "#/components/schemas/DeliveryMode",
-            "description": "Whether this meeting is held in person or online",
+            "description": "Whether this meeting is held in person or online\n\nPython type: `DeliveryMode`.",
             "default": "in_person"
           }
         },
@@ -2025,7 +2025,7 @@
           "duration"
         ],
         "title": "Meeting",
-        "description": "Represents a single meeting instance.\n\n**Usage:**\n```python\nMeeting(day=\"MON\", duration=90, lab=False)\n```"
+        "description": "Represents a single meeting instance.\n\n**Usage:**\n```python\nMeeting(day=\"MON\", duration=90, lab=False)\n```\n\nPython type: `Meeting`."
       },
       "MessageResponse": {
         "properties": {
@@ -2087,7 +2087,7 @@
         "type": "integer",
         "maximum": 10.0,
         "minimum": 0.0,
-        "description": "Preference score between 0 and 10",
+        "description": "Preference score between 0 and 10\n\nPython type: `Preference`.",
         "example": 5
       },
       "ProvenanceEdgeResponse": {
@@ -2243,7 +2243,7 @@
       },
       "Room": {
         "type": "string",
-        "description": "Room name",
+        "description": "Room name\n\nPython type: `Room`.",
         "example": "Room 101"
       },
       "RoomConfig-Input": {
@@ -2252,13 +2252,13 @@
             "type": "string",
             "minLength": 1,
             "title": "Name",
-            "description": "Unique, nonblank room name used by references and schedule output"
+            "description": "Unique, nonblank room name used by references and schedule output\n\nPython type: `str`."
           },
           "capacity": {
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Capacity",
-            "description": "Maximum number of students the room can accommodate"
+            "description": "Maximum number of students the room can accommodate\n\nPython type: `int`."
           },
           "features": {
             "items": {
@@ -2267,7 +2267,7 @@
             "type": "array",
             "uniqueItems": true,
             "title": "Features",
-            "description": "Facility and equipment feature tags supplied by this room"
+            "description": "Facility and equipment feature tags supplied by this room\n\nPython type: `set[str]`."
           },
           "times": {
             "anyOf": [
@@ -2288,7 +2288,7 @@
               }
             ],
             "title": "Times",
-            "description": "Optional weekday room availability windows; null means unrestricted availability"
+            "description": "Optional weekday room availability windows; null means unrestricted availability\n\nPython type: `dict[Day, list[TimeRange]] | None`."
           }
         },
         "additionalProperties": false,
@@ -2298,7 +2298,7 @@
           "capacity"
         ],
         "title": "RoomConfig",
-        "description": "A lecture-room resource that can be assigned to physical course meetings.\n\nFields:\n    name: Unique, nonblank identifier used by course room candidates,\n        faculty preferences, generated schedules, and diagnostics.\n    capacity: Positive count of usable student seats. Physical assignments\n        require a value at least as large as the course section capacity.\n    features: Facility or equipment tags supplied by the room. A room is\n        eligible only when it contains every feature required by the course.\n    times: Optional availability windows for every scheduler weekday. ``None``\n        means unrestricted availability; a mapping restricts occupancy to the\n        listed windows."
+        "description": "A lecture-room resource that can be assigned to physical course meetings.\n\nFields:\n    name: Unique, nonblank identifier used by course room candidates,\n        faculty preferences, generated schedules, and diagnostics.\n    capacity: Positive count of usable student seats. Physical assignments\n        require a value at least as large as the course section capacity.\n    features: Facility or equipment tags supplied by the room. A room is\n        eligible only when it contains every feature required by the course.\n    times: Optional availability windows for every scheduler weekday. ``None``\n        means unrestricted availability; a mapping restricts occupancy to the\n        listed windows.\n\nPython type: `RoomConfig`."
       },
       "RoomConfig-Output": {
         "properties": {
@@ -2306,13 +2306,13 @@
             "type": "string",
             "minLength": 1,
             "title": "Name",
-            "description": "Unique, nonblank room name used by references and schedule output"
+            "description": "Unique, nonblank room name used by references and schedule output\n\nPython type: `str`."
           },
           "capacity": {
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Capacity",
-            "description": "Maximum number of students the room can accommodate"
+            "description": "Maximum number of students the room can accommodate\n\nPython type: `int`."
           },
           "features": {
             "items": {
@@ -2321,7 +2321,7 @@
             "type": "array",
             "uniqueItems": true,
             "title": "Features",
-            "description": "Facility and equipment feature tags supplied by this room"
+            "description": "Facility and equipment feature tags supplied by this room\n\nPython type: `set[str]`."
           },
           "times": {
             "anyOf": [
@@ -2342,7 +2342,7 @@
               }
             ],
             "title": "Times",
-            "description": "Optional weekday room availability windows; null means unrestricted availability"
+            "description": "Optional weekday room availability windows; null means unrestricted availability\n\nPython type: `dict[Day, list[TimeRange]] | None`."
           }
         },
         "additionalProperties": false,
@@ -2352,7 +2352,7 @@
           "capacity"
         ],
         "title": "RoomConfig",
-        "description": "A lecture-room resource that can be assigned to physical course meetings.\n\nFields:\n    name: Unique, nonblank identifier used by course room candidates,\n        faculty preferences, generated schedules, and diagnostics.\n    capacity: Positive count of usable student seats. Physical assignments\n        require a value at least as large as the course section capacity.\n    features: Facility or equipment tags supplied by the room. A room is\n        eligible only when it contains every feature required by the course.\n    times: Optional availability windows for every scheduler weekday. ``None``\n        means unrestricted availability; a mapping restricts occupancy to the\n        listed windows."
+        "description": "A lecture-room resource that can be assigned to physical course meetings.\n\nFields:\n    name: Unique, nonblank identifier used by course room candidates,\n        faculty preferences, generated schedules, and diagnostics.\n    capacity: Positive count of usable student seats. Physical assignments\n        require a value at least as large as the course section capacity.\n    features: Facility or equipment tags supplied by the room. A room is\n        eligible only when it contains every feature required by the course.\n    times: Optional availability windows for every scheduler weekday. ``None``\n        means unrestricted availability; a mapping restricts occupancy to the\n        listed windows.\n\nPython type: `RoomConfig`."
       },
       "ScheduleAuditResponse": {
         "properties": {
@@ -2844,7 +2844,7 @@
             "type": "array",
             "minItems": 1,
             "title": "Rooms",
-            "description": "List of available room definitions",
+            "description": "List of available room definitions\n\nPython type: `list[RoomConfig]`.",
             "example": [
               {
                 "capacity": 40,
@@ -2858,7 +2858,7 @@
             },
             "type": "array",
             "title": "Labs",
-            "description": "List of available lab definitions",
+            "description": "List of available lab definitions\n\nPython type: `list[LabConfig]`.",
             "example": [
               {
                 "capacity": 24,
@@ -2873,7 +2873,7 @@
             "type": "array",
             "minItems": 1,
             "title": "Courses",
-            "description": "List of course configurations",
+            "description": "List of course configurations\n\nPython type: `list[CourseConfig]`.",
             "example": [
               {
                 "capacity": 24,
@@ -2901,7 +2901,7 @@
             "type": "array",
             "minItems": 1,
             "title": "Faculty",
-            "description": "List of faculty configurations",
+            "description": "List of faculty configurations\n\nPython type: `list[FacultyConfig]`.",
             "example": [
               {
                 "course_preferences": {
@@ -2942,7 +2942,7 @@
           "faculty"
         ],
         "title": "SchedulerConfig",
-        "description": "Represents a scheduler configuration.\n\n**Usage:**\n```python\nSchedulerConfig(\n    rooms=[RoomConfig(name=\"Room 101\", capacity=40)],\n    labs=[LabConfig(name=\"Lab 101\", capacity=24)],\n    courses=[...],\n    faculty=[...],\n)\n```"
+        "description": "Represents a scheduler configuration.\n\n**Usage:**\n```python\nSchedulerConfig(\n    rooms=[RoomConfig(name=\"Room 101\", capacity=40)],\n    labs=[LabConfig(name=\"Lab 101\", capacity=24)],\n    courses=[...],\n    faculty=[...],\n)\n```\n\nPython type: `SchedulerConfig`."
       },
       "SchedulerConfig-Output": {
         "properties": {
@@ -2953,7 +2953,7 @@
             "type": "array",
             "minItems": 1,
             "title": "Rooms",
-            "description": "List of available room definitions",
+            "description": "List of available room definitions\n\nPython type: `list[RoomConfig]`.",
             "example": [
               {
                 "capacity": 40,
@@ -2967,7 +2967,7 @@
             },
             "type": "array",
             "title": "Labs",
-            "description": "List of available lab definitions",
+            "description": "List of available lab definitions\n\nPython type: `list[LabConfig]`.",
             "example": [
               {
                 "capacity": 24,
@@ -2982,7 +2982,7 @@
             "type": "array",
             "minItems": 1,
             "title": "Courses",
-            "description": "List of course configurations",
+            "description": "List of course configurations\n\nPython type: `list[CourseConfig]`.",
             "example": [
               {
                 "capacity": 24,
@@ -3010,7 +3010,7 @@
             "type": "array",
             "minItems": 1,
             "title": "Faculty",
-            "description": "List of faculty configurations",
+            "description": "List of faculty configurations\n\nPython type: `list[FacultyConfig]`.",
             "example": [
               {
                 "course_preferences": {
@@ -3051,7 +3051,7 @@
           "faculty"
         ],
         "title": "SchedulerConfig",
-        "description": "Represents a scheduler configuration.\n\n**Usage:**\n```python\nSchedulerConfig(\n    rooms=[RoomConfig(name=\"Room 101\", capacity=40)],\n    labs=[LabConfig(name=\"Lab 101\", capacity=24)],\n    courses=[...],\n    faculty=[...],\n)\n```"
+        "description": "Represents a scheduler configuration.\n\n**Usage:**\n```python\nSchedulerConfig(\n    rooms=[RoomConfig(name=\"Room 101\", capacity=40)],\n    labs=[LabConfig(name=\"Lab 101\", capacity=24)],\n    courses=[...],\n    faculty=[...],\n)\n```\n\nPython type: `SchedulerConfig`."
       },
       "SessionDiagnosticResponse": {
         "properties": {
@@ -3192,19 +3192,19 @@
         "properties": {
           "start": {
             "$ref": "#/components/schemas/TimeString",
-            "description": "Start time of the time block",
+            "description": "Start time of the time block\n\nPython type: `TimeString`.",
             "example": "10:00"
           },
           "spacing": {
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Spacing",
-            "description": "Time spacing between slots in minutes",
+            "description": "Time spacing between slots in minutes\n\nPython type: `int`.",
             "example": 60
           },
           "end": {
             "$ref": "#/components/schemas/TimeString",
-            "description": "End time of the time block",
+            "description": "End time of the time block\n\nPython type: `TimeString`.",
             "example": "17:00"
           }
         },
@@ -3216,24 +3216,24 @@
           "end"
         ],
         "title": "TimeBlock",
-        "description": "Represents a time block within a day.\n\n**Usage:**\n```python\nTimeBlock(start=\"09:00\", spacing=60, end=\"17:00\")\n```"
+        "description": "Represents a time block within a day.\n\n**Usage:**\n```python\nTimeBlock(start=\"09:00\", spacing=60, end=\"17:00\")\n```\n\nPython type: `TimeBlock`."
       },
       "TimeBlock-Output": {
         "properties": {
           "start": {
             "$ref": "#/components/schemas/TimeString",
-            "description": "Start time of the time block"
+            "description": "Start time of the time block\n\nPython type: `TimeString`."
           },
           "spacing": {
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Spacing",
-            "description": "Time spacing between slots in minutes",
+            "description": "Time spacing between slots in minutes\n\nPython type: `int`.",
             "example": 60
           },
           "end": {
             "$ref": "#/components/schemas/TimeString",
-            "description": "End time of the time block",
+            "description": "End time of the time block\n\nPython type: `TimeString`.",
             "example": "17:00"
           }
         },
@@ -3245,7 +3245,7 @@
           "end"
         ],
         "title": "TimeBlock",
-        "description": "Represents a time block within a day.\n\n**Usage:**\n```python\nTimeBlock(start=\"09:00\", spacing=60, end=\"17:00\")\n```"
+        "description": "Represents a time block within a day.\n\n**Usage:**\n```python\nTimeBlock(start=\"09:00\", spacing=60, end=\"17:00\")\n```\n\nPython type: `TimeBlock`."
       },
       "TimeInstanceResponse": {
         "properties": {
@@ -3289,12 +3289,12 @@
         "properties": {
           "start": {
             "$ref": "#/components/schemas/TimeString",
-            "description": "Start time of the time range",
+            "description": "Start time of the time range\n\nPython type: `TimeString`.",
             "example": "10:00"
           },
           "end": {
             "$ref": "#/components/schemas/TimeString",
-            "description": "End time of the time range",
+            "description": "End time of the time range\n\nPython type: `TimeString`.",
             "example": "17:00"
           }
         },
@@ -3305,17 +3305,17 @@
           "end"
         ],
         "title": "TimeRange",
-        "description": "A time range with start and end times, ensuring start < end.\n\n**Usage:**\n```python\nTimeRange(start=\"09:00\", end=\"17:00\")\n```"
+        "description": "A time range with start and end times, ensuring start < end.\n\n**Usage:**\n```python\nTimeRange(start=\"09:00\", end=\"17:00\")\n```\n\nPython type: `TimeRange`."
       },
       "TimeRange-Output": {
         "properties": {
           "start": {
             "$ref": "#/components/schemas/TimeString",
-            "description": "Start time of the time range"
+            "description": "Start time of the time range\n\nPython type: `TimeString`."
           },
           "end": {
             "$ref": "#/components/schemas/TimeString",
-            "description": "End time of the time range",
+            "description": "End time of the time range\n\nPython type: `TimeString`.",
             "example": "17:00"
           }
         },
@@ -3326,7 +3326,7 @@
           "end"
         ],
         "title": "TimeRange",
-        "description": "A time range with start and end times, ensuring start < end.\n\n**Usage:**\n```python\nTimeRange(start=\"09:00\", end=\"17:00\")\n```"
+        "description": "A time range with start and end times, ensuring start < end.\n\n**Usage:**\n```python\nTimeRange(start=\"09:00\", end=\"17:00\")\n```\n\nPython type: `TimeRange`."
       },
       "TimeSlotConfig-Input": {
         "properties": {
@@ -3342,7 +3342,7 @@
             },
             "type": "object",
             "title": "Times",
-            "description": "Time blocks keyed by weekday; every Monday-Friday list must be non-empty"
+            "description": "Time blocks keyed by weekday; every Monday-Friday list must be non-empty\n\nPython type: `dict[Day, list[TimeBlock]]`."
           },
           "classes": {
             "items": {
@@ -3350,14 +3350,14 @@
             },
             "type": "array",
             "title": "Classes",
-            "description": "Meeting patterns; at least one pattern must be enabled"
+            "description": "Meeting patterns; at least one pattern must be enabled\n\nPython type: `list[ClassPattern]`."
           },
           "max_time_gap": {
             "type": "integer",
             "minimum": 0.0,
             "exclusiveMinimum": 0.0,
             "title": "Max Time Gap",
-            "description": "Maximum gap in minutes used to determine whether meetings are adjacent",
+            "description": "Maximum gap in minutes used to determine whether meetings are adjacent\n\nPython type: `int`.",
             "default": 30,
             "example": 30
           },
@@ -3365,7 +3365,7 @@
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Min Time Overlap",
-            "description": "Minimum clock-time overlap in minutes between meetings on different pattern days",
+            "description": "Minimum clock-time overlap in minutes between meetings on different pattern days\n\nPython type: `int`.",
             "default": 45,
             "example": 45
           }
@@ -3377,7 +3377,7 @@
           "classes"
         ],
         "title": "TimeSlotConfig",
-        "description": "Represents a time slot configuration.\n\n**Usage:**\n```python\nTimeSlotConfig(times={...}, classes=[...])\n```"
+        "description": "Represents a time slot configuration.\n\n**Usage:**\n```python\nTimeSlotConfig(times={...}, classes=[...])\n```\n\nPython type: `TimeSlotConfig`."
       },
       "TimeSlotConfig-Output": {
         "properties": {
@@ -3393,7 +3393,7 @@
             },
             "type": "object",
             "title": "Times",
-            "description": "Time blocks keyed by weekday; every Monday-Friday list must be non-empty"
+            "description": "Time blocks keyed by weekday; every Monday-Friday list must be non-empty\n\nPython type: `dict[Day, list[TimeBlock]]`."
           },
           "classes": {
             "items": {
@@ -3401,14 +3401,14 @@
             },
             "type": "array",
             "title": "Classes",
-            "description": "Meeting patterns; at least one pattern must be enabled"
+            "description": "Meeting patterns; at least one pattern must be enabled\n\nPython type: `list[ClassPattern]`."
           },
           "max_time_gap": {
             "type": "integer",
             "minimum": 0.0,
             "exclusiveMinimum": 0.0,
             "title": "Max Time Gap",
-            "description": "Maximum gap in minutes used to determine whether meetings are adjacent",
+            "description": "Maximum gap in minutes used to determine whether meetings are adjacent\n\nPython type: `int`.",
             "default": 30,
             "example": 30
           },
@@ -3416,7 +3416,7 @@
             "type": "integer",
             "exclusiveMinimum": 0.0,
             "title": "Min Time Overlap",
-            "description": "Minimum clock-time overlap in minutes between meetings on different pattern days",
+            "description": "Minimum clock-time overlap in minutes between meetings on different pattern days\n\nPython type: `int`.",
             "default": 45,
             "example": 45
           }
@@ -3428,12 +3428,12 @@
           "classes"
         ],
         "title": "TimeSlotConfig",
-        "description": "Represents a time slot configuration.\n\n**Usage:**\n```python\nTimeSlotConfig(times={...}, classes=[...])\n```"
+        "description": "Represents a time slot configuration.\n\n**Usage:**\n```python\nTimeSlotConfig(times={...}, classes=[...])\n```\n\nPython type: `TimeSlotConfig`."
       },
       "TimeString": {
         "type": "string",
         "pattern": "^([0-1][0-9]|2[0-3]):[0-5][0-9]$",
-        "description": "Time in HH:MM format",
+        "description": "Time in HH:MM format\n\nPython type: `TimeString`.",
         "example": "10:00"
       },
       "ValidationError": {

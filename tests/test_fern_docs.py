@@ -94,3 +94,14 @@ def test_combined_config_schema_descriptions_include_python_types() -> None:
     assert "Python type: `list[Room]`." in course_properties["room"]["description"]
     assert "Python type: `set[str]`." in course_properties["required_room_features"]["description"]
     assert "Python type: `dict[Day, list[TimeRange]] | None`." in room_properties["times"]["description"]
+
+
+def test_openapi_config_schema_descriptions_include_python_types() -> None:
+    """Keep the rendered Fern schema's Python types aligned with the download."""
+    schema = json.loads((ROOT / "fern" / "openapi.json").read_text(encoding="utf-8"))["components"]["schemas"]
+
+    assert "Python type: `list[Room]`." in schema["CourseConfig-Input"]["properties"]["room"]["description"]
+    assert (
+        "Python type: `set[str]`."
+        in schema["CourseConfig-Input"]["properties"]["required_room_features"]["description"]
+    )
