@@ -1,4 +1,4 @@
-name: Python Linting and Type Checking
+name: CI
 
 on:
   push:
