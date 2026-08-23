@@ -13,7 +13,8 @@ description: >-
 - **`.github/workflows/linting.yml`**:
   - `lint` job: `uv sync --locked --group dev` then `uv run prek run --all-files`
   - `test` job: `uv sync --locked --group dev` then `uv run pytest`
-  - Both jobs run on Python `3.12` and `3.13`
+  - The lint job runs on Ubuntu with Python `3.12`–`3.14`.
+  - The test job runs on Ubuntu, macOS, and Windows with Python `3.12`–`3.14`.
 - **`.github/workflows/docs.yml`**: Fern docs build/deploy (see file for triggers and secrets).
 - **`.github/workflows/publish.yml`**: Package publish pipeline.
 
