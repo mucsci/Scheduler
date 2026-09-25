@@ -99,7 +99,12 @@ def test_auditor_reports_alternate_faculty_availability_violation() -> None:
 
     audit = auditor.audit_schedule(schedule)
 
-    assert any(item.kind == "alternate_faculty_availability" for item in audit.constraint_violations)
+    diagnostic = next(item for item in audit.constraint_violations if item.kind == "alternate_faculty_availability")
+    assert diagnostic.locations == (
+        "/config/courses/0/alternate_faculty",
+        "/config/faculty/1/times",
+        "/time_slot_config/classes",
+    )
 
 
 @pytest.mark.parametrize(

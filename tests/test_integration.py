@@ -99,7 +99,16 @@ def test_alternate_faculty_availability_is_a_hard_constraint() -> None:
     )
     data["config"]["courses"][0]["alternate_faculty"] = ["F2"]
 
-    assert next(Scheduler(CombinedConfig.model_validate(data)).get_models(), None) is None
+    scheduler = Scheduler(CombinedConfig.model_validate(data))
+    assert next(scheduler.get_models(), None) is None
+    diagnostic = next(
+        item for item in scheduler.diagnose().conflicting_constraints if item.kind == "alternate_faculty_availability"
+    )
+    assert diagnostic.locations == (
+        "/config/courses/0/alternate_faculty",
+        "/config/faculty/1/times",
+        "/time_slot_config/classes",
+    )
 
 
 def test_schedule_respects_conflicts(two_course_combined_config: CombinedConfig) -> None:
