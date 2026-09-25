@@ -86,6 +86,22 @@ def test_schedule_respects_faculty_availability(minimal_combined_config: Combine
     _assert_faculty_availability(model, minimal_combined_config)
 
 
+def test_alternate_faculty_availability_is_a_hard_constraint() -> None:
+    data = json.loads((Path(__file__).parent / "fixtures" / "minimal_config.json").read_text(encoding="utf-8"))
+    data["config"]["faculty"].append(
+        {
+            "name": "F2",
+            "maximum_credits": 0,
+            "minimum_credits": 0,
+            "unique_course_limit": 1,
+            "times": {"MON": ["08:00-09:00"], "WED": ["08:00-09:00"]},
+        }
+    )
+    data["config"]["courses"][0]["alternate_faculty"] = ["F2"]
+
+    assert next(Scheduler(CombinedConfig.model_validate(data)).get_models(), None) is None
+
+
 def test_schedule_respects_conflicts(two_course_combined_config: CombinedConfig) -> None:
     sched = Scheduler(two_course_combined_config)
     model = next(sched.get_models(), None)

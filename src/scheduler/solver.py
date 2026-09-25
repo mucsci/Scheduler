@@ -883,6 +883,24 @@ class SolverEngine:
                 )
             )
 
+            for alternate_faculty in c.alternate_faculty:
+                alternate_availability_constraint = cast(
+                    z3.BoolRef,
+                    faculty_available(
+                        z3_data.faculty_constants[alternate_faculty],
+                        self._variables(c).time,
+                    ),
+                )
+                course_constraint_list.append(alternate_availability_constraint)
+                self._diagnostic_constraints.append(
+                    DiagnosticConstraintArtifact(
+                        alternate_availability_constraint,
+                        f"Course {c} must fit alternate faculty {alternate_faculty}'s availability",
+                        kind="alternate_faculty_availability",
+                        subjects=(str(c), alternate_faculty),
+                    )
+                )
+
             if c.labs:
                 lab_constraint = cast(
                     z3.BoolRef,

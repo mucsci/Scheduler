@@ -82,6 +82,26 @@ def test_auditor_reports_faculty_availability_violation() -> None:
     assert any(item.kind == "faculty_availability" for item in audit.constraint_violations)
 
 
+def test_auditor_reports_alternate_faculty_availability_violation() -> None:
+    data = minimal_config_data()
+    data["config"]["faculty"].append(
+        {
+            "name": "F2",
+            "maximum_credits": 0,
+            "minimum_credits": 0,
+            "unique_course_limit": 1,
+            "times": {day: ["08:00-20:00"] for day in ("MON", "TUE", "WED", "THU", "FRI")},
+        }
+    )
+    data["config"]["courses"][0]["alternate_faculty"] = ["F2"]
+    problem, schedule, auditor = _solved(config_from(data))
+    auditor._faculty_availability["F2"] = []
+
+    audit = auditor.audit_schedule(schedule)
+
+    assert any(item.kind == "alternate_faculty_availability" for item in audit.constraint_violations)
+
+
 @pytest.mark.parametrize(
     "field,value,expected_kind",
     [

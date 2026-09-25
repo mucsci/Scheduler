@@ -140,6 +140,17 @@
           ],
           "title": "Faculty"
         },
+        "alternate_faculty": {
+          "description": "Faculty who must also be available for every assigned meeting time\n\nPython type: `list[Faculty]`.",
+          "example": [
+            "Dr. Johnson"
+          ],
+          "items": {
+            "$ref": "#/$defs/Faculty"
+          },
+          "title": "Alternate Faculty",
+          "type": "array"
+        },
         "modality": {
           "$ref": "#/$defs/CourseModality",
           "default": "in_person",

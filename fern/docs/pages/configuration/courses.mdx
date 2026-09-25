@@ -21,7 +21,8 @@ contain at least one course.
   "required_lab_features": ["gpu"],
   "reserve_room_during_lab": false,
   "conflicts": ["CS102"],
-  "faculty": ["Dr. Smith", "Dr. Johnson"]
+  "faculty": ["Dr. Smith", "Dr. Johnson"],
+  "alternate_faculty": ["Dr. Lee"]
 }
 ```
 
@@ -31,6 +32,8 @@ contain at least one course.
 
 `room` may be `[]` only when a compatible pattern does not occupy a lecture room. `faculty` accepts either a non-empty
 candidate list or `null` to derive candidates from matching `course_preferences` entries.
+`alternate_faculty` defaults to `[]`. Each listed person must be a configured faculty member and must be available
+for every assigned course meeting; alternates are not eligible assigned instructors unless they also appear in `faculty`.
 
 `credits` must match an enabled class pattern. `required_room_features` and `required_lab_features` constrain the
 assigned resources, and `reserve_room_during_lab` controls whether the lecture room remains occupied during a lab.
@@ -38,7 +41,7 @@ assigned resources, and `reserve_room_during_lab` controls whether the lecture r
 ## Validation rules
 
 - Room, lab, and faculty names must exist in the corresponding global lists.
-- The `room`, `lab`, `faculty`, and `conflicts` lists cannot repeat the same name; duplicates are rejected instead
+- The `room`, `lab`, `faculty`, `alternate_faculty`, and `conflicts` lists cannot repeat the same name; duplicates are rejected instead
   of implicitly changing optimizer weights.
 - Course ids, section ids, faculty names, resource names, and feature tags cannot be blank or contain leading or
   trailing whitespace.
@@ -47,6 +50,7 @@ assigned resources, and `reserve_room_during_lab` controls whether the lecture r
 - `capacity` must be a positive integer. Resource capacity equality is accepted; undersized candidate resources
   are excluded by a hard rule rather than rejected during configuration validation.
 - `faculty: null` requires at least one faculty member with a `course_preferences` entry for that course; `faculty: []` is invalid.
+- Every `alternate_faculty` entry must name configured faculty and be available for the selected meeting pattern.
 - `online` courses cannot list rooms or labs. An `in_person` or `hybrid` section may use `room: []` only when at
   least one otherwise-compatible pattern has no in-person non-lab meeting and does not reserve a room during its lab.
 - Every course credit value needs an enabled pattern with matching lab presence and matching `modality`.

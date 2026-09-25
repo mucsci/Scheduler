@@ -22,7 +22,8 @@ online sections and separately modeled lab-only sections with `reserve_room_duri
   meeting. Additional lab sections are represented as additional course-section entries.
 - A course with `lab: []` uses a no-lab pattern and its generated `lab` and `lab_index` values are `null`.
 - The meeting pattern must have matching credits, lab presence, and course modality.
-- The assigned pattern must fit entirely within the assigned faculty member's availability.
+- The assigned pattern must fit entirely within the assigned faculty member's availability and every listed
+  `alternate_faculty` member's availability.
 
 Repeated `course_id` values are separate sections, numbered in configuration order (`CS101.01`, `CS101.02`, and
 so on) unless a stable `section_id` supplies the suffix. A `conflicts` entry names the base course id and therefore

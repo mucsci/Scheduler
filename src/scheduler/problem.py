@@ -110,6 +110,7 @@ class CoursePolicy:
         rooms: Eligible rooms.
         conflicts: Base course identifiers that must not overlap.
         faculties: Eligible faculty after explicit or preference-derived resolution.
+        alternate_faculty: Faculty who must also be available for every assigned meeting.
         config_path: JSON Pointer to the source course configuration.
         faculty_origin: Whether faculty eligibility was configured or derived.
         required_room_features: Features required on the assigned room.
@@ -128,6 +129,7 @@ class CoursePolicy:
     rooms: tuple[str, ...]
     conflicts: tuple[str, ...]
     faculties: tuple[str, ...]
+    alternate_faculty: tuple[str, ...]
     config_path: str
     faculty_origin: str
     required_room_features: frozenset[str]
@@ -280,6 +282,7 @@ class SchedulingProblem:
                 rooms=list(course_config.room),
                 conflicts=list(course_config.conflicts),
                 faculties=course_faculty,
+                alternate_faculty=list(course_config.alternate_faculty),
                 section_id=course_config.section_id,
                 modality=course_config.modality.value,
                 required_room_features=frozenset(course_config.required_room_features),
@@ -303,6 +306,7 @@ class SchedulingProblem:
                 rooms=tuple(course.rooms),
                 conflicts=tuple(course.conflicts),
                 faculties=tuple(course.faculties),
+                alternate_faculty=tuple(course.alternate_faculty),
                 config_path=course_config_paths[str(course)],
                 faculty_origin=course_faculty_origins[str(course)],
                 required_room_features=course.required_room_features,

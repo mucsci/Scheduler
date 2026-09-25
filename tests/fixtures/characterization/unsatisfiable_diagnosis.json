@@ -301,7 +301,7 @@
       ]
     }
   ],
-  "configuration_fingerprint": "c644b6c8c70b170b765ba29359c9110f56adde253b887902700bafd278306a76",
+  "configuration_fingerprint": "d042b356e76dd784895be9d23d08096fa4400b9c67ad359d049a1ab581f9097f",
   "conflicting_constraints": [
     {
       "code": "SCHED.FACULTY.CREDIT.RANGE",

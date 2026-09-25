@@ -58,6 +58,9 @@ class Course:
     The list of potential faculty for the course
     """
 
+    alternate_faculty: list[str] = field(default_factory=list)
+    """Faculty who must be available whenever this course meets, but are not teaching candidates."""
+
     section_id: str | None = None
     """Explicit stable section suffix, or null when input-order numbering is used."""
 

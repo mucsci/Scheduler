@@ -167,6 +167,7 @@ class DiagnosticEngine:
             "course_lab_resource_shortfall": "lab",
             "course_conflict": "conflicts",
             "faculty_availability": "times",
+            "alternate_faculty_availability": "alternate_faculty",
             "faculty_credit_range": None,
             "faculty_unique_course_limit": "unique_course_limit",
             "faculty_maximum_days": "maximum_days",
@@ -232,7 +233,12 @@ class DiagnosticEngine:
                     for lab in course.labs
                     for suffix in ("/capacity", "/features", "/times")
                 )
-        if kind in {"course_time_pattern", "course_lab_eligibility", "faculty_availability"}:
+        if kind in {
+            "course_time_pattern",
+            "course_lab_eligibility",
+            "faculty_availability",
+            "alternate_faculty_availability",
+        }:
             locations.append("/time_slot_config/classes")
         if kind in {"shared_room_overlap", "same_course_room"}:
             locations.append("/config/rooms")
