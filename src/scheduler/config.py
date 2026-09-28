@@ -804,6 +804,13 @@ class CourseConfig(StrictBaseModel):
     List of faculty names. `null` derives candidates from matching faculty course preferences.
     """
 
+    alternate_faculty: list[Faculty] = Field(
+        default_factory=list,
+        description="Faculty who must also be available for every assigned meeting time",
+        json_schema_extra={"example": ["Dr. Johnson"]},
+    )
+    """Faculty whose availability is a hard constraint, without making them teaching candidates."""
+
     modality: CourseModality = Field(
         default=CourseModality.IN_PERSON,
         description="Required delivery composition of the selected class pattern",
@@ -835,7 +842,7 @@ class CourseConfig(StrictBaseModel):
             raise ValueError("Faculty candidates must be non-empty or null for preference-based assignment")
         return value
 
-    @field_validator("room", "lab", "conflicts", "faculty")
+    @field_validator("room", "lab", "conflicts", "faculty", "alternate_faculty")
     @classmethod
     def _validate_unique_references(cls, value: list[str] | None) -> list[str] | None:
         if value is not None:
@@ -1336,6 +1343,15 @@ class SchedulerConfig(StrictBaseModel):
                             ("courses", course_index, "faculty", item_index),
                             faculty,
                         )
+
+            for item_index, faculty in enumerate(course.alternate_faculty):
+                if faculty not in valid_faculty:
+                    add_error(
+                        "unknown_course_alternate_faculty",
+                        f'Course "{course.course_id}" references invalid alternate faculty: {faculty}',
+                        ("courses", course_index, "alternate_faculty", item_index),
+                        faculty,
+                    )
 
         # Validate FacultyConfig references
         for faculty_index, faculty in enumerate(self.faculty):

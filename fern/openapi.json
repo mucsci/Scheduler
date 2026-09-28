@@ -1165,6 +1165,17 @@
               "Dr. Smith"
             ]
           },
+          "alternate_faculty": {
+            "items": {
+              "$ref": "#/components/schemas/Faculty"
+            },
+            "type": "array",
+            "title": "Alternate Faculty",
+            "description": "Faculty who must also be available for every assigned meeting time\n\nPython type: `list[Faculty]`.",
+            "example": [
+              "Dr. Johnson"
+            ]
+          },
           "modality": {
             "$ref": "#/components/schemas/CourseModality",
             "description": "Required delivery composition of the selected class pattern\n\nPython type: `CourseModality`.",
@@ -1286,6 +1297,17 @@
             "description": "Non-empty faculty candidates, or null to derive candidates from faculty course-preference keys\n\nPython type: `list[Faculty] | None`.",
             "example": [
               "Dr. Smith"
+            ]
+          },
+          "alternate_faculty": {
+            "items": {
+              "$ref": "#/components/schemas/Faculty"
+            },
+            "type": "array",
+            "title": "Alternate Faculty",
+            "description": "Faculty who must also be available for every assigned meeting time\n\nPython type: `list[Faculty]`.",
+            "example": [
+              "Dr. Johnson"
             ]
           },
           "modality": {

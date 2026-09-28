@@ -167,6 +167,7 @@ class DiagnosticEngine:
             "course_lab_resource_shortfall": "lab",
             "course_conflict": "conflicts",
             "faculty_availability": "times",
+            "alternate_faculty_availability": "alternate_faculty",
             "faculty_credit_range": None,
             "faculty_unique_course_limit": "unique_course_limit",
             "faculty_maximum_days": "maximum_days",
@@ -175,10 +176,11 @@ class DiagnosticEngine:
         for subject in subjects:
             course_path = self._course_config_paths.get(subject)
             if course_path is not None:
-                locations.append(f"{course_path}/{field_by_kind.get(kind, '')}".rstrip("/"))
+                field = "alternate_faculty" if kind == "alternate_faculty_availability" else field_by_kind.get(kind, "")
+                locations.append(f"{course_path}/{field}".rstrip("/"))
             faculty_path = self._faculty_config_paths.get(subject)
             if faculty_path is not None:
-                field = field_by_kind.get(kind)
+                field = "times" if kind == "alternate_faculty_availability" else field_by_kind.get(kind)
                 locations.append(f"{faculty_path}/{field}" if field else faculty_path)
             if subject in self._room_config_paths and "room" in kind and "capacity" in kind:
                 locations.append(self._room_config_paths[subject] + "/capacity")
@@ -232,7 +234,12 @@ class DiagnosticEngine:
                     for lab in course.labs
                     for suffix in ("/capacity", "/features", "/times")
                 )
-        if kind in {"course_time_pattern", "course_lab_eligibility", "faculty_availability"}:
+        if kind in {
+            "course_time_pattern",
+            "course_lab_eligibility",
+            "faculty_availability",
+            "alternate_faculty_availability",
+        }:
             locations.append("/time_slot_config/classes")
         if kind in {"shared_room_overlap", "same_course_room"}:
             locations.append("/config/rooms")

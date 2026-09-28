@@ -426,6 +426,10 @@ def test_scheduler_config_requires_nonempty_courses_and_faculty(field: str) -> N
         (lambda data: data["config"]["courses"][0].update({"room": ["missing"]}), "/config/courses/0/room/0"),
         (lambda data: data["config"]["courses"][0].update({"lab": ["missing"]}), "/config/courses/0/lab/0"),
         (lambda data: data["config"]["courses"][0].update({"faculty": ["missing"]}), "/config/courses/0/faculty/0"),
+        (
+            lambda data: data["config"]["courses"][0].update({"alternate_faculty": ["missing"]}),
+            "/config/courses/0/alternate_faculty/0",
+        ),
     ],
 )
 def test_raw_validation_reports_precise_identity_and_reference_paths(mutate, expected_path: str) -> None:
@@ -535,6 +539,20 @@ def test_course_config_rejects_documented_invalid_values(field: str, value: obje
         CourseConfig.model_validate(values)
 
 
+def test_course_config_defaults_alternate_faculty_to_empty_list() -> None:
+    course = CourseConfig(
+        course_id="CS101",
+        credits=3,
+        capacity=30,
+        room=["R1"],
+        lab=[],
+        conflicts=[],
+        faculty=["F1"],
+    )
+
+    assert course.alternate_faculty == []
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
@@ -542,6 +560,7 @@ def test_course_config_rejects_documented_invalid_values(field: str, value: obje
         ("lab", ["L1", "L1"]),
         ("conflicts", ["CS102", "CS102"]),
         ("faculty", ["F1", "F1"]),
+        ("alternate_faculty", ["F1", "F1"]),
     ],
 )
 def test_course_config_rejects_duplicate_references(field: str, value: list[str]) -> None:

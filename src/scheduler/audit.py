@@ -67,6 +67,7 @@ class ScheduleAuditor:
             "course_lab_availability": "lab",
             "course_conflict": "conflicts",
             "faculty_availability": "times",
+            "alternate_faculty_availability": "alternate_faculty",
             "faculty_credit_range": None,
             "faculty_unique_course_limit": "unique_course_limit",
             "faculty_maximum_days": "maximum_days",
@@ -75,10 +76,11 @@ class ScheduleAuditor:
         for subject in subjects:
             course_path = self._course_config_paths.get(subject)
             if course_path is not None:
-                locations.append(f"{course_path}/{field_by_kind.get(kind, '')}".rstrip("/"))
+                field = "alternate_faculty" if kind == "alternate_faculty_availability" else field_by_kind.get(kind, "")
+                locations.append(f"{course_path}/{field}".rstrip("/"))
             faculty_path = self._faculty_config_paths.get(subject)
             if faculty_path is not None:
-                field = field_by_kind.get(kind)
+                field = "times" if kind == "alternate_faculty_availability" else field_by_kind.get(kind)
                 locations.append(f"{faculty_path}/{field}" if field else faculty_path)
             if subject in self._room_config_paths and kind == "course_room_capacity":
                 locations.append(self._room_config_paths[subject] + "/capacity")
@@ -92,7 +94,12 @@ class ScheduleAuditor:
                 locations.append(self._lab_config_paths[subject] + "/features")
             if subject in self._lab_config_paths and kind == "course_lab_availability":
                 locations.append(self._lab_config_paths[subject] + "/times")
-        if kind in {"course_time_pattern", "course_lab_eligibility", "faculty_availability"}:
+        if kind in {
+            "course_time_pattern",
+            "course_lab_eligibility",
+            "faculty_availability",
+            "alternate_faculty_availability",
+        }:
             locations.append("/time_slot_config/classes")
         if kind in {"shared_room_overlap", "same_course_room"}:
             locations.append("/config/rooms")
@@ -312,6 +319,16 @@ class ScheduleAuditor:
                         f"Course {course} falls outside {instance.faculty}'s availability",
                     )
                 )
+
+            for alternate_faculty in course.alternate_faculty:
+                if not instance.time.in_time_ranges(self._faculty_availability[alternate_faculty]):
+                    violations.append(
+                        self._make_diagnostic(
+                            "alternate_faculty_availability",
+                            (str(course), alternate_faculty),
+                            f"Course {course} falls outside alternate faculty {alternate_faculty}'s availability",
+                        )
+                    )
 
         workloads: list[FacultyWorkloadDiagnostic] = []
         for faculty in self._faculty:

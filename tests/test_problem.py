@@ -23,6 +23,25 @@ def test_problem_normalizes_null_faculty_from_preferences(
     assert problem.course_policies["CS101.01"].faculty_origin == "derived_from_preferences"
 
 
+def test_problem_normalizes_alternate_faculty() -> None:
+    data = minimal_config_data()
+    data["config"]["faculty"].append(
+        {
+            "name": "F2",
+            "maximum_credits": 0,
+            "minimum_credits": 0,
+            "unique_course_limit": 1,
+            "times": {"MON": ["08:00-20:00"], "WED": ["08:00-20:00"]},
+        }
+    )
+    data["config"]["courses"][0]["alternate_faculty"] = ["F2"]
+
+    problem = SchedulingProblem.from_config(config_from(data))
+
+    assert problem.courses[0].alternate_faculty == ["F2"]
+    assert problem.course_policies["CS101.01"].alternate_faculty == ("F2",)
+
+
 def test_problem_caches_compatible_slot_domains(
     minimal_combined_config: CombinedConfig,
 ) -> None:
